@@ -75,7 +75,7 @@ guidance and too imprecise for support.
 | Version mismatch UX | Treat helper/Hub protocol mismatch as `versionMismatch`, not generic `helperError`. | The user action is specific: update or repair the ShoMetrics install so Hub and helper use a compatible protocol. |
 | Descriptor catalog state | Treat descriptor catalog pending/failure as "catalog not ready", not "metric does not exist". | Until the source catalog is available, Hub cannot prove that a selected metric is truly absent. |
 | Freshness owner | Do not introduce a second Hub-owned source freshness system. Hub consumes source/runtime freshness and unavailable reports, while sources own retained-value semantics. | The Windows helper already owns retained sample freshness and age. Duplicating stale logic in Hub would create conflicting truth sources. |
-| Hub retained-value limitation | Treat Hub's current 7s timestamp freshness gate as a known follow-up, not part of onboarding copy. | Helper-retained values may still render `N/A` until Hub consumes source-reported freshness/retained attribution. This must not turn into `Install helper` copy. |
+| Hub retained-value limitation | Treat Hub's current 7s timestamp freshness gate as a known follow-up, not part of onboarding copy. | Helper-retained values may still render `N/A` until Hub consumes source-reported freshness/retained metadata. This must not turn into `Install helper` copy. |
 | i18n scope | Define copy keys and English/Japanese/Chinese target text in this plan, but render English only until the Hub has a real i18n layer. | The repo does not currently have a general i18n layer. This plan prevents hard-coded copy drift without pretending localization is implemented. |
 
 ## Implementation Slices
@@ -1204,7 +1204,7 @@ for source errors that have no more specific remediation.
   NVIDIA-SMI failure.
 - Helper-retained values may still show `N/A` while Hub uses its temporary 7s
   timestamp freshness gate; the follow-up fix is to consume source-reported
-  freshness/retained attribution.
+  freshness/retained metadata.
 - Driver/sensor-path issues guide users through PI and ShoMetrics Control Panel
   without adding the broad typed health diagnostic contract in this slice.
 - ShoMetrics Control Panel uses helper-reported component status for

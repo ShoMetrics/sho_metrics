@@ -5,7 +5,7 @@ import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
 import { SelectSetting } from "../controls/SelectSetting";
-import type { DisplayedMetricReadAttribution } from "../../runtime/widget-runtime-cache";
+import type { DisplayedMetricReadTrace } from "../../runtime/widget-runtime-cache";
 import {
     requireResolvedSingleMetricWidget,
     type ResolvedGpuMetricTarget,
@@ -54,7 +54,6 @@ export function GpuWidgetSettings(props: GpuWidgetSettingsProps): React.JSX.Elem
         </>
     );
 }
-
 function GpuMetricSettings({
     context,
     target,
@@ -65,7 +64,7 @@ function GpuMetricSettings({
     const isSelectedReadingSupported = isGpuReadingSupportedOnCurrentPlatform(context.platform, target);
     const shouldShowNoValueGuidance = shouldShowGpuNoValueGuidance(
         context.isWindows,
-        context.runtimeCache.displayedMetricReadAttribution,
+        context.runtimeCache.displayedMetricReadTrace,
     );
 
     return (
@@ -102,13 +101,13 @@ function GpuMetricSettings({
 
 function shouldShowGpuNoValueGuidance(
     isWindows: boolean,
-    attribution: DisplayedMetricReadAttribution | undefined,
+    trace: DisplayedMetricReadTrace | undefined,
 ): boolean {
-    if (!isWindows || attribution?.metricKey.startsWith("gpu.") !== true) {
+    if (!isWindows || trace?.metricKey.startsWith("gpu.") !== true) {
         return false;
     }
 
-    if (attribution.outcome?.kind === "value") {
+    if (trace.outcome?.kind === "value") {
         return false;
     }
 

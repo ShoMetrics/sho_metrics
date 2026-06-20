@@ -879,10 +879,10 @@ WidgetSettingsTab boundary:
   section and metric source diagnostic. Otherwise the user is not really inside
   a metric-editing page.
 - The Stacked settings page should not show the outer metric source diagnostic.
-  That diagnostic describes the currently displayed active slot attribution,
+  That diagnostic describes the currently displayed active slot read trace,
   not the Stacked container and not necessarily the slot being edited. Showing
   it at the Stacked level is misleading.
-- Dense Multi Metric has the same attribution ownership issue: the outer debug
+- Dense Multi Metric has the same read-trace ownership issue: the outer debug
   diagnostic cannot unambiguously describe all rows. Hide the outer DEBUG
   diagnostic for both Stacked and Dense. Do not add per-row or per-slot DEBUG
   in this step; that would require a separate diagnostic owner under the

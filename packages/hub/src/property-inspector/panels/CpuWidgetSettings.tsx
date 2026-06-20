@@ -65,7 +65,7 @@ function CpuMetricSettings({
     const helperOnlyGuidance = reading.kind === "usage"
         ? undefined
         : resolveHelperStatusGuidanceText(
-            context.runtimeCache.displayedMetricReadAttribution?.preferredSourceStatus,
+            context.runtimeCache.displayedMetricReadTrace?.preferredSourceStatus,
             { i18n, installSubject: "thisMetric" },
         );
 

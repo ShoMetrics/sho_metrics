@@ -36,12 +36,12 @@ export function readCustomHttpWidgetData(options: {
         readonly maximum?: number | undefined;
     } | undefined;
 }): CustomHttpWidgetDataResult {
-    const readResult = options.metrics.getWidgetDataWithAttribution(
+    const readResult = options.metrics.getWidgetDataReadResult(
         options.metricKey,
         options.displayOverrides?.label ?? CUSTOM_METRIC_DEFAULT_LABEL,
         "",
     );
-    const displayHint = readResult.valueAttribution?.displayHint;
+    const displayHint = readResult.valueMetadata?.displayHint;
     const label = resolveCustomHttpLabel(
         displayHint,
         options.shouldCompactCircleLabel,

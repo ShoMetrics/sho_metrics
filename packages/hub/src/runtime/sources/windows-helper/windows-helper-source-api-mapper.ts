@@ -2,22 +2,25 @@ import { logger } from "../../../logging/logger";
 import {
     MetricUnavailableReason as ProtoMetricUnavailableReason,
     MetricValueFreshness as ProtoMetricValueFreshness,
-    type GetSourceHealthResponse,
-    type MetricDescriptor as ProtoMetricDescriptor,
-    type MetricUnavailableReport as ProtoMetricUnavailableReport,
-    type MetricValueAttribution as ProtoMetricValueAttribution,
-    type RawSensorIdentity as ProtoRawSensorIdentity,
-    type SourceWarning as ProtoSourceWarning,
-} from "../../../generated/proto/shometrics/v1/source_api_pb.js";
+    type MetricValueMetadata as ProtoMetricValueMetadata,
+} from "../../../generated/proto/shometrics/v1/metric_common_pb.js";
+import type {
+    GetSourceHealthResponse,
+    HelperMetricDescriptor as ProtoHelperMetricDescriptor,
+    HelperMetricUnavailableReport as ProtoHelperMetricUnavailableReport,
+    HelperMetricValueProvenance as ProtoHelperMetricValueProvenance,
+    RawSensorIdentity as ProtoRawSensorIdentity,
+    SourceWarning as ProtoSourceWarning,
+} from "../../../generated/proto/shometrics/v1/helper_grpc_service_pb.js";
 import type { MetricSnapshot } from "../metric-source";
 import type {
     MetricDescriptor,
     MetricUnavailableReason,
     MetricUnavailableReport,
-    MetricValueAttribution,
     MetricValueFreshness,
     RawSensorIdentity,
     SourceHealth,
+    SourceMetricValueMetadata,
     SourceWarning,
 } from "../source-client";
 
@@ -37,63 +40,90 @@ export function toRuntimeSourceHealth(response: GetSourceHealthResponse): Source
 export function toRuntimeSnapshotMetadata(options: {
     readonly requestedMetricKeys: readonly string[];
     readonly snapshot: MetricSnapshot;
-    readonly valueAttributions: readonly ProtoMetricValueAttribution[];
-    readonly unavailableMetrics: readonly ProtoMetricUnavailableReport[];
+    readonly valueProvenance: readonly ProtoHelperMetricValueProvenance[];
+    readonly unavailableMetrics: readonly ProtoHelperMetricUnavailableReport[];
 }): {
-    readonly valueAttributions: readonly MetricValueAttribution[];
+    readonly valueMetadata: readonly SourceMetricValueMetadata[];
     readonly unavailableMetrics: readonly MetricUnavailableReport[];
 } {
     const emittedMetricIds = new Set(Object.keys(options.snapshot.metrics));
     const requestedMetricIds = new Set(options.requestedMetricKeys);
     const validateRequestedMetricIds = requestedMetricIds.size > 0;
-    const seenValueAttributionMetricIds = new Set<string>();
+    const seenValueProvenanceMetricIds = new Set<string>();
     const seenUnavailableMetricIds = new Set<string>();
-    const valueAttributions: MetricValueAttribution[] = [];
+    const valueProvenanceByMetricId = new Map<string, RawSensorIdentity>();
+    const valueMetadata: SourceMetricValueMetadata[] = [];
     const unavailableMetrics: MetricUnavailableReport[] = [];
 
-    for (const attribution of options.valueAttributions) {
-        if (!emittedMetricIds.has(attribution.metricId)) {
-            logDroppedWireRecord("valueAttribution", attribution.metricId, "orphan");
+    for (const provenance of options.valueProvenance) {
+        if (!emittedMetricIds.has(provenance.metricId)) {
+            logDroppedWireRecord("valueProvenance", provenance.metricId, "orphan");
             continue;
         }
 
-        if (seenValueAttributionMetricIds.has(attribution.metricId)) {
-            logDroppedWireRecord("valueAttribution", attribution.metricId, "duplicate");
+        if (seenValueProvenanceMetricIds.has(provenance.metricId)) {
+            logDroppedWireRecord("valueProvenance", provenance.metricId, "duplicate");
             continue;
         }
 
-        seenValueAttributionMetricIds.add(attribution.metricId);
-        valueAttributions.push(toRuntimeMetricValueAttribution(attribution));
+        seenValueProvenanceMetricIds.add(provenance.metricId);
+
+        if (provenance.rawSensorIdentity) {
+            valueProvenanceByMetricId.set(provenance.metricId, toRuntimeRawSensorIdentity(provenance.rawSensorIdentity));
+        }
     }
 
-    for (const unavailableReport of options.unavailableMetrics) {
-        if (validateRequestedMetricIds && !requestedMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "notRequested");
+    for (const [metricId, value] of Object.entries(options.snapshot.metrics)) {
+        const metadata = value.metadata;
+        const rawSensorIdentity = valueProvenanceByMetricId.get(metricId);
+
+        if (!metadata && rawSensorIdentity === undefined) {
             continue;
         }
 
-        if (emittedMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "emitted");
+        valueMetadata.push(toRuntimeMetricValueMetadata(metricId, metadata, rawSensorIdentity));
+    }
+
+    for (const unavailableMetric of options.unavailableMetrics) {
+        const report = unavailableMetric.report;
+        if (!report) {
+            logDroppedWireRecord("unavailableMetric", "", "missingReport");
             continue;
         }
 
-        if (seenUnavailableMetricIds.has(unavailableReport.metricId)) {
-            logDroppedWireRecord("unavailableMetric", unavailableReport.metricId, "duplicate");
+        if (validateRequestedMetricIds && !requestedMetricIds.has(report.metricId)) {
+            logDroppedWireRecord("unavailableMetric", report.metricId, "notRequested");
             continue;
         }
 
-        seenUnavailableMetricIds.add(unavailableReport.metricId);
-        unavailableMetrics.push(toRuntimeMetricUnavailableReport(unavailableReport));
+        if (emittedMetricIds.has(report.metricId)) {
+            logDroppedWireRecord("unavailableMetric", report.metricId, "emitted");
+            continue;
+        }
+
+        if (seenUnavailableMetricIds.has(report.metricId)) {
+            logDroppedWireRecord("unavailableMetric", report.metricId, "duplicate");
+            continue;
+        }
+
+        seenUnavailableMetricIds.add(report.metricId);
+        unavailableMetrics.push(toRuntimeMetricUnavailableReport(unavailableMetric));
     }
 
     return {
-        valueAttributions,
+        valueMetadata,
         unavailableMetrics,
     };
 }
 
-export function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): MetricDescriptor | undefined {
-    const rawSensorIdentity = readRequiredRawSensorIdentity(descriptor.rawSensorIdentity, descriptor.metricId);
+export function toRuntimeMetricDescriptor(wrapper: ProtoHelperMetricDescriptor): MetricDescriptor | undefined {
+    const descriptor = wrapper.descriptor;
+    if (!descriptor) {
+        logDroppedDescriptor("", "missingDescriptor");
+        return undefined;
+    }
+
+    const rawSensorIdentity = readRequiredRawSensorIdentity(wrapper.rawSensorIdentity, descriptor.metricId);
     const pollingGroupId = readRequiredDescriptorString({
         fieldName: "polling_group_id",
         fieldValue: descriptor.pollingGroupId,
@@ -101,9 +131,6 @@ export function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): Me
     });
 
     if (!rawSensorIdentity || !pollingGroupId) {
-        // Helper/plugin versions may be skewed. A malformed descriptor should
-        // not make the whole helper source unavailable; drop the bad record and
-        // keep the support log from the field reader.
         return undefined;
     }
 
@@ -118,9 +145,9 @@ export function toRuntimeMetricDescriptor(descriptor: ProtoMetricDescriptor): Me
 }
 
 function logDroppedWireRecord(
-    recordKind: "valueAttribution" | "unavailableMetric",
+    recordKind: "valueProvenance" | "unavailableMetric",
     metricId: string,
-    reason: "orphan" | "duplicate" | "notRequested" | "emitted",
+    reason: "orphan" | "duplicate" | "notRequested" | "emitted" | "missingReport",
 ): void {
     log.atWarn()
         .everyMs(
@@ -168,29 +195,38 @@ function logDroppedDescriptor(metricId: string, reason: string): void {
         ].join(" "));
 }
 
-function toRuntimeMetricValueAttribution(
-    attribution: ProtoMetricValueAttribution,
-): MetricValueAttribution {
+function toRuntimeMetricValueMetadata(
+    metricId: string,
+    metadata: ProtoMetricValueMetadata | undefined,
+    rawSensorIdentity: RawSensorIdentity | undefined,
+): SourceMetricValueMetadata {
+    const valueFreshness = metadata
+        ? normalizeMetricValueFreshness(metadata.freshness, metricId)
+        : "fresh";
+
     return {
-        metricId: attribution.metricId,
-        ...(attribution.rawSensorIdentity
-            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(attribution.rawSensorIdentity) }
-            : {}),
-        valueFreshness: normalizeMetricValueFreshness(attribution.valueFreshness, attribution.metricId),
-        ...(attribution.retainedAgeMilliseconds === undefined
+        metricId,
+        valueFreshness,
+        ...(metadata?.retainedAgeMilliseconds === undefined
             ? {}
-            : { retainedAgeMilliseconds: attribution.retainedAgeMilliseconds }),
+            : { retainedAgeMilliseconds: metadata.retainedAgeMilliseconds }),
+        ...(rawSensorIdentity === undefined ? {} : { rawSensorIdentity }),
     };
 }
 
 function toRuntimeMetricUnavailableReport(
-    unavailableReport: ProtoMetricUnavailableReport,
+    unavailableMetric: ProtoHelperMetricUnavailableReport,
 ): MetricUnavailableReport {
+    const report = unavailableMetric.report;
+    if (!report) {
+        throw new Error("Helper unavailable report must be validated before mapping.");
+    }
+
     return {
-        metricId: unavailableReport.metricId,
-        reason: normalizeMetricUnavailableReason(unavailableReport.reason, unavailableReport.metricId),
-        ...(unavailableReport.rawSensorIdentity
-            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(unavailableReport.rawSensorIdentity) }
+        metricId: report.metricId,
+        reason: normalizeMetricUnavailableReason(report.reason, report.metricId),
+        ...(unavailableMetric.rawSensorIdentity
+            ? { rawSensorIdentity: toRuntimeRawSensorIdentity(unavailableMetric.rawSensorIdentity) }
             : {}),
     };
 }
@@ -201,16 +237,12 @@ function normalizeMetricValueFreshness(
 ): MetricValueFreshness {
     switch (freshness) {
         case ProtoMetricValueFreshness.FRESH:
+        case ProtoMetricValueFreshness.UNSPECIFIED:
             return "fresh";
         case ProtoMetricValueFreshness.RETAINED:
             return "retained";
-        case ProtoMetricValueFreshness.UNSPECIFIED:
-            logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
-            return "retained";
     }
 
-    // Helper and plugin versions can be skewed; generated TypeScript enums do
-    // not prevent a future helper from sending an unknown numeric enum value.
     logUnknownWireEnum("valueFreshness", metricId, freshness, "retained");
     return "retained";
 }
@@ -220,8 +252,8 @@ function normalizeMetricUnavailableReason(
     metricId: string,
 ): MetricUnavailableReason {
     switch (reason) {
-        case ProtoMetricUnavailableReason.NO_SENSOR:
-            return "noSensorData";
+        case ProtoMetricUnavailableReason.NO_SOURCE_READING:
+            return "noSourceReading";
         case ProtoMetricUnavailableReason.INVALID_VALUE:
             return "invalidValue";
         case ProtoMetricUnavailableReason.EXPIRED:
@@ -233,8 +265,6 @@ function normalizeMetricUnavailableReason(
             return "unknown";
     }
 
-    // Helper and plugin versions can be skewed; generated TypeScript enums do
-    // not prevent a future helper from sending an unknown numeric enum value.
     logUnknownWireEnum("unavailableReason", metricId, reason, "debugOnly");
     return "unknown";
 }

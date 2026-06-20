@@ -48,13 +48,13 @@ test("fallback reader attributes the first fresh scalar value to its source", ()
     }));
 
     const reader = createTestFallbackReader(metricStore, readPlan);
-    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+    const readResult = reader.getWidgetDataReadResult("ram.used", "RAM", "B");
 
     assert.equal(readResult.selectedSourceId, "windows-helper");
     assert.equal(readResult.widgetData.current, 25);
 });
 
-test("fallback reader forwards value attribution from the rendered source value", () => {
+test("fallback reader forwards value metadata from the rendered source value", () => {
     const metricStore = new MetricStore();
     const readPlan = buildReadPlan();
 
@@ -64,7 +64,7 @@ test("fallback reader forwards value attribution from the rendered source value"
             "ram.used": buildScalarMetricValue(25),
         },
     }), {
-        valueAttributions: [{
+        valueMetadata: [{
             metricId: "ram.used",
             valueFreshness: "retained",
             retainedAgeMilliseconds: 1500,
@@ -72,10 +72,10 @@ test("fallback reader forwards value attribution from the rendered source value"
     });
 
     const reader = createTestFallbackReader(metricStore, readPlan);
-    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+    const readResult = reader.getWidgetDataReadResult("ram.used", "RAM", "B");
 
     assert.equal(readResult.selectedSourceId, "windows-helper");
-    assert.deepEqual(readResult.valueAttribution, {
+    assert.deepEqual(readResult.valueMetadata, {
         metricId: "ram.used",
         valueFreshness: "retained",
         retainedAgeMilliseconds: 1500,
@@ -194,7 +194,7 @@ test("fallback reader ignores helper unavailable metadata when fallback has a fr
     }));
 
     const reader = createTestFallbackReader(metricStore, readPlan);
-    const readResult = reader.getWidgetDataWithAttribution("gpu.temp", "GPU", "C");
+    const readResult = reader.getWidgetDataReadResult("gpu.temp", "GPU", "C");
 
     assert.equal(readResult.selectedSourceId, "node-system");
     assert.equal(readResult.widgetData.current, 60);
@@ -222,7 +222,7 @@ test("fallback reader attributes fallback values to the selected fallback source
         now: 11000,
         maximumSampleAgeMilliseconds: 5000,
     });
-    const readResult = reader.getWidgetDataWithAttribution("ram.used", "RAM", "B");
+    const readResult = reader.getWidgetDataReadResult("ram.used", "RAM", "B");
 
     assert.equal(readResult.selectedSourceId, "node-system");
     assert.equal(readResult.widgetData.current, 50);
@@ -283,7 +283,7 @@ test("fallback reader returns no data when every scalar value is stale", () => {
         label: "RAM",
         sampleTimestampMilliseconds: undefined,
     });
-    assert.deepEqual(reader.getWidgetDataWithAttribution("ram.used", "RAM", "B"), {
+    assert.deepEqual(reader.getWidgetDataReadResult("ram.used", "RAM", "B"), {
         widgetData: {
             current: 0,
             progress: 0,
@@ -306,17 +306,17 @@ test("fallback reader forwards unavailable metadata when no source has a fresh v
     }), {
         unavailableMetrics: [{
             metricId: "cpu.temp",
-            reason: "noSensorData",
+            reason: "noSourceReading",
         }],
     });
 
     const reader = createTestFallbackReader(metricStore, readPlan);
-    const readResult = reader.getWidgetDataWithAttribution("cpu.temp", "CPU", "C");
+    const readResult = reader.getWidgetDataReadResult("cpu.temp", "CPU", "C");
 
     assert.equal(readResult.selectedSourceId, undefined);
     assert.deepEqual(readResult.unavailableMetric, {
         metricId: "cpu.temp",
-        reason: "noSensorData",
+        reason: "noSourceReading",
     });
 });
 

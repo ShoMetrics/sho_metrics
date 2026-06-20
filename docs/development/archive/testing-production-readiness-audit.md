@@ -115,7 +115,7 @@ Do not test: generated protobuf classes directly, trivial constants, or every co
 
 Files:
 
-- `contracts/proto/shometrics/v1/source_api.proto`
+- `contracts/proto/shometrics/v1/helper_grpc_service.proto`
 - `packages/hub/src/runtime/sources/source-client.ts`
 - `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-api-mapper.ts`
 - `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-client.ts`

@@ -374,6 +374,8 @@ function resolveStackedSlotSummary(target: ResolvedMetricTarget, t: ReturnType<t
             return "Disk";
         case "network":
             return "Network";
+        case "system":
+            return "System";
         case "catalog":
             return t(stackedMessages.catalogMetricChoice);
         case "customMetric":

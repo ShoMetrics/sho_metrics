@@ -77,19 +77,19 @@ Actions may choose a metric target from resolved settings, but they must not cho
 Create source API protos separate from persisted settings:
 
 ```txt
-contracts/proto/shometrics/v1/source_api.proto
+contracts/proto/shometrics/v1/helper_grpc_service.proto
 contracts/proto/shometrics/v1/source_ipc.proto
 ```
 
 Do not put source availability, runtime descriptors, helper install state, or resolved read plans into Stream Deck settings.
 
-`source_api.proto` contains business request and response messages shared by local IPC and future remote RPC:
+`helper_grpc_service.proto` contains business request and response messages shared by local IPC and future remote RPC:
 
 ```proto
 syntax = "proto3";
 package shometrics.v1;
 
-import "shometrics/v1/snapshot.proto";
+import "shometrics/v1/metric_common.proto";
 
 message GetSourceHealthRequest {}
 
@@ -121,7 +121,7 @@ message ReadMetricSnapshotResponse {
 }
 ```
 
-`MetricSnapshot`, `MetricValue`, `MetricDescriptor`, `MetricUnit`, `MetricValueKind`, and `MetricIdKind` live in `snapshot.proto`.
+`MetricSnapshot`, `MetricValue`, `MetricDescriptor`, `MetricUnit`, `MetricValueKind`, and `MetricIdKind` live in `metric_common.proto`.
 
 `source_ipc.proto` contains the local IPC envelope. Windows named pipes and future macOS/Linux local IPC transports should use this envelope unless the transport already provides method routing and correlation:
 
@@ -129,7 +129,7 @@ message ReadMetricSnapshotResponse {
 syntax = "proto3";
 package shometrics.v1;
 
-import "shometrics/v1/source_api.proto";
+import "shometrics/v1/helper_grpc_service.proto";
 
 message SourceIpcRequest {
   string request_id = 1;
@@ -503,8 +503,8 @@ Rules:
 The service must generate C# messages from the same proto files used by Node:
 
 ```txt
-contracts/proto/shometrics/v1/snapshot.proto
-contracts/proto/shometrics/v1/source_api.proto
+contracts/proto/shometrics/v1/metric_common.proto
+contracts/proto/shometrics/v1/helper_grpc_service.proto
 contracts/proto/shometrics/v1/source_ipc.proto
 ```
 
@@ -518,10 +518,10 @@ Project file protobuf items:
 
 ```xml
 <ItemGroup>
-  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\snapshot.proto"
+  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\metric_common.proto"
             ProtoRoot="..\..\..\contracts\proto"
             GrpcServices="None" />
-  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_api.proto"
+  <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\helper_grpc_service.proto"
             ProtoRoot="..\..\..\contracts\proto"
             GrpcServices="None" />
   <Protobuf Include="..\..\..\contracts\proto\shometrics\v1\source_ipc.proto"
@@ -762,7 +762,7 @@ Rules:
 
 - Units returned in proto must use canonical `MetricUnit` enum values, not display strings.
 - LHM `Data` values in GiB and `SmallData` values in MiB must be converted to bytes before writing `MetricValue.scalar`.
-- LHM `Clock`, `Timing`, `Energy`, and `Conductivity` values must be converted to the canonical units defined by `snapshot.proto`.
+- LHM `Clock`, `Timing`, `Energy`, and `Conductivity` values must be converted to the canonical units defined by `metric_common.proto`.
 - Unknown requested metric ids are omitted from the snapshot and reported through `SourceWarning` with `code="metric_unavailable"`.
 - Semantically invalid values are omitted and reported through `SourceWarning`; do not clamp at the service boundary.
 - `0C` for normal CPU/GPU temperature is invalid and must be omitted.
@@ -1274,7 +1274,7 @@ Remote requirements already known:
 Remote transport:
 
 - Use gRPC over TLS.
-- Reuse `source_api.proto` business request and response messages where practical.
+- Reuse `helper_grpc_service.proto` business request and response messages where practical.
 - Do not reuse `source_ipc.proto` for remote RPC unless a future gRPC transport explicitly needs a local-style envelope.
 - Do not implement a JSON-only remote source contract.
 

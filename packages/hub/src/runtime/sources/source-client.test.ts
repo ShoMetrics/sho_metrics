@@ -17,7 +17,7 @@ test("metric source client uses pollMetrics when the source supports requested k
     const readResult = await sourceClient.readSnapshot(["cpu.usage_percent"]);
 
     assert.equal(readResult.snapshot, source.snapshot);
-    assert.deepEqual(readResult.valueAttributions, []);
+    assert.deepEqual(readResult.valueMetadata, []);
     assert.deepEqual(readResult.unavailableMetrics, []);
     assert.deepEqual(source.polledMetricKeyListList, [["cpu.usage_percent"]]);
 });

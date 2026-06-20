@@ -1,4 +1,4 @@
-﻿# Network Ping Feature Implementation Plan
+# Network Ping Feature Implementation Plan
 
 This document is the complete implementation specification for adding ping to
 the existing Network widget. It is written so an agent with no prior chat
@@ -67,7 +67,7 @@ normalizer.
 Existing metric unit state:
 
 ```text
-contracts/proto/shometrics/v1/snapshot.proto
+contracts/proto/shometrics/v1/metric_common.proto
 ```
 
 `MetricUnit` currently has no milliseconds value. Add:
@@ -118,7 +118,7 @@ steps.
 
 | Step | Scope | Files | Goal |
 | --- | --- | --- | --- |
-| Step 1 | Contract and dependency foundation | `packages/hub/package.json`, `packages/hub/package-lock.json`, `contracts/proto/shometrics/v1/settings.proto`, `contracts/proto/shometrics/v1/snapshot.proto`, generated proto | Add the accepted validation dependency and make protobuf contracts able to store ping and emit millisecond samples. |
+| Step 1 | Contract and dependency foundation | `packages/hub/package.json`, `packages/hub/package-lock.json`, `contracts/proto/shometrics/v1/settings.proto`, `contracts/proto/shometrics/v1/metric_common.proto`, generated proto | Add the accepted validation dependency and make protobuf contracts able to store ping and emit millisecond samples. |
 | Step 2 | Settings and normalization | `settings/resolved-settings.ts`, `settings/storage/*`, `settings/network-ping-target.ts` | Resolve traffic-vs-ping, normalize ping targets, and write sparse settings patches. |
 | Step 3 | Runtime source and metric data | `runtime/network-metric-keys.ts`, `runtime/source-routing/*`, `runtime/sources/node-system/*`, `metrics/network-ping-widget-data.ts` | Route ping to node-system, poll requested ping targets only, emit canonical millisecond samples, and build ping WidgetData. |
 | Step 4 | Action, PI, and verification | `actions/network*`, `property-inspector/panels/*`, focused tests, verification commands | Subscribe/render ping, expose ping settings, prove traffic behavior remains unchanged, and run the verification gates. |
@@ -240,7 +240,7 @@ message NetworkMetricTarget {
 After editing proto, run the proto commands listed in [Verification](#verification).
 Regenerated files under `packages/hub/src/generated/` are expected.
 
-### `snapshot.proto`
+### `metric_common.proto`
 
 Add the canonical unit:
 

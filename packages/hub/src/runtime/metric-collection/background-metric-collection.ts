@@ -208,7 +208,7 @@ export class BackgroundMetricCollection {
         try {
             const readResult = await sourceClient.readSnapshot(metricKeys);
             const ingestReport = metricStore.ingest(sourceCandidate.sourceId, readResult.snapshot, {
-                valueAttributions: readResult.valueAttributions,
+                valueMetadata: readResult.valueMetadata,
                 unavailableMetrics: readResult.unavailableMetrics,
             });
             // This refresh path bypasses CollectorGroupRunner, so it must attach

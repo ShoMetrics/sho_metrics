@@ -277,7 +277,7 @@ function buildMetricReader(
 
     return {
         getWidgetData: () => fullWidgetData,
-        getWidgetDataWithAttribution: (): MetricWidgetDataReadResult => ({
+        getWidgetDataReadResult: (): MetricWidgetDataReadResult => ({
             widgetData: fullWidgetData,
             selectedSourceId: "local:windows-helper",
             ...(unavailableMetric === undefined ? {} : { unavailableMetric }),

@@ -140,7 +140,7 @@ function buildGpuTarget(reading: ResolvedGpuReading): ResolvedGpuMetricTarget {
 function buildMetricReader(widgetDataByMetricKey: Readonly<Record<string, WidgetData>>): MetricStoreReader {
     return {
         getWidgetData: (metricKey) => widgetDataByMetricKey[metricKey] ?? buildWidgetData(),
-        getWidgetDataWithAttribution: (metricKey): MetricWidgetDataReadResult => {
+        getWidgetDataReadResult: (metricKey): MetricWidgetDataReadResult => {
             const widgetData = widgetDataByMetricKey[metricKey] ?? buildWidgetData();
 
             return {

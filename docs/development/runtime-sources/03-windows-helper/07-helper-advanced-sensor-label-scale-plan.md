@@ -77,10 +77,10 @@ Hard decisions for this batch:
 - The Property Inspector section name is **Label & Scale**.
 - Do not add user-editable unit text in this batch.
 - Use helper/source descriptors that are already available in the PI picker; do
-  not add fields to `source_api.proto`.
+  not add fields to `helper_grpc_service.proto`.
 - Store typed source-derived display hints in `CatalogMetricTarget` when the
   user selects a metric.
-- Use `MetricUnit` from `snapshot.proto` for the stored detected unit.
+- Use `MetricUnit` from `metric_common.proto` for the stored detected unit.
 - Add ShoMetrics-owned `CatalogMetricCategory` and
   `CatalogMetricReadingKind` enums in `settings.proto`.
 - Do not store helper/LHM raw hardware types, raw sensor types, hardware ids, or
@@ -118,10 +118,10 @@ change, `detected_label` means "source/picker-derived display label" and
 
 Update `contracts/proto/shometrics/v1/settings.proto`.
 
-Import `snapshot.proto` so settings can store `MetricUnit`:
+Import `metric_common.proto` so settings can store `MetricUnit`:
 
 ```proto
-import "shometrics/v1/snapshot.proto";
+import "shometrics/v1/metric_common.proto";
 ```
 
 Replace the current `CatalogMetricTarget` fields with:
@@ -187,7 +187,7 @@ enum CatalogMetricReadingKind {
 
 Rationale:
 
-- `MetricUnit` is source-agnostic and already exists in `snapshot.proto`; using
+- `MetricUnit` is source-agnostic and already exists in `metric_common.proto`; using
   it avoids another unit string or duplicated settings-only unit enum.
 - Category/reading enums are ShoMetrics-owned. They intentionally do not reuse
   helper/LHM raw hardware or sensor enums.
@@ -200,7 +200,7 @@ Rationale:
   `fallback_unit` should be reselected. This batch intentionally does not add
   migration code.
 
-No `source_api.proto` change is required.
+No `helper_grpc_service.proto` change is required.
 
 ## Resolved Settings
 
@@ -677,7 +677,7 @@ Follow-up tests:
 
 1. Update `settings.proto` `CatalogMetricTarget`.
 2. Add `CatalogMetricCategory` and `CatalogMetricReadingKind`.
-3. Import `snapshot.proto` for `MetricUnit`.
+3. Import `metric_common.proto` for `MetricUnit`.
 4. Run proto format/lint/build.
 5. Update generated TS references.
 
@@ -790,7 +790,7 @@ Manual checks:
   overrides.
 - `fallback_label` and `fallback_unit` are removed or fully renamed in code and
   tests; no mixed old/new vocabulary remains.
-- No `source_api.proto` change was made.
+- No `helper_grpc_service.proto` change was made.
 - `MetricUnit` is stored as an enum, not a string.
 - Category and reading are ShoMetrics-owned settings enums, not helper/LHM raw
   enums.

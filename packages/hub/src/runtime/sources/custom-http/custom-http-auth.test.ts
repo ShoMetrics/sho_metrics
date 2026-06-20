@@ -1,12 +1,10 @@
-import { create } from "@bufbuild/protobuf";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-    CustomHttpCredentialSchema,
-    StoredGlobalSettingsSchema,
-    type StoredGlobalSettings,
-} from "../../../generated/proto/shometrics/v1/settings_pb";
 import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
+import type {
+    CustomHttpCredentialSettings,
+    CustomHttpSecretCredential,
+} from "../../../settings/storage/custom-http-credential-settings";
 import {
     isValidCustomHttpHeaderName,
     prepareCustomHttpRequest,
@@ -20,7 +18,7 @@ describe("Custom HTTP auth resolution", () => {
         const result = resolveCustomHttpPreparedAuth({
             url: "https://api.example.com/data",
             authReference: defaultAuthReference(),
-            globalSettings: globalSettings(),
+            credentialSettings: globalSettings(),
         });
 
         assert.deepEqual(result, {
@@ -33,18 +31,13 @@ describe("Custom HTTP auth resolution", () => {
         const result = resolveCustomHttpPreparedAuth({
             url: "http://192.168.1.10/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    nickname: "LHM",
-                    auth: {
-                        case: "basic",
-                        value: {
-                            username: "admin",
-                            password: "secret",
-                        },
-                    },
-                }),
+                    authKind: "basic",
+                    username: "admin",
+                    password: "secret",
+                },
             ),
         });
 
@@ -62,14 +55,12 @@ describe("Custom HTTP auth resolution", () => {
         const result = resolveCustomHttpPreparedAuth({
             url: "http://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "bearer",
-                        value: { token: "secret" },
-                    },
-                }),
+                    authKind: "bearer",
+                    token: "secret",
+                },
             ),
         });
 
@@ -84,14 +75,12 @@ describe("Custom HTTP auth resolution", () => {
         const result = resolveCustomHttpPreparedAuth({
             url: "http://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: true },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "bearer",
-                        value: { token: "secret" },
-                    },
-                }),
+                    authKind: "bearer",
+                    token: "secret",
+                },
             ),
         });
 
@@ -112,33 +101,25 @@ describe("Custom HTTP auth resolution", () => {
         const headerResult = resolveCustomHttpPreparedAuth({
             url: "https://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "header",
-                        value: {
-                            headerName: "X Api Key",
-                            token: "secret",
-                        },
-                    },
-                }),
+                    authKind: "header",
+                    headerName: "X Api Key",
+                    token: "secret",
+                },
             ),
         });
         const queryResult = resolveCustomHttpPreparedAuth({
             url: "https://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "query",
-                        value: {
-                            queryParameterName: "api key",
-                            token: "secret",
-                        },
-                    },
-                }),
+                    authKind: "query",
+                    queryParameterName: "api key",
+                    token: "secret",
+                },
             ),
         });
 
@@ -152,30 +133,24 @@ describe("Custom HTTP auth resolution", () => {
         const bearerResult = resolveCustomHttpPreparedAuth({
             url: "https://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "bearer",
-                        value: { token: "secret\r\nX-Leak: yes" },
-                    },
-                }),
+                    authKind: "bearer",
+                    token: "secret\r\nX-Leak: yes",
+                },
             ),
         });
         const headerResult = resolveCustomHttpPreparedAuth({
             url: "https://api.example.com/data",
             authReference: { credentialId: "credential-1", allowPublicHttpCredentials: false },
-            globalSettings: globalSettings(
-                create(CustomHttpCredentialSchema, {
+            credentialSettings: globalSettings(
+                {
                     id: "credential-1",
-                    auth: {
-                        case: "header",
-                        value: {
-                            headerName: "X-Api-Key",
-                            token: "secret\r\nX-Leak: yes",
-                        },
-                    },
-                }),
+                    authKind: "header",
+                    headerName: "X-Api-Key",
+                    token: "secret\r\nX-Leak: yes",
+                },
             ),
         });
 
@@ -281,7 +256,7 @@ function defaultAuthReference(): ResolvedCustomHttpRequestAuth {
 }
 
 function globalSettings(
-    ...customHttpCredentials: StoredGlobalSettings["customHttpCredentials"]
-): StoredGlobalSettings {
-    return create(StoredGlobalSettingsSchema, { customHttpCredentials });
+    ...customHttpCredentials: readonly CustomHttpSecretCredential[]
+): CustomHttpCredentialSettings {
+    return { customHttpCredentials };
 }

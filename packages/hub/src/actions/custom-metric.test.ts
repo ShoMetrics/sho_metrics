@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { create } from "@bufbuild/protobuf";
 import type {
     DidReceiveSettingsEvent,
     SendToPluginEvent,
@@ -46,11 +45,10 @@ import {
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
-import {
-    CustomHttpCredentialSchema,
-    StoredGlobalSettingsSchema,
-    type StoredGlobalSettings,
-} from "../generated/proto/shometrics/v1/settings_pb";
+import type {
+    CustomHttpCredentialSettings,
+    CustomHttpSecretCredential,
+} from "../settings/storage/custom-http-credential-settings";
 
 test("Custom Metric without configured HTTP does not register collection or runtime definition", () => {
     const registry = new CustomHttpDefinitionRegistry();
@@ -456,17 +454,12 @@ test("Custom Metric PI sample fetch returns bounded preview through the action b
 for (const authCase of [
     {
         name: "Basic",
-        credential: create(CustomHttpCredentialSchema, {
+        credential: {
             id: "credential-basic",
-            nickname: "LHM",
-            auth: {
-                case: "basic",
-                value: {
-                    username: "111111",
-                    password: "111111",
-                },
-            },
-        }),
+            authKind: "basic",
+            username: "111111",
+            password: "111111",
+        },
         credentialId: "credential-basic",
         requestUrl: "http://127.0.0.1:8085/data.json",
         expectedUrl: "http://127.0.0.1:8085/data.json",
@@ -476,14 +469,11 @@ for (const authCase of [
     },
     {
         name: "Bearer",
-        credential: create(CustomHttpCredentialSchema, {
+        credential: {
             id: "credential-bearer",
-            nickname: "Bearer",
-            auth: {
-                case: "bearer",
-                value: { token: "bearer-token" },
-            },
-        }),
+            authKind: "bearer",
+            token: "bearer-token",
+        },
         credentialId: "credential-bearer",
         requestUrl: "https://api.example.com/data",
         expectedUrl: "https://api.example.com/data",
@@ -493,17 +483,12 @@ for (const authCase of [
     },
     {
         name: "API key header",
-        credential: create(CustomHttpCredentialSchema, {
+        credential: {
             id: "credential-header",
-            nickname: "Header",
-            auth: {
-                case: "header",
-                value: {
-                    headerName: "X-API-Key",
-                    token: "header-token",
-                },
-            },
-        }),
+            authKind: "header",
+            headerName: "X-API-Key",
+            token: "header-token",
+        },
         credentialId: "credential-header",
         requestUrl: "https://api.example.com/data",
         expectedUrl: "https://api.example.com/data",
@@ -513,17 +498,12 @@ for (const authCase of [
     },
     {
         name: "API key query",
-        credential: create(CustomHttpCredentialSchema, {
+        credential: {
             id: "credential-query",
-            nickname: "Query",
-            auth: {
-                case: "query",
-                value: {
-                    queryParameterName: "api_key",
-                    token: "query-token",
-                },
-            },
-        }),
+            authKind: "query",
+            queryParameterName: "api_key",
+            token: "query-token",
+        },
         credentialId: "credential-query",
         requestUrl: "https://api.example.com/data?api_key=old&mode=current",
         expectedUrl: "https://api.example.com/data?api_key=query-token&mode=current",
@@ -538,9 +518,7 @@ for (const authCase of [
         });
         const action = new TestCustomMetric(registry, {
             fetcher,
-            credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
-                customHttpCredentials: [authCase.credential],
-            })),
+            credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(globalSettings(authCase.credential)),
         });
         const streamDeckAction = new FakeStreamDeckAction(`custom-pi-fetch-${authCase.name}-action`);
 
@@ -580,19 +558,14 @@ test("Custom Metric PI sample fetch redacts echoed credential secrets from previ
     });
     const action = new TestCustomMetric(registry, {
         fetcher,
-        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
-            customHttpCredentials: [create(CustomHttpCredentialSchema, {
+        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(globalSettings(
+            {
                 id: "credential-query",
-                nickname: "Query",
-                auth: {
-                    case: "query",
-                    value: {
-                        queryParameterName: "api_key",
-                        token: "query-token",
-                    },
-                },
-            })],
-        })),
+                authKind: "query",
+                queryParameterName: "api_key",
+                token: "query-token",
+            },
+        )),
     });
     const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-redacted-success-action");
 
@@ -634,19 +607,14 @@ test("Custom Metric PI sample fetch does not guess-redact blocked redirect URLs"
     });
     const action = new TestCustomMetric(registry, {
         fetcher,
-        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(create(StoredGlobalSettingsSchema, {
-            customHttpCredentials: [create(CustomHttpCredentialSchema, {
+        credentialSettingsReader: new FakeCustomHttpCredentialSettingsReader(globalSettings(
+            {
                 id: "credential-header",
-                nickname: "Header",
-                auth: {
-                    case: "header",
-                    value: {
-                        headerName: "X-API-Key",
-                        token: "header-token",
-                    },
-                },
-            })],
-        })),
+                authKind: "header",
+                headerName: "X-API-Key",
+                token: "header-token",
+            },
+        )),
     });
     const streamDeckAction = new FakeStreamDeckAction("custom-pi-fetch-redirect-action");
 
@@ -1023,11 +991,15 @@ class TestCustomMetric extends CustomMetric {
 }
 
 class FakeCustomHttpCredentialSettingsReader implements CustomHttpCredentialSettingsReader {
-    constructor(private readonly settings: StoredGlobalSettings) {}
+    constructor(private readonly settings: CustomHttpCredentialSettings) {}
 
-    readStoredGlobalSettings(): StoredGlobalSettings {
+    readCredentialSettings(): CustomHttpCredentialSettings {
         return this.settings;
     }
+}
+
+function globalSettings(...customHttpCredentials: readonly CustomHttpSecretCredential[]): CustomHttpCredentialSettings {
+    return { customHttpCredentials };
 }
 
 class FakeMetricCollectionBinding implements MetricCollectionBinding {
@@ -1052,10 +1024,10 @@ class CapturingMetricStoreReader implements MetricStoreReader {
     }) {}
 
     getWidgetData(metricKey: string, label: string, unit: string, maxValue?: number): WidgetData {
-        return this.getWidgetDataWithAttribution(metricKey, label, unit, maxValue).widgetData;
+        return this.getWidgetDataReadResult(metricKey, label, unit, maxValue).widgetData;
     }
 
-    getWidgetDataWithAttribution(
+    getWidgetDataReadResult(
         metricKey: string,
         label: string,
         unit: string,
@@ -1079,7 +1051,7 @@ class CapturingMetricStoreReader implements MetricStoreReader {
             ...(this.options.sampleTimestampMilliseconds === undefined
                 ? {}
                 : {
-                    valueAttribution: {
+                    valueMetadata: {
                         metricId: metricKey,
                         valueFreshness: "fresh",
                         ...(this.options.displayHint === undefined ? {} : { displayHint: this.options.displayHint }),

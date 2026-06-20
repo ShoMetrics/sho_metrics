@@ -43,8 +43,8 @@ export function createFallbackMetricStoreReader(
 
     return {
         getWidgetData: (metricKey, label, unit, maxValue) =>
-            readWidgetDataWithAttribution(metricKey, label, unit, maxValue).widgetData,
-        getWidgetDataWithAttribution: readWidgetDataWithAttribution,
+            readWidgetDataResult(metricKey, label, unit, maxValue).widgetData,
+        getWidgetDataReadResult: readWidgetDataResult,
         getTextValue: metricKey => {
             // Text values currently represent static descriptors such as CPU/GPU
             // model names. Add timestamped text reads only when real-time text
@@ -63,7 +63,7 @@ export function createFallbackMetricStoreReader(
         },
     };
 
-    function readWidgetDataWithAttribution(
+    function readWidgetDataResult(
         metricKey: string,
         label: string,
         unit: string,
@@ -74,7 +74,7 @@ export function createFallbackMetricStoreReader(
         let firstUnavailableMetric: MetricWidgetDataReadResult["unavailableMetric"];
 
         for (const sourceReader of sourceReaders) {
-            const readResult = sourceReader.getWidgetDataWithAttribution(metricKey, label, unit, maxValue);
+            const readResult = sourceReader.getWidgetDataReadResult(metricKey, label, unit, maxValue);
 
             // Prefer the earliest source-reported unavailable reason. With normal
             // source order this keeps the preferred source's reason ahead of

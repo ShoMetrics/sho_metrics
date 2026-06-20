@@ -195,6 +195,16 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
                 secondaryDisplayValue: "430 / 1 TB",
                 barLabel: "SSD",
             });
+        case "system":
+            return buildHardwarePreviewSample({
+                hardware: "other",
+                label: "BATT",
+                current: 78,
+                unit: "%",
+                displayValue: "78",
+                progress: 0.78,
+                secondaryDisplayValue: "Battery",
+            });
         case "catalog":
             return buildHardwarePreviewSample({
                 hardware: target.detectedCategory,

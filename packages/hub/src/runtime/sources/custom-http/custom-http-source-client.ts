@@ -3,12 +3,11 @@ import { wallClockNowMilliseconds } from "../../../shared/clock";
 import {
     buildMetricSnapshot,
     buildScalarMetricValue,
-    MetricUnit,
     type MetricValue,
 } from "../metric-source";
 import {
     type MetricUnavailableReport,
-    type MetricValueAttribution,
+    type SourceMetricValueMetadata,
     type SourceClient,
     type SourceClientStatus,
     type SourceSnapshotReadResult,
@@ -101,7 +100,7 @@ export class CustomHttpSourceClient implements SourceClient {
         const snapshotTimestampMilliseconds = this.wallClockNow();
         const metricResults = await Promise.all(metricKeys.map(metricKey => this.readMetric(metricKey)));
         const metrics: Record<string, MetricValue> = {};
-        const valueAttributions: MetricValueAttribution[] = [];
+        const valueMetadata: SourceMetricValueMetadata[] = [];
         const unavailableMetrics: MetricUnavailableReport[] = [];
         let successCount = 0;
 
@@ -111,7 +110,7 @@ export class CustomHttpSourceClient implements SourceClient {
                 metrics[metricResult.metricKey] = buildScalarMetricValue(metricResult.output.value, {
                     unit: metricResult.output.unit,
                 });
-                valueAttributions.push(buildValueAttribution(metricResult.metricKey, metricResult.output));
+                valueMetadata.push(buildValueMetadata(metricResult.metricKey, metricResult.output));
                 continue;
             }
 
@@ -140,7 +139,7 @@ export class CustomHttpSourceClient implements SourceClient {
                 timestampMilliseconds: snapshotTimestampMilliseconds,
                 metrics,
             }),
-            valueAttributions,
+            valueMetadata,
             unavailableMetrics,
         };
     }
@@ -178,7 +177,7 @@ export class CustomHttpSourceClient implements SourceClient {
         const authResult = resolveCustomHttpPreparedAuth({
             url: definition.request.url,
             authReference: definition.request.auth,
-            globalSettings: this.credentialSettingsReader.readStoredGlobalSettings(),
+            credentialSettings: this.credentialSettingsReader.readCredentialSettings(),
         });
         if (!authResult.ok) {
             return {
@@ -268,10 +267,10 @@ export class CustomHttpSourceClient implements SourceClient {
     }
 }
 
-function buildValueAttribution(
+function buildValueMetadata(
     metricKey: string,
     output: CustomHttpMetricTransformOutput,
-): MetricValueAttribution {
+): SourceMetricValueMetadata {
     return {
         metricId: metricKey,
         valueFreshness: "fresh",
@@ -284,22 +283,7 @@ function buildValueAttribution(
                 suggestedLucideIconId: output.suggestedLucideIconId,
             }),
         },
-        rawSensorIdentity: {
-            sourceSensorId: metricKey,
-            hardwareId: "custom-http",
-            hardwareName: "Custom HTTP",
-            hardwareType: "HTTP",
-            sensorName: output.label,
-            sourceSensorType: output.customUnit ?? formatMetricUnitForAttribution(output.unit),
-        },
     };
-}
-
-function formatMetricUnitForAttribution(unit: MetricUnit): string {
-    const enumName = MetricUnit[unit];
-    return typeof enumName === "string" && unit !== MetricUnit.UNSPECIFIED
-        ? enumName.toLowerCase()
-        : "custom";
 }
 
 function isMetricReadSuccess(metricResult: CustomHttpMetricReadResult): metricResult is CustomHttpMetricReadSuccess {

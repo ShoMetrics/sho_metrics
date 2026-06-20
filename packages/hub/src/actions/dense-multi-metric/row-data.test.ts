@@ -15,7 +15,7 @@ import type {
 import { CPU_USAGE_METRIC_KEY, GPU_USAGE_METRIC_KEY } from "../../runtime/metric-keys";
 import { resolveDiskUsageMetricKey } from "../../runtime/disk-metric-keys";
 import { MetricUnit } from "../../runtime/sources/metric-source";
-import type { MetricValueAttribution } from "../../runtime/sources/source-client";
+import type { SourceMetricValueMetadata } from "../../runtime/sources/source-client";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     BUILT_IN_NODE_SYSTEM_SOURCE_PROFILE_ID,
@@ -420,14 +420,14 @@ function buildWidgetData(overrides: Partial<WidgetData> = {}): WidgetData {
 class FakeMetricStoreReader implements MetricStoreReader {
     constructor(
         private readonly widgetDataByMetricKey: Readonly<Record<string, WidgetData>>,
-        private readonly attributionByMetricKey: Readonly<Record<string, MetricValueAttribution>> = {},
+        private readonly metadataByMetricKey: Readonly<Record<string, SourceMetricValueMetadata>> = {},
     ) {}
 
     getWidgetData(metricKey: string, label: string, unit: string, maxValue = 100): WidgetData {
         return this.widgetDataByMetricKey[metricKey] ?? buildWidgetData({ label, unit, progress: 0 / maxValue });
     }
 
-    getWidgetDataWithAttribution(
+    getWidgetDataReadResult(
         metricKey: string,
         label: string,
         unit: string,
@@ -436,7 +436,7 @@ class FakeMetricStoreReader implements MetricStoreReader {
         return {
             widgetData: this.getWidgetData(metricKey, label, unit, maxValue),
             selectedSourceId: undefined,
-            valueAttribution: this.attributionByMetricKey[metricKey],
+            valueMetadata: this.metadataByMetricKey[metricKey],
         };
     }
 

@@ -138,7 +138,7 @@ const restrictedSchemaHardeningImports = {
 const restrictedGeneratedSettingsProtoImports = {
   patterns: [
     {
-      group: ['**/generated/shometrics/v1/settings_pb', '**/generated/shometrics/v1/settings_pb.js'],
+      group: ['**/generated/proto/shometrics/v1/settings_pb', '**/generated/proto/shometrics/v1/settings_pb.js'],
       message: 'Generated settings proto may only be imported by settings/storage modules.',
     },
   ],
@@ -153,16 +153,14 @@ const sourceProtoBoundaryFiles = [
   'src/runtime/sources/windows-helper/windows-helper-source-client.test.ts',
 ];
 
-const restrictedGeneratedSourceProtoImports = {
+const restrictedGeneratedHelperProtoImports = {
   patterns: [
     {
       group: [
-        '**/generated/shometrics/v1/source_api_pb',
-        '**/generated/shometrics/v1/source_api_pb.js',
-        '**/generated/shometrics/v1/snapshot_pb',
-        '**/generated/shometrics/v1/snapshot_pb.js',
+        '**/generated/proto/shometrics/v1/helper_grpc_service_pb',
+        '**/generated/proto/shometrics/v1/helper_grpc_service_pb.js',
       ],
-      message: 'Generated source IPC/API proto may only be imported by runtime source boundary files.',
+      message: 'Generated helper gRPC proto may only be imported by runtime source boundary files.',
     },
   ],
 };
@@ -179,7 +177,7 @@ const restrictedNonStorageSchemaAndSourceProtoImports = {
   paths: [...restrictedNonStorageSchemaHardeningImports.paths],
   patterns: [
     ...restrictedNonStorageSchemaHardeningImports.patterns,
-    ...restrictedGeneratedSourceProtoImports.patterns,
+    ...restrictedGeneratedHelperProtoImports.patterns,
   ],
 };
 

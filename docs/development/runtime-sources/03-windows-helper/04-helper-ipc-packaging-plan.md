@@ -384,10 +384,10 @@ batch unless it is the chosen client adapter skeleton.
 
 ### Batch 1: Define The gRPC Service Contract
 
-**Goal:** make `source_api.proto` the source API contract and retire
+**Goal:** make `helper_grpc_service.proto` the source API contract and retire
 `source_ipc.proto` as an envelope contract.
 
-1. Add a service to `contracts/proto/shometrics/v1/source_api.proto`:
+1. Add a service to `contracts/proto/shometrics/v1/helper_grpc_service.proto`:
 
    ```proto
    service MetricSourceService {
@@ -397,7 +397,7 @@ batch unless it is the chosen client adapter skeleton.
    }
    ```
 
-   Keep the request/response messages already in `source_api.proto`. Do not add
+   Keep the request/response messages already in `helper_grpc_service.proto`. Do not add
    a new `Any`, generic operation name, or bytes extension lane.
 
 2. Do not add `capability_ids` in this migration.
@@ -418,7 +418,7 @@ batch unless it is the chosen client adapter skeleton.
      map to "unknown" for DEBUG
 
    unknown value kind or descriptor kind:
-     drop that descriptor/attribution, log a throttled warning
+     drop that descriptor/provenance record, log a throttled warning
    ```
 
    Every dropped wire item must have a low-frequency warn log. No silent drops.
@@ -426,7 +426,7 @@ batch unless it is the chosen client adapter skeleton.
 4. Update proto generation:
 
    - C# `ShoMetrics.Source.Windows.Contracts.csproj` should generate
-     server/client gRPC code for `source_api.proto`.
+     server/client gRPC code for `helper_grpc_service.proto`.
    - Hub TypeScript should keep using generated message types at the source
      adapter boundary only. Do not let generated gRPC/proto types leak into PI,
      actions, rendering, or settings.
@@ -644,7 +644,7 @@ preserving the current runtime source contract.
    - deadline exceeded
    - `UNIMPLEMENTED` future-method vs core-method behavior
    - unknown enum values normalize conservatively
-   - malformed descriptors/attributions are dropped with warn logs
+   - malformed descriptors/provenance records are dropped with warn logs
    - retained values do not append history
    - descriptor cache invalidates on fingerprint changes
    - a 35+ minute idle channel either recovers on the next call or is lazily

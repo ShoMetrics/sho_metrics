@@ -12,7 +12,7 @@ import {
     SetMetricRefreshDemandRequestSchema,
     type ListMetricDescriptorsResponse,
     type ReadMetricSnapshotResponse,
-} from "../../../generated/proto/shometrics/v1/source_api_pb.js";
+} from "../../../generated/proto/shometrics/v1/helper_grpc_service_pb.js";
 import {
     readMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
@@ -267,13 +267,13 @@ export class WindowsHelperSourceClient implements SourceClient {
         const sourceMetadata = toRuntimeSnapshotMetadata({
             requestedMetricKeys: metricKeys,
             snapshot,
-            valueAttributions: readResponse.valueAttributions,
+            valueProvenance: readResponse.valueProvenance,
             unavailableMetrics: readResponse.unavailableMetrics,
         });
 
         return {
             snapshot,
-            valueAttributions: sourceMetadata.valueAttributions,
+            valueMetadata: sourceMetadata.valueMetadata,
             unavailableMetrics: sourceMetadata.unavailableMetrics,
         };
     }

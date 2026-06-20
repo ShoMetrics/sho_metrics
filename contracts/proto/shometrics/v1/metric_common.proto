@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package shometrics.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "ShoMetrics.Contracts.V1";
+
+// Source-agnostic metric vocabulary.
+//
+// This file is shared by in-process Node sources, Custom HTTP sources, and
+// out-of-process helpers. Keep transport, process-boundary, protocol-version,
+// helper/raw-sensor, and incidental domain-specific runtime context assumptions
+// out of this file.
+//
+// Contract placement rules:
+// - Persisted settings and profile data belong in settings.proto.
+// - Data that crosses an independently versioned, cross-language, or long-lived
+//   compatibility boundary belongs in a proto owned by that boundary.
+// - Data that stays inside one co-versioned implementation, including
+//   TypeScript-only plugin <-> Property Inspector JSON messages, belongs in
+//   that implementation's runtime model unless it is persisted as settings.
+// - Domain-specific runtime context, such as battery connection details, GPU
+//   throttle state, disk SMART status, or network link state, belongs in the
+//   owning runtime model or boundary proto by default. Promote it into this
+//   common file only as an evidence-backed deduplication refactor: the same
+//   domain-agnostic concept must already exist in at least two narrower
+//   contracts, and that duplication must have caused real drift.
+
+message MetricSnapshot {
+  // Moment the source completed the read pass used to build this snapshot.
+  google.protobuf.Timestamp captured_at = 1;
+
+  // Keyed by ShoMetrics metric id. Metric ids are opaque to generic runtime code.
+  map<string, MetricValue> metrics = 2;
+}
+
+message MetricValue {
+  oneof value {
+    double scalar = 1;
+
+    // Plain text metric value for source-derived logical metrics such as
+    // hardware model names. Source-native numeric readings are scalar unless a
+    // source exposes a real text-valued reading.
+    string text = 2;
+  }
+
+  // Canonical unit for scalar values. Text values use METRIC_UNIT_UNSPECIFIED.
+  MetricUnit unit = 3;
+
+  // Optional source-agnostic metadata for this value. This must not contain
+  // helper/raw-sensor provenance or transport-specific state.
+  MetricValueMetadata metadata = 4;
+}
+
+message MetricValueMetadata {
+  // Absence or UNSPECIFIED means consumers should treat the value as fresh
+  // unless the source boundary already supplied a stricter policy.
+  MetricValueFreshness freshness = 1;
+
+  // Present only when freshness is METRIC_VALUE_FRESHNESS_RETAINED.
+  //
+  // Retained values are display continuity values. Hub may update the current
+  // display value from them, but must not append them to real value history.
+  optional uint32 retained_age_milliseconds = 2;
+
+  // Do not add domain-specific runtime context here just because a metric needs
+  // extra display data. Start with the owning runtime model or boundary proto.
+  // Promote only as an evidence-backed deduplication refactor, following the
+  // contract placement rules at the top of this file.
+}
+
+// Catalog metadata for a metric the source can produce.
+//
+// This is intentionally source-agnostic. Source-specific raw sensor identity,
+// helper provenance, and external protocol metadata belong in the source
+// boundary that publishes the descriptor.
+message MetricDescriptor {
+  // ShoMetrics metric id, for example "cpu.temp" or a normalized native source
+  // reading id.
+  string metric_id = 1;
+
+  MetricValueKind value_kind = 2;
+  MetricUnit unit = 3;
+  MetricIdKind metric_id_kind = 4;
+
+  // Source-owned collector cost group. Consumers treat this as opaque.
+  string polling_group_id = 5;
+}
+
+// Source-reported reason for a requested metric that this source did not emit.
+//
+// This is source-agnostic supportability metadata. Consumers must still detect
+// missing values from the request/result shape they own: a requested metric is
+// missing when it has no entry in MetricSnapshot.metrics.
+message MetricUnavailableReport {
+  // ShoMetrics metric id requested by the caller.
+  string metric_id = 1;
+
+  MetricUnavailableReason reason = 2;
+}
+
+enum MetricValueKind {
+  METRIC_VALUE_KIND_UNSPECIFIED = 0;
+  METRIC_VALUE_KIND_SCALAR = 1;
+  METRIC_VALUE_KIND_TEXT = 2;
+}
+
+enum MetricIdKind {
+  METRIC_ID_KIND_UNSPECIFIED = 0;
+
+  // ShoMetrics-owned stable alias such as cpu.temp or cpu.usage_percent.
+  METRIC_ID_KIND_STABLE_ALIAS = 1;
+
+  // Source-owned native reading id such as an imported hardware sensor id.
+  METRIC_ID_KIND_SOURCE_NATIVE = 2;
+}
+
+enum MetricUnit {
+  METRIC_UNIT_UNSPECIFIED = 0;
+  METRIC_UNIT_PERCENT = 1;
+  METRIC_UNIT_CELSIUS = 2;
+  METRIC_UNIT_VOLTS = 3;
+  METRIC_UNIT_AMPERES = 4;
+  METRIC_UNIT_WATTS = 5;
+  METRIC_UNIT_HERTZ = 6;
+  METRIC_UNIT_BYTES = 7;
+  METRIC_UNIT_BYTES_PER_SECOND = 8;
+  METRIC_UNIT_REVOLUTIONS_PER_MINUTE = 9;
+  METRIC_UNIT_LITERS_PER_HOUR = 10;
+  METRIC_UNIT_UNITLESS = 11;
+  METRIC_UNIT_SECONDS = 12;
+  METRIC_UNIT_WATT_HOURS = 13;
+  METRIC_UNIT_DECIBELS_A_WEIGHTED = 14;
+  METRIC_UNIT_SIEMENS_PER_CENTIMETER = 15;
+  METRIC_UNIT_MILLISECONDS = 16;
+}
+
+enum MetricValueFreshness {
+  METRIC_VALUE_FRESHNESS_UNSPECIFIED = 0;
+
+  // The emitted value came from the source's current read pass.
+  METRIC_VALUE_FRESHNESS_FRESH = 1;
+
+  // The emitted value is a bounded last-good value retained by the source.
+  METRIC_VALUE_FRESHNESS_RETAINED = 2;
+}
+
+enum MetricUnavailableReason {
+  METRIC_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+
+  // The source could not find a backing reading for the requested metric.
+  METRIC_UNAVAILABLE_REASON_NO_SOURCE_READING = 1;
+
+  // A matching source exists, but its current value is absent or invalid.
+  METRIC_UNAVAILABLE_REASON_INVALID_VALUE = 2;
+
+  // A retained last-good value exists but exceeded the source retention window.
+  METRIC_UNAVAILABLE_REASON_EXPIRED = 3;
+
+  // The metric is known and belongs to a known polling group, but that group
+  // has not published its first snapshot yet.
+  METRIC_UNAVAILABLE_REASON_PENDING_REFRESH = 4;
+}

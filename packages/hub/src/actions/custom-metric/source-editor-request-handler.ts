@@ -302,7 +302,7 @@ export class CustomHttpSourceEditorRequestHandler {
         const authResult = resolveCustomHttpPreparedAuth({
             url,
             authReference,
-            globalSettings: this.credentialSettingsReader.readStoredGlobalSettings(),
+            credentialSettings: this.credentialSettingsReader.readCredentialSettings(),
         });
         if (!authResult.ok) {
             return authResult;

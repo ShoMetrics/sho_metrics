@@ -33,6 +33,8 @@ export const GPU_METRIC_KEYS = [
 export const RAM_USED_METRIC_KEY = "ram.used";
 export const RAM_TOTAL_METRIC_KEY = "ram.total";
 
+export const SYSTEM_BATTERY_PERCENT_METRIC_KEY = "system.battery_percent";
+
 const CPU_METRIC_KEY_SET = new Set<string>(CPU_METRIC_KEYS);
 const GPU_METRIC_KEY_SET = new Set<string>(GPU_METRIC_KEYS);
 const RAM_METRIC_KEY_SET = new Set<string>([

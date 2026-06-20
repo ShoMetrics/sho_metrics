@@ -1,8 +1,9 @@
 import { Buffer } from "node:buffer";
 import type {
-    CustomHttpCredential,
-    StoredGlobalSettings,
-} from "../../../generated/proto/shometrics/v1/settings_pb.js";
+    CustomHttpCredentialSettings,
+    CustomHttpSecretCredential,
+} from "../../../settings/storage/custom-http-credential-settings";
+import { readCustomHttpCredentialSettings } from "../../../settings/storage/custom-http-credential-settings";
 import { pluginGlobalSettingsStore } from "../../../settings/global-settings-store";
 import type { ResolvedCustomHttpRequestAuth } from "../../../settings/resolved-settings";
 import { isCustomHttpLocalOrPrivateUrl } from "./custom-http-url";
@@ -53,13 +54,13 @@ export type CustomHttpPreparedRequestResult =
     };
 
 export interface CustomHttpCredentialSettingsReader {
-    readStoredGlobalSettings(): StoredGlobalSettings;
+    readCredentialSettings(): CustomHttpCredentialSettings;
 }
 
 /** Reads Custom HTTP credentials from the in-memory global settings snapshot. */
 export class PluginGlobalCustomHttpCredentialSettingsReader implements CustomHttpCredentialSettingsReader {
-    readStoredGlobalSettings(): StoredGlobalSettings {
-        return pluginGlobalSettingsStore.getStored();
+    readCredentialSettings(): CustomHttpCredentialSettings {
+        return readCustomHttpCredentialSettings(pluginGlobalSettingsStore.getStored());
     }
 }
 
@@ -70,7 +71,7 @@ export class PluginGlobalCustomHttpCredentialSettingsReader implements CustomHtt
 export function resolveCustomHttpPreparedAuth(input: {
     readonly url: string;
     readonly authReference: ResolvedCustomHttpRequestAuth;
-    readonly globalSettings: StoredGlobalSettings;
+    readonly credentialSettings: CustomHttpCredentialSettings;
 }): CustomHttpPreparedAuthResult {
     const credentialId = input.authReference.credentialId;
     if (credentialId === undefined || credentialId.trim().length === 0) {
@@ -93,7 +94,7 @@ export function resolveCustomHttpPreparedAuth(input: {
         };
     }
 
-    const credential = input.globalSettings.customHttpCredentials.find(candidate => candidate.id === credentialId);
+    const credential = input.credentialSettings.customHttpCredentials.find(candidate => candidate.id === credentialId);
     if (credential === undefined) {
         return {
             ok: false,
@@ -203,11 +204,11 @@ function isValidCustomHttpHeaderValue(headerName: string, headerValue: string): 
     }
 }
 
-function resolveStoredCustomHttpCredential(credential: CustomHttpCredential): CustomHttpPreparedAuthResult {
-    switch (credential.auth.case) {
+function resolveStoredCustomHttpCredential(credential: CustomHttpSecretCredential): CustomHttpPreparedAuthResult {
+    switch (credential.authKind) {
         case "basic": {
-            const username = credential.auth.value.username ?? "";
-            const password = credential.auth.value.password ?? "";
+            const username = credential.username;
+            const password = credential.password;
             if (username.trim().length === 0) {
                 return {
                     ok: false,
@@ -230,7 +231,7 @@ function resolveStoredCustomHttpCredential(credential: CustomHttpCredential): Cu
             };
         }
         case "bearer": {
-            const token = credential.auth.value.token ?? "";
+            const token = credential.token;
             if (token.trim().length === 0) {
                 return missingSecretFailure();
             }
@@ -248,8 +249,8 @@ function resolveStoredCustomHttpCredential(credential: CustomHttpCredential): Cu
             };
         }
         case "header": {
-            const headerName = credential.auth.value.headerName ?? "";
-            const token = credential.auth.value.token ?? "";
+            const headerName = credential.headerName;
+            const token = credential.token;
             if (!isValidCustomHttpHeaderName(headerName)) {
                 return {
                     ok: false,
@@ -276,8 +277,8 @@ function resolveStoredCustomHttpCredential(credential: CustomHttpCredential): Cu
             };
         }
         case "query": {
-            const queryParameterName = credential.auth.value.queryParameterName ?? "";
-            const token = credential.auth.value.token ?? "";
+            const queryParameterName = credential.queryParameterName;
+            const token = credential.token;
             if (hasInvalidNameWhitespace(queryParameterName)) {
                 return {
                     ok: false,
@@ -297,7 +298,7 @@ function resolveStoredCustomHttpCredential(credential: CustomHttpCredential): Cu
                     },
                 };
         }
-        case undefined:
+        case "missing":
             return missingSecretFailure();
     }
 }

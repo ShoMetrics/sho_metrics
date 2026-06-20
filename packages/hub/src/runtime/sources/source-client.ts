@@ -3,9 +3,11 @@ import {
     MetricValueKind,
     type MetricDescriptor as ProtoMetricDescriptor,
     type MetricUnavailableReport as ProtoMetricUnavailableReport,
-    type MetricValueAttribution as ProtoMetricValueAttribution,
+    type MetricValueMetadata as ProtoMetricValueMetadata,
+} from "../../generated/proto/shometrics/v1/metric_common_pb.js";
+import {
     type RawSensorIdentity as ProtoRawSensorIdentity,
-} from "../../generated/proto/shometrics/v1/source_api_pb.js";
+} from "../../generated/proto/shometrics/v1/helper_grpc_service_pb.js";
 import type {
     MetricSnapshot,
     MetricSource,
@@ -31,22 +33,14 @@ export interface SourceWarning {
 
 export { MetricIdKind, MetricValueKind };
 
-// Source-runtime payloads intentionally derive from the source API proto so the
-// wire shape and runtime facade cannot drift. Strip protobuf-es implementation
-// fields here; adapters still own wire invariant and version-skew handling.
+// Source-runtime payloads derive from the narrow proto messages they expose.
+// Strip protobuf-es implementation fields here; adapters still own wire
+// invariant and version-skew handling.
 type RuntimeProtoPayload<T> = Readonly<{
     [Key in keyof T as Key extends `$${string}` ? never : Key]: T[Key];
 }>;
-type RuntimeProtoPayloadWithRequiredRawSensor<T> = Readonly<
-    Omit<RuntimeProtoPayload<T>, "rawSensorIdentity">
-    & { readonly rawSensorIdentity: RawSensorIdentity }
->;
-type RuntimeProtoPayloadWithOptionalRawSensor<T> = Readonly<
-    Omit<RuntimeProtoPayload<T>, "rawSensorIdentity">
-    & { readonly rawSensorIdentity?: RawSensorIdentity }
->;
 
-/** Source-owned raw sensor identity for descriptors and source attribution. */
+/** Helper-owned raw sensor identity for descriptors, provenance, and diagnostics. */
 export type RawSensorIdentity = RuntimeProtoPayload<ProtoRawSensorIdentity>;
 
 /** Runtime freshness state after source adapter enum compatibility handling. */
@@ -72,7 +66,7 @@ export interface MetricValueDisplayHint {
 
 /** Runtime unavailable reason after source adapter enum compatibility handling. */
 export type MetricUnavailableReason =
-    | "noSensorData"
+    | "noSourceReading"
     | "invalidValue"
     | "expired"
     | "pendingRefresh"
@@ -138,7 +132,10 @@ export interface SourceClientStatus {
 }
 
 /** Runtime descriptor for a metric exposed by a source. */
-export type MetricDescriptor = RuntimeProtoPayloadWithRequiredRawSensor<ProtoMetricDescriptor>;
+export type MetricDescriptor = Readonly<
+    RuntimeProtoPayload<ProtoMetricDescriptor>
+    & { readonly rawSensorIdentity?: RawSensorIdentity }
+>;
 
 /** Source-owned descriptor snapshot read through the source client boundary. */
 export interface MetricDescriptorSnapshot {
@@ -157,7 +154,7 @@ export interface MetricDescriptorSnapshot {
 /** Runtime source snapshot plus source-owned per-metric metadata. */
 export interface SourceSnapshotReadResult {
     readonly snapshot: MetricSnapshot;
-    readonly valueAttributions: readonly MetricValueAttribution[];
+    readonly valueMetadata: readonly SourceMetricValueMetadata[];
     readonly unavailableMetrics: readonly MetricUnavailableReport[];
 }
 
@@ -190,19 +187,24 @@ export function isInvalidSourceRefreshDemandError(error: unknown): boolean {
         && error.reason === "invalidDemand";
 }
 
-/** Source-owned attribution for a metric value included in a snapshot. */
-export type MetricValueAttribution = Readonly<
-    Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricValueAttribution>, "valueFreshness">
+/** Source-owned metadata for a metric value included in a snapshot. */
+export type SourceMetricValueMetadata = Readonly<
+    Omit<RuntimeProtoPayload<ProtoMetricValueMetadata>, "freshness">
     & {
+        readonly metricId: string;
         readonly valueFreshness: MetricValueFreshness;
+        readonly rawSensorIdentity?: RawSensorIdentity;
         readonly displayHint?: MetricValueDisplayHint;
     }
 >;
 
 /** Source-reported reason for a requested metric omitted from a snapshot. */
 export type MetricUnavailableReport = Readonly<
-    Omit<RuntimeProtoPayloadWithOptionalRawSensor<ProtoMetricUnavailableReport>, "reason">
-    & { readonly reason: MetricUnavailableReason }
+    Omit<RuntimeProtoPayload<ProtoMetricUnavailableReport>, "reason">
+    & {
+        readonly reason: MetricUnavailableReason;
+        readonly rawSensorIdentity?: RawSensorIdentity;
+    }
 >;
 
 /** Runtime source adapter consumed by background metric collection. */
@@ -254,7 +256,7 @@ export function createMetricSourceClient(source: MetricSource): SourceClient {
             snapshot: source.pollMetrics
                 ? await source.pollMetrics(metricKeys)
                 : await source.poll(),
-            valueAttributions: [],
+            valueMetadata: [],
             unavailableMetrics: [],
         }),
         resolveMetricPollingGroups: source.resolveMetricPollingGroups.bind(source),

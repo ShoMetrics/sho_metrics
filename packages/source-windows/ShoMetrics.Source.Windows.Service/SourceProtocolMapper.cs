@@ -18,7 +18,6 @@ using ProtoMetricDescriptor = ShoMetrics.Contracts.V1.MetricDescriptor;
 using ProtoMetricIdKind = ShoMetrics.Contracts.V1.MetricIdKind;
 using ProtoMetricUnavailableReport = ShoMetrics.Contracts.V1.MetricUnavailableReport;
 using ProtoMetricSnapshot = ShoMetrics.Contracts.V1.MetricSnapshot;
-using ProtoMetricValueAttribution = ShoMetrics.Contracts.V1.MetricValueAttribution;
 using ProtoMetricValueFreshness = ShoMetrics.Contracts.V1.MetricValueFreshness;
 using ProtoMetricUnit = ShoMetrics.Contracts.V1.MetricUnit;
 using ProtoMetricValue = ShoMetrics.Contracts.V1.MetricValue;
@@ -83,7 +82,7 @@ internal sealed class SourceProtocolMapper
             readResponse.Warnings,
             requestedMetricIds,
             snapshot.Readings.Select(reading => reading.MetricId));
-        AddValueAttributions(readResponse, snapshot.Readings);
+        AddValueProvenance(readResponse, snapshot.Readings);
         AddUnavailableMetrics(readResponse, snapshot.UnavailableMetrics);
 
         if (descriptorSnapshot is not null)
@@ -152,9 +151,9 @@ internal sealed class SourceProtocolMapper
         return protoSnapshot;
     }
 
-    private static MetricDescriptorSnapshot BuildMetricDescriptorSnapshot(CoreDescriptorSnapshot descriptorSnapshot)
+    private static HelperMetricDescriptorSnapshot BuildMetricDescriptorSnapshot(CoreDescriptorSnapshot descriptorSnapshot)
     {
-        MetricDescriptorSnapshot protoSnapshot = new()
+        HelperMetricDescriptorSnapshot protoSnapshot = new()
         {
             DescriptorFingerprint = descriptorSnapshot.DescriptorFingerprint,
         };
@@ -169,35 +168,44 @@ internal sealed class SourceProtocolMapper
 
     private static ProtoMetricValue BuildMetricValue(CoreMetricReading reading)
     {
-        return new ProtoMetricValue
+        ProtoMetricValue value = new()
         {
             Scalar = reading.Value,
             Unit = MapMetricUnit(reading.Unit),
         };
+
+        if (reading.ValueFreshness is not CoreMetricValueFreshness.Fresh || reading.RetainedAge is not null)
+        {
+            value.Metadata = new MetricValueMetadata
+            {
+                Freshness = MapMetricValueFreshness(reading.ValueFreshness),
+            };
+
+            if (reading.RetainedAge is not null)
+            {
+                value.Metadata.RetainedAgeMilliseconds = (uint)Math.Clamp(
+                    reading.RetainedAge.Value.TotalMilliseconds,
+                    0,
+                    uint.MaxValue);
+            }
+        }
+
+        return value;
     }
 
-    private static void AddValueAttributions(
+    private static void AddValueProvenance(
         ReadMetricSnapshotResponse readResponse,
         IReadOnlyList<CoreMetricReading> readings)
     {
         foreach (CoreMetricReading reading in readings)
         {
-            ProtoMetricValueAttribution attribution = new()
+            HelperMetricValueProvenance provenance = new()
             {
                 MetricId = reading.MetricId,
                 RawSensorIdentity = BuildRawSensorIdentity(reading),
-                ValueFreshness = MapMetricValueFreshness(reading.ValueFreshness),
             };
 
-            if (reading.RetainedAge is not null)
-            {
-                attribution.RetainedAgeMilliseconds = (uint)Math.Clamp(
-                        reading.RetainedAge.Value.TotalMilliseconds,
-                        0,
-                        uint.MaxValue);
-            }
-
-            readResponse.ValueAttributions.Add(attribution);
+            readResponse.ValueProvenance.Add(provenance);
         }
     }
 
@@ -212,26 +220,33 @@ internal sealed class SourceProtocolMapper
                 MetricId = diagnostic.MetricId,
                 Reason = MapMetricUnavailableReason(diagnostic.Reason),
             };
+            HelperMetricUnavailableReport helperUnavailableReport = new()
+            {
+                Report = unavailableReport,
+            };
 
             if (diagnostic.RawSensorIdentity is not null)
             {
-                unavailableReport.RawSensorIdentity = BuildRawSensorIdentity(diagnostic.RawSensorIdentity);
+                helperUnavailableReport.RawSensorIdentity = BuildRawSensorIdentity(diagnostic.RawSensorIdentity);
             }
 
-            readResponse.UnavailableMetrics.Add(unavailableReport);
+            readResponse.UnavailableMetrics.Add(helperUnavailableReport);
         }
     }
 
-    private static ProtoMetricDescriptor BuildMetricDescriptor(CoreDescriptor descriptor)
+    private static HelperMetricDescriptor BuildMetricDescriptor(CoreDescriptor descriptor)
     {
-        return new ProtoMetricDescriptor
+        return new HelperMetricDescriptor
         {
-            MetricId = descriptor.MetricId,
+            Descriptor_ = new ProtoMetricDescriptor
+            {
+                MetricId = descriptor.MetricId,
+                PollingGroupId = descriptor.PollingGroupId,
+                ValueKind = MapMetricValueKind(descriptor.ValueKind),
+                Unit = MapMetricUnit(descriptor.Unit),
+                MetricIdKind = MapMetricIdKind(descriptor.MetricIdKind),
+            },
             RawSensorIdentity = BuildRawSensorIdentity(descriptor),
-            PollingGroupId = descriptor.PollingGroupId,
-            ValueKind = MapMetricValueKind(descriptor.ValueKind),
-            Unit = MapMetricUnit(descriptor.Unit),
-            MetricIdKind = MapMetricIdKind(descriptor.MetricIdKind),
         };
     }
 
@@ -314,7 +329,7 @@ internal sealed class SourceProtocolMapper
         return metricIdKind switch
         {
             CoreMetricIdKind.StableAlias => ProtoMetricIdKind.StableAlias,
-            CoreMetricIdKind.SourceSensor => ProtoMetricIdKind.SourceSensor,
+            CoreMetricIdKind.SourceSensor => ProtoMetricIdKind.SourceNative,
             CoreMetricIdKind.Unspecified => throw new UnreachableException("Metric descriptors must use a specified metric id kind."),
             _ => throw new UnreachableException($"Missing protobuf metric id kind mapping for '{metricIdKind}'."),
         };
@@ -334,7 +349,7 @@ internal sealed class SourceProtocolMapper
     {
         return reason switch
         {
-            CoreMetricUnavailableReason.NoSensor => ProtoMetricUnavailableReason.NoSensor,
+            CoreMetricUnavailableReason.NoSensor => ProtoMetricUnavailableReason.NoSourceReading,
             CoreMetricUnavailableReason.InvalidValue => ProtoMetricUnavailableReason.InvalidValue,
             CoreMetricUnavailableReason.Expired => ProtoMetricUnavailableReason.Expired,
             CoreMetricUnavailableReason.PendingRefresh => ProtoMetricUnavailableReason.PendingRefresh,

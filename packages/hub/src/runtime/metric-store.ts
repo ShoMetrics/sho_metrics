@@ -3,7 +3,7 @@ import type { WidgetData } from "../view-rendering/widget-data";
 import { readRequiredMetricSnapshotTimestampMilliseconds, type MetricSnapshot } from "./sources/metric-source";
 import type {
     MetricUnavailableReport,
-    MetricValueAttribution,
+    SourceMetricValueMetadata,
 } from "./sources/source-client";
 
 export type MetricStoreIngestRejectionReason = "nonFiniteScalar" | "emptyText";
@@ -37,10 +37,11 @@ export interface MetricStoreReader {
     /**
      * Builds renderer-facing widget data and reports which source scope supplied it.
      *
-     * Fallback readers use this to expose runtime attribution without
-     * reimplementing source selection outside the fallback decision point.
+     * Fallback readers use this to expose the selected source and source-owned
+     * value metadata without reimplementing source selection outside the
+     * fallback decision point.
      */
-    getWidgetDataWithAttribution(
+    getWidgetDataReadResult(
         metricKey: string,
         label: string,
         unit: string,
@@ -51,11 +52,11 @@ export interface MetricStoreReader {
     getTextValue(metricKey: string): string | undefined;
 }
 
-/** Renderer-facing metric data plus source attribution. */
+/** Renderer-facing metric data plus the source selection result for that read. */
 export interface MetricWidgetDataReadResult {
     readonly widgetData: WidgetData;
     readonly selectedSourceId: string | undefined;
-    readonly valueAttribution?: MetricValueAttribution;
+    readonly valueMetadata?: SourceMetricValueMetadata;
     readonly unavailableMetric?: MetricUnavailableReport;
 }
 
@@ -71,7 +72,7 @@ export class MetricStore {
     // - inner key: ShoMetrics metric id inside that source scope, for example "cpu.usage_percent" or "disk.throughput.read".
     // No separator or escaped string format is reserved here; adapters own validation before values reach this store.
     private store = new Map<string, SourceMetricStore>();
-    private valueAttributionsBySourceScopeId = new Map<string, Map<string, MetricValueAttribution>>();
+    private valueMetadataBySourceScopeId = new Map<string, Map<string, SourceMetricValueMetadata>>();
     private unavailableMetricsBySourceScopeId = new Map<string, Map<string, MetricUnavailableReport>>();
 
     // Count of scalar samples retained for history-style views. This is not a
@@ -81,7 +82,7 @@ export class MetricStore {
 
     /** Creates a read-only metric view bound to one runtime source scope. */
     forScope(sourceScopeId: string): MetricStoreReader {
-        const readWidgetDataWithAttribution = (
+        const readWidgetDataResult = (
             metricKey: string,
             label: string,
             unit: string,
@@ -94,9 +95,9 @@ export class MetricStore {
                 unit,
                 maxValue,
             );
-            const valueAttribution = widgetData.sampleTimestampMilliseconds === undefined
+            const valueMetadata = widgetData.sampleTimestampMilliseconds === undefined
                 ? undefined
-                : this.readValueAttribution(sourceScopeId, metricKey);
+                : this.readValueMetadata(sourceScopeId, metricKey);
             const unavailableMetric = this.readUnavailableMetric(sourceScopeId, metricKey);
 
             return {
@@ -104,19 +105,19 @@ export class MetricStore {
                 selectedSourceId: widgetData.sampleTimestampMilliseconds === undefined
                     ? undefined
                     : sourceScopeId,
-                ...(valueAttribution === undefined ? {} : { valueAttribution }),
+                ...(valueMetadata === undefined ? {} : { valueMetadata }),
                 ...(unavailableMetric === undefined ? {} : { unavailableMetric }),
             };
         };
 
         return {
-            getWidgetData: (metricKey, label, unit, maxValue) => readWidgetDataWithAttribution(
+            getWidgetData: (metricKey, label, unit, maxValue) => readWidgetDataResult(
                 metricKey,
                 label,
                 unit,
                 maxValue,
             ).widgetData,
-            getWidgetDataWithAttribution: readWidgetDataWithAttribution,
+            getWidgetDataReadResult: readWidgetDataResult,
             getTextValue: metricKey => this.readTextValue(sourceScopeId, metricKey),
         };
     }
@@ -132,14 +133,14 @@ export class MetricStore {
         sourceScopeId: string,
         snapshot: MetricSnapshot,
         sourceMetadata: {
-            readonly valueAttributions?: readonly MetricValueAttribution[];
+            readonly valueMetadata?: readonly SourceMetricValueMetadata[];
             readonly unavailableMetrics?: readonly MetricUnavailableReport[];
         } = {},
     ): MetricStoreIngestReport {
         const snapshotTimestampMilliseconds = readRequiredMetricSnapshotTimestampMilliseconds(snapshot);
         const sourceStore = this.ensureSourceStore(sourceScopeId);
-        const valueAttributionsByMetricKey = new Map(
-            sourceMetadata.valueAttributions?.map(attribution => [attribution.metricId, attribution]) ?? [],
+        const valueMetadataByMetricKey = new Map(
+            sourceMetadata.valueMetadata?.map(metadata => [metadata.metricId, metadata]) ?? [],
         );
         const rejections: MetricStoreIngestRejection[] = [];
         let acceptedScalarCount = 0;
@@ -156,17 +157,17 @@ export class MetricStore {
                 }
 
                 acceptedScalarCount += 1;
-                const valueAttribution = valueAttributionsByMetricKey.get(metricKey);
-                this.recordValueAttribution(sourceScopeId, metricKey, valueAttribution);
+                const valueMetadata = valueMetadataByMetricKey.get(metricKey);
+                this.recordValueMetadata(sourceScopeId, metricKey, valueMetadata);
                 this.clearUnavailableMetric(sourceScopeId, metricKey);
                 this.record(
                     sourceStore,
                     metricKey,
                     value.value.value,
                     snapshotTimestampMilliseconds,
-                    valueAttribution === undefined
+                    valueMetadata === undefined
                         ? "fresh"
-                        : valueAttribution.valueFreshness,
+                        : valueMetadata.valueFreshness,
                 );
                 continue;
             }
@@ -179,7 +180,7 @@ export class MetricStore {
 
                 acceptedTextCount += 1;
                 this.recordText(sourceStore, metricKey, value.value.value, snapshotTimestampMilliseconds);
-                this.recordValueAttribution(sourceScopeId, metricKey, valueAttributionsByMetricKey.get(metricKey));
+                this.recordValueMetadata(sourceScopeId, metricKey, valueMetadataByMetricKey.get(metricKey));
                 this.clearUnavailableMetric(sourceScopeId, metricKey);
             }
         }
@@ -263,7 +264,7 @@ export class MetricStore {
     /** Clears all metric history and text values. Intended for isolated tests and source resets. */
     clear(): void {
         this.store.clear();
-        this.valueAttributionsBySourceScopeId.clear();
+        this.valueMetadataBySourceScopeId.clear();
         this.unavailableMetricsBySourceScopeId.clear();
     }
 
@@ -281,11 +282,11 @@ export class MetricStore {
         return this.store.get(sourceScopeId)?.get(metricKey);
     }
 
-    private readValueAttribution(
+    private readValueMetadata(
         sourceScopeId: string,
         metricKey: string,
-    ): MetricValueAttribution | undefined {
-        return this.valueAttributionsBySourceScopeId.get(sourceScopeId)?.get(metricKey);
+    ): SourceMetricValueMetadata | undefined {
+        return this.valueMetadataBySourceScopeId.get(sourceScopeId)?.get(metricKey);
     }
 
     private readUnavailableMetric(
@@ -295,24 +296,24 @@ export class MetricStore {
         return this.unavailableMetricsBySourceScopeId.get(sourceScopeId)?.get(metricKey);
     }
 
-    private recordValueAttribution(
+    private recordValueMetadata(
         sourceScopeId: string,
         metricKey: string,
-        valueAttribution: MetricValueAttribution | undefined,
+        valueMetadata: SourceMetricValueMetadata | undefined,
     ): void {
-        let valueAttributionsByMetricKey = this.valueAttributionsBySourceScopeId.get(sourceScopeId);
+        let valueMetadataByMetricKey = this.valueMetadataBySourceScopeId.get(sourceScopeId);
 
-        if (valueAttribution === undefined) {
-            valueAttributionsByMetricKey?.delete(metricKey);
+        if (valueMetadata === undefined) {
+            valueMetadataByMetricKey?.delete(metricKey);
             return;
         }
 
-        if (!valueAttributionsByMetricKey) {
-            valueAttributionsByMetricKey = new Map<string, MetricValueAttribution>();
-            this.valueAttributionsBySourceScopeId.set(sourceScopeId, valueAttributionsByMetricKey);
+        if (!valueMetadataByMetricKey) {
+            valueMetadataByMetricKey = new Map<string, SourceMetricValueMetadata>();
+            this.valueMetadataBySourceScopeId.set(sourceScopeId, valueMetadataByMetricKey);
         }
 
-        valueAttributionsByMetricKey.set(metricKey, valueAttribution);
+        valueMetadataByMetricKey.set(metricKey, valueMetadata);
     }
 
     private recordUnavailableMetrics(
@@ -326,10 +327,10 @@ export class MetricStore {
         }
 
         for (const unavailableMetric of unavailableMetrics) {
-            // Value attribution and unavailable reports are mutually exclusive
+            // Value metadata and unavailable reports are mutually exclusive
             // for the latest source report; keep the last value separately in
             // MetricStore so rendering can still use it during the freshness window.
-            this.recordValueAttribution(sourceScopeId, unavailableMetric.metricId, undefined);
+            this.recordValueMetadata(sourceScopeId, unavailableMetric.metricId, undefined);
             unavailableMetricsByMetricKey.set(unavailableMetric.metricId, unavailableMetric);
         }
     }

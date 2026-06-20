@@ -4,7 +4,7 @@ package shometrics.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
-import "shometrics/v1/snapshot.proto";
+import "shometrics/v1/metric_common.proto";
 
 option csharp_namespace = "ShoMetrics.Contracts.V1";
 
@@ -149,6 +149,7 @@ message MetricSelection {
     NetworkMetricTarget network = 12;
     DiskMetricTarget disk = 13;
     GpuMetricTarget gpu = 14;
+    SystemMetricTarget system = 15;
     CatalogMetricTarget catalog = 20;
     CustomMetricTarget custom = 30;
   }
@@ -337,6 +338,62 @@ message GpuMetricTarget {
   }];
 }
 
+message SystemMetricTarget {
+  // V1 System supports battery percentage only. Add future System readings as
+  // new oneof arms when they are implemented; do not use a kind enum.
+  oneof reading {
+    SystemBatteryMetricTarget battery = 1;
+  }
+}
+
+message SystemBatteryMetricTarget {
+  // Stable user binding captured when the user selected a peripheral System
+  // battery. Absence means the built-in computer battery. When present, the
+  // resolver must treat insufficient or non-unique identity evidence as
+  // peripheral no-data instead of matching an arbitrary device.
+  optional SystemPeripheralIdentity peripheral_identity = 1;
+
+  // Display hint captured at selection time. The resolver may show this for a
+  // stale/offline binding, but runtime discovery owns current display names.
+  optional string detected_peripheral_display_name = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message SystemPeripheralIdentity {
+  optional uint32 vendor_id = 1 [(buf.validate.field).uint32.lte = 65535];
+  optional uint32 product_id = 2 [(buf.validate.field).uint32.lte = 65535];
+  optional string manufacturer = 3 [(buf.validate.field).string.max_len = 256];
+  optional string product_name = 4 [(buf.validate.field).string.max_len = 256];
+  optional string serial_number = 5 [(buf.validate.field).string.max_len = 512];
+
+  optional uint32 interface_number = 6 [(buf.validate.field).uint32.lte = 255];
+  optional uint32 usage_page = 7 [(buf.validate.field).uint32.lte = 65535];
+  optional uint32 usage_id = 8 [(buf.validate.field).uint32.lte = 65535];
+
+  // Transport observed when the binding was captured. This is only a fallback
+  // matching signal; current display connection is observed at runtime, not
+  // from this stored fallback.
+  optional SystemPeripheralBindingTransport binding_transport = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  optional SystemPeripheralReceiverKind receiver_kind = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+
+  // Vendor-specific stable unit id from a known read-only protocol feature,
+  // such as Logitech HID++ DeviceInformation. Treat as opaque.
+  optional string vendor_unit_id = 11 [(buf.validate.field).string.max_len = 512];
+
+  // Stable model or family id owned by the vendor adapter. This is a fallback
+  // signal, not a per-unit identity.
+  optional string model_id = 12 [(buf.validate.field).string.max_len = 256];
+
+  // Route diagnostics and weak matching signal. This must not be treated as
+  // primary cross-transport identity.
+  optional uint32 receiver_slot = 13 [(buf.validate.field).uint32.lte = 255];
+}
+
 message CatalogMetricTarget {
   // Source-scoped normalized metric id produced by a source adapter.
   //
@@ -456,10 +513,34 @@ enum CatalogMetricReadingKind {
   CATALOG_METRIC_READING_KIND_OTHER = 13;
 }
 
+// Connection class observed when the user created a peripheral binding.
+// Runtime device paths and current display connection remain source-owned.
+enum SystemPeripheralBindingTransport {
+  SYSTEM_PERIPHERAL_BINDING_TRANSPORT_UNSPECIFIED = 0;
+  SYSTEM_PERIPHERAL_BINDING_TRANSPORT_BLUETOOTH = 1;
+  SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER = 2;
+  SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_WIRED = 3;
+}
+
+// Receiver family for battery route diagnostics and fallback matching. This is
+// not a per-unit identity; prefer serials or vendor unit ids when available.
+enum SystemPeripheralReceiverKind {
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_UNSPECIFIED = 0;
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_UNKNOWN_RECEIVER = 1;
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_BOLT = 2;
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_UNIFYING = 3;
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_ROG_OMNI = 4;
+  SYSTEM_PERIPHERAL_RECEIVER_KIND_LIGHTSPEED = 5;
+}
+
 // WidgetPreferences holds behavior shared by the whole widget instance.
 // Metric-specific display parameters belong in their respective *MetricTarget
 // or SlotOverrides message so future multi-slot widgets stay unambiguous.
 message WidgetPreferences {
+  // This field is intentionally broad because safe polling limits depend on
+  // the selected source and metric. The resolver must enforce source-specific
+  // minimums for sources whose polling can conflict with hardware or
+  // manufacturer software.
   optional uint32 polling_frequency_seconds = 1 [(buf.validate.field).uint32 = {
     gte: 1
     lte: 86400
@@ -484,6 +565,18 @@ message StoredGlobalSettings {
   // User-created Custom HTTP credentials. Widgets store only credential ids;
   // password and token values must not be copied into action settings.
   repeated CustomHttpCredential custom_http_credentials = 6;
+
+  // Product-level System behavior. Per-widget System selections stay in
+  // SingleMetricWidget through SystemMetricTarget; runtime-discovered device
+  // lists are never stored here.
+  optional SystemFeatureSettings system = 7;
+}
+
+message SystemFeatureSettings {
+  // Global opt-in for experimental vendor HID battery reads such as USB
+  // receiver, dongle, and wired Logitech/ROG peripherals. Absence means the
+  // resolver uses the product default, currently enabled.
+  optional bool experimental_vendor_hid_battery_enabled = 1;
 }
 
 message CustomHttpCredential {

@@ -705,9 +705,10 @@ function readMetricUnit(value) {
 function readMetricUnavailableReason(value) {
     return [
         "UNSPECIFIED",
-        "NO_SENSOR",
+        "NO_SOURCE_READING",
         "INVALID_VALUE",
         "EXPIRED",
+        "PENDING_REFRESH",
     ][value] ?? `unknown:${value}`;
 }
 

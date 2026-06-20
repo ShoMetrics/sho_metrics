@@ -187,7 +187,7 @@ Implications:
 ## Non-Goals
 
 - Do not change Windows helper C# descriptor generation for this batch.
-- Do not change `source_api.proto` for picker display metadata in v1.
+- Do not change `helper_grpc_service.proto` for picker display metadata in v1.
 - Do not add per-sensor helper refresh logic beyond the existing polling-group
   demand path.
 - Do not add a source picker.
@@ -215,7 +215,7 @@ Implications:
 | Curated recommended list inside Advanced Sensor. | Shorter common paths. | Duplicates built-in widget responsibility and blurs the picker with curated product widgets. | Reject. |
 | Store helper-only source policy in settings. | Source routing stays explicit and existing collection code works unchanged. | Stored source policy is required even before a metric is selected. | Choose. |
 | Override source routing only inside `CatalogMetric` action. | Fewer stored settings fields. | Hides source ownership outside the normal settings/source-routing path. | Reject. |
-| Add helper-owned display tree to `source_api.proto`. | Helper could provide perfect grouping and labels. | More contract work before v1 proves the current descriptor fields are insufficient. | Reject for v1. |
+| Add helper-owned display tree to `helper_grpc_service.proto`. | Helper could provide perfect grouping and labels. | More contract work before v1 proves the current descriptor fields are insufficient. | Reject for v1. |
 | Persist picker path fields such as type/hardware/reading. | Restores the exact cascade state. | Duplicates descriptor-derived UI state and can drift after hardware changes. | Reject. |
 | Keep stable aliases when a matching raw source-sensor descriptor exists. | Preserves helper-ranked alias failover such as CPU temperature/package power inside Advanced Sensor. | Repeats curated built-in widget metrics in the raw picker and hides the more specific raw sensors users came to Advanced Sensor to choose. | Reject. Built-in CPU/GPU widgets own curated aliases and their failover behavior; Advanced Sensor owns fine-grained source descriptors, accepting that selected raw sensors may be less stable. |
 | Hide noisy virtual/filter/software hardware from Advanced Sensor. | Shorter lists. | Can hide real user-needed readings and makes support/debug harder. | Reject for v1. Demote and label clearly instead of hiding. |
@@ -223,12 +223,12 @@ Implications:
 
 ## Existing Files And Owners
 
-### Generated And Source API
+### Generated Helper Contract
 
 | File | Current role | Advanced Sensor change |
 | --- | --- | --- |
-| `contracts/proto/shometrics/v1/source_api.proto` | Defines `MetricDescriptor`, `RawSensorIdentity`, polling group ids, and `ListMetricDescriptors`; imports `MetricUnit` from `snapshot.proto`. | No proto change in v1. |
-| `packages/hub/src/generated/shometrics/v1/source_api_pb.ts` | Generated source API types. | No generation expected in v1 because source API does not change. |
+| `contracts/proto/shometrics/v1/helper_grpc_service.proto` | Defines `MetricDescriptor`, `RawSensorIdentity`, polling group ids, and `ListMetricDescriptors`; imports `MetricUnit` from `metric_common.proto`. | No proto change in v1. |
+| `packages/hub/src/generated/proto/shometrics/v1/helper_grpc_service_pb.ts` | Generated helper gRPC contract types. | No generation expected in v1 because the helper contract does not change. |
 | `packages/hub/src/runtime/sources/source-client.ts` | App-owned runtime source contract. Defines `MetricDescriptor`, `MetricDescriptorSnapshot`, and `SourceClient.listMetricDescriptors`. | Reuse `MetricDescriptor` in runtime cache and PI option builder. |
 | `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-client.ts` | Owns helper gRPC calls, descriptor preload/cache, and `resolveMetricPollingGroups`. | Reuse `listMetricDescriptors([])` through the runtime root. Do not duplicate descriptor caches in PI. |
 | `packages/hub/src/runtime/sources/windows-helper/windows-helper-source-api-mapper.ts` | Converts generated descriptor messages to runtime descriptors and drops malformed wire records. | Keep as the only generated source API conversion boundary. |
@@ -356,7 +356,7 @@ Implementation rule:
   remove it from `metricCollectionBindings`, and return.
 - `CatalogMetric.onMetricsUpdate(...)` must render the no-selection placeholder
   without calling `getMetricReader(...)`.
-- `MetricAction.publishDisplayedMetricReadAttribution(...)` is already safe
+- `MetricAction.publishDisplayedMetricReadTrace(...)` is already safe
   when `getDisplayedMetricKey(...)` returns `undefined`; keep that behavior.
 
 ### 3. Property Inspector Loads Helper Descriptors

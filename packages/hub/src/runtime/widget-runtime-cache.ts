@@ -26,13 +26,12 @@ export interface WidgetRuntimeCache {
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: number | undefined;
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: number | undefined;
     runtimeMaximumGpuPowerWatts: number | undefined;
-    displayedMetricReadAttribution: DisplayedMetricReadAttribution | undefined;
+    displayedMetricReadTrace: DisplayedMetricReadTrace | undefined;
 }
-
 export type WidgetRuntimeCacheLoadState = "pending" | "ready" | "failed";
 
-/** Latest render-path source attribution for the primary metric displayed by an action. */
-export interface DisplayedMetricReadAttribution {
+/** Latest routing and outcome trace for the primary metric displayed by an action. */
+export interface DisplayedMetricReadTrace {
     readonly metricKey: string;
     readonly routing: DisplayedMetricReadRouting;
     readonly preferredSourceStatus?: SourceClientStatus;
@@ -51,7 +50,7 @@ export type DisplayedMetricReadOutcome =
 export interface DisplayedMetricValueOutcome {
     readonly kind: "value";
     readonly valueTimestampMilliseconds: number;
-    readonly freshness: DisplayedMetricValueState;
+    readonly freshness: MetricValueFreshness;
     readonly retainedAgeMilliseconds?: number;
     readonly rawSensorIdentity?: DisplayedRawSensorIdentity;
 }
@@ -70,8 +69,6 @@ export interface DisplayedRawSensorIdentity {
     readonly hardwareName?: string;
 }
 
-export type DisplayedMetricValueState = MetricValueFreshness;
-
 export type DisplayedMetricUnavailableReason = MetricUnavailableReason;
 
 export type WidgetRuntimeCachePatch = Partial<WidgetRuntimeCache>;
@@ -87,7 +84,7 @@ export const emptyWidgetRuntimeCache: WidgetRuntimeCache = {
     runtimeMaximumDiskReadThroughputMebibytesPerSecond: undefined,
     runtimeMaximumDiskWriteThroughputMebibytesPerSecond: undefined,
     runtimeMaximumGpuPowerWatts: undefined,
-    displayedMetricReadAttribution: undefined,
+    displayedMetricReadTrace: undefined,
 };
 
 export const WIDGET_RUNTIME_CACHE_MESSAGE_TYPE = "widget-runtime-cache";

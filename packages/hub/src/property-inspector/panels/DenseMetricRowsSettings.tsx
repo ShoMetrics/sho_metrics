@@ -39,7 +39,7 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
 import { buildCpuMetricKindOptionList, buildGpuMetricKindOptionList, diskMetricKindOptionList } from "./setting-options";
 
-type DenseMetricCategoryId = "cpu" | "gpu" | "memory" | "disk" | "network" | "catalog" | "customMetric";
+type DenseMetricCategoryId = "cpu" | "gpu" | "memory" | "disk" | "network" | "system" | "catalog" | "customMetric";
 
 const denseMetricCategoryOptionList = [
     { value: "cpu", label: "CPU" },
@@ -311,6 +311,8 @@ function DenseMetricTargetSettings({
             return <DenseDiskMetricSettings context={context} target={target} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
         case "network":
             return <DenseNetworkMetricSettings context={context} reading={target.reading} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
+        case "system":
+            return <></>;
         case "catalog":
             return (
                 <DenseCatalogMetricSettings
@@ -657,6 +659,8 @@ function resolveDenseMetricCategoryId(target: ResolvedMetricTarget): DenseMetric
         case "disk":
         case "network":
             return target.domain;
+        case "system":
+            return "system";
         case "catalog":
             return "catalog";
         case "customMetric":
@@ -680,6 +684,8 @@ function buildDefaultDenseMetricTarget(
             return { domain: "disk", kind: "usage" };
         case "network":
             return { domain: "network", kind: "traffic", direction: "download" };
+        case "system":
+            return { domain: "system" };
         case "catalog":
             return buildDenseCatalogMetricTarget(buildCatalogMetricOptions(descriptors, {}, i18n).selectedMetric);
         case "customMetric":
@@ -914,6 +920,8 @@ function resolveDenseMetricPlaceholderLabel(target: ResolvedMetricTarget): strin
             return target.reading.kind === "usage" ? "DSK" : "DISK";
         case "network":
             return target.reading.kind === "traffic" && target.reading.direction === "upload" ? "UP" : "DOWN";
+        case "system":
+            return "BATT";
         case "catalog":
             return target.detectedLabel ?? "METRIC";
         case "customMetric":
@@ -932,6 +940,11 @@ const denseMetricCategoryMessageByValue = {
     memory: optionMessages.memoryOption,
     disk: optionMessages.diskOption,
     network: optionMessages.networkOption,
+    system: {
+        en: "System Metric",
+        zh_CN: "系统指标",
+        ja: "システムメトリクス",
+    },
     catalog: denseMessages.catalogMetricChoice,
     customMetric: denseMessages.customMetricChoice,
 } as const satisfies Record<DenseMetricCategoryId, LocalizedMessage>;

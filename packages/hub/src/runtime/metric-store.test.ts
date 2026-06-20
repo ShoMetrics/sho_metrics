@@ -70,7 +70,7 @@ test("retained scalar values update the current value without adding history poi
             "cpu.temperature": buildScalarMetricValue(50, { unit: MetricUnit.CELSIUS }),
         },
     }), {
-        valueAttributions: [{
+        valueMetadata: [{
             metricId: "cpu.temperature",
             valueFreshness: "retained",
         }],
@@ -91,7 +91,7 @@ test("retained scalar values update the current value without adding history poi
     });
 });
 
-test("widget reads expose value attribution from the latest value", () => {
+test("widget reads expose value metadata from the latest value", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -101,7 +101,7 @@ test("widget reads expose value attribution from the latest value", () => {
             "cpu.temperature": buildScalarMetricValue(51, { unit: MetricUnit.CELSIUS }),
         },
     }), {
-        valueAttributions: [{
+        valueMetadata: [{
             metricId: "cpu.temperature",
             rawSensorIdentity: {
                 sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
@@ -115,10 +115,10 @@ test("widget reads expose value attribution from the latest value", () => {
         }],
     });
 
-    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+    const readResult = metrics.getWidgetDataReadResult("cpu.temperature", "CPU", "C", 100);
 
     assert.equal(readResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
-    assert.deepEqual(readResult.valueAttribution, {
+    assert.deepEqual(readResult.valueMetadata, {
         metricId: "cpu.temperature",
         rawSensorIdentity: {
             sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
@@ -142,17 +142,17 @@ test("widget reads expose unavailable reports without mutating metric history", 
     }), {
         unavailableMetrics: [{
             metricId: "cpu.temperature",
-            reason: "noSensorData",
+            reason: "noSourceReading",
         }],
     });
 
-    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+    const readResult = metrics.getWidgetDataReadResult("cpu.temperature", "CPU", "C", 100);
 
     assert.equal(readResult.selectedSourceId, undefined);
     assert.equal(readResult.widgetData.sampleTimestampMilliseconds, undefined);
     assert.deepEqual(readResult.unavailableMetric, {
         metricId: "cpu.temperature",
-        reason: "noSensorData",
+        reason: "noSourceReading",
     });
 
     metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
@@ -162,13 +162,13 @@ test("widget reads expose unavailable reports without mutating metric history", 
         },
     }));
 
-    const recoveredReadResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+    const recoveredReadResult = metrics.getWidgetDataReadResult("cpu.temperature", "CPU", "C", 100);
 
     assert.equal(recoveredReadResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
     assert.equal(recoveredReadResult.unavailableMetric, undefined);
 });
 
-test("unavailable reports replace stale value attribution without deleting the last value", () => {
+test("unavailable reports replace stale value metadata without deleting the last value", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
 
@@ -178,7 +178,7 @@ test("unavailable reports replace stale value attribution without deleting the l
             "cpu.temperature": buildScalarMetricValue(51, { unit: MetricUnit.CELSIUS }),
         },
     }), {
-        valueAttributions: [{
+        valueMetadata: [{
             metricId: "cpu.temperature",
             rawSensorIdentity: {
                 sourceSensorId: "lhm.sensor:/intelcpu/0/temperature/26",
@@ -201,11 +201,11 @@ test("unavailable reports replace stale value attribution without deleting the l
         }],
     });
 
-    const readResult = metrics.getWidgetDataWithAttribution("cpu.temperature", "CPU", "C", 100);
+    const readResult = metrics.getWidgetDataReadResult("cpu.temperature", "CPU", "C", 100);
 
     assert.equal(readResult.selectedSourceId, LOCAL_SOURCE_SCOPE_ID);
     assert.equal(readResult.widgetData.sampleTimestampMilliseconds, 1000);
-    assert.equal(readResult.valueAttribution, undefined);
+    assert.equal(readResult.valueMetadata, undefined);
     assert.deepEqual(readResult.unavailableMetric, {
         metricId: "cpu.temperature",
         reason: "invalidValue",

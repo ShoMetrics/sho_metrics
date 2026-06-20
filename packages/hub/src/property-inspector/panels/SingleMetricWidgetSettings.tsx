@@ -33,6 +33,7 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
                 />
             );
         case "memory":
+        case "system":
             return <DefaultWidgetSettings {...props} />;
     }
 }
