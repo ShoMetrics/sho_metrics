@@ -7,6 +7,7 @@ import type {
 } from "../native-hid-loader-internal";
 import {
     LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
+    LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
@@ -14,6 +15,7 @@ import {
     LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
 } from "./hidpp-protocol";
 import { LogitechBatteryDeviceDiscoverer } from "./logitech-battery-discovery";
+import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 
 const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
 
@@ -63,6 +65,25 @@ test("Logitech discovery uses Unifying arrival events as the online slot source"
     assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
 });
 
+test("Logitech discovery emits LIGHTSPEED candidates from responsive slot 1", async () => {
+    const nativeModule = new FakeNativeHidModule(
+        [buildLightspeedReceiverDeviceInfo()],
+        writeBytes => responseReportsForLightspeedDiscovery(writeBytes),
+    );
+    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+
+    const candidates = await discoverer.discoverBatteryDevices();
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].displayName, "Logitech LIGHTSPEED device slot 1");
+    assert.equal(candidates[0].transport, "usbReceiver");
+    assert.equal(candidates[0].receiverKind, "lightspeed");
+    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
+    assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
+    assert.equal(candidates[0].diagnostics?.batteryPercentSource, "voltageEstimated");
+    assert.equal(candidates[0].diagnostics?.batteryVoltageMillivolts, 4166);
+});
+
 test("Logitech discovery leaves direct HID++ paths to OS or future wired support", async () => {
     const nativeModule = new FakeNativeHidModule(
         [buildDirectHidppLongDeviceInfo()],
@@ -93,6 +114,14 @@ function buildUnifyingNanoReceiverDeviceInfo(): NativeHidDeviceInfo {
         ...buildBoltReceiverDeviceInfo(),
         path: "unifying-nano-path",
         productId: LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
+    };
+}
+
+function buildLightspeedReceiverDeviceInfo(): NativeHidDeviceInfo {
+    return {
+        ...buildBoltReceiverDeviceInfo(),
+        path: "lightspeed-path",
+        productId: SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES[0].productId,
     };
 }
 
@@ -137,6 +166,37 @@ function responseReportsForUnifyingDiscovery(
     return responseReportsForBatteryRead(writeBytes, onlineSlot);
 }
 
+function responseReportsForLightspeedDiscovery(
+    writeBytes: readonly number[],
+): readonly (readonly number[])[] {
+    if (writeBytes[1] !== 1) {
+        return [buildFeatureResponse(writeBytes, [0x00, 0x00, 0x00])];
+    }
+
+    const featureId = readFeatureLookupRequestFeatureId(writeBytes);
+    if (featureId !== undefined) {
+        return [buildFeatureResponse(writeBytes, lightspeedFeatureLookupPayload(featureId))];
+    }
+
+    if (writeBytes[2] === 0x07 && writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [0x10, 0x46, 0x00])];
+    }
+
+    if (writeBytes[2] === 0x03 && writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [
+            0x02,
+            0x12, 0x34, 0x56, 0x78,
+            0x00,
+            0x0F,
+            0x1A, 0x83, 0x1A, 0x85, 0x00, 0x00,
+            0x01,
+            0x01,
+        ])];
+    }
+
+    return [];
+}
+
 function responseReportsForBatteryRead(
     writeBytes: readonly number[],
     supportedSlot: number | undefined,
@@ -171,6 +231,10 @@ function responseReportsForBatteryRead(
         ])];
     }
 
+    if (writeBytes[2] === 0x07 && writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [0x10, 0x46, 0x00])];
+    }
+
     return [];
 }
 
@@ -178,6 +242,19 @@ function featureLookupPayload(featureId: number): readonly number[] {
     switch (featureId) {
         case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
             return [0x09, 0x00, 0x02];
+        case LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID:
+            return [0x07, 0x00, 0x02];
+        case 0x0003:
+            return [0x03, 0x00, 0x04];
+        default:
+            return [0x00, 0x00, 0x00];
+    }
+}
+
+function lightspeedFeatureLookupPayload(featureId: number): readonly number[] {
+    switch (featureId) {
+        case LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID:
+            return [0x07, 0x00, 0x02];
         case 0x0003:
             return [0x03, 0x00, 0x04];
         default:

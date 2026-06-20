@@ -3,9 +3,11 @@
  *
  * The framing, feature ids, function ids, and payload offsets are cross-checked
  * against local `scripts/battery/probe-logitech-current-state.mjs` runs plus
- * OpenLogi and Mouser references. No reference implementation code is copied
- * here.
+ * OpenLogi, Mouser, and Solaar references. Solaar-derived expression is kept
+ * in `solaar-derived/`.
  */
+
+import { estimateSolaarLogitechBatteryPercentFromVoltageMillivolts } from "./solaar-derived/solaar-logitech-battery-voltage";
 
 export const LOGITECH_HIDPP_VENDOR_ID = 0x046D;
 export const LOGITECH_BOLT_RECEIVER_PRODUCT_ID = 0xC548;
@@ -17,6 +19,7 @@ export const LOGITECH_HIDPP_SHORT_USAGE = 0x0001;
 export const LOGITECH_HIDPP_ROOT_FEATURE_ID = 0x0000;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
+export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
 export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = 0x1004;
 
 export const LOGITECH_HIDPP_SHORT_REPORT_ID = 0x10;
@@ -27,6 +30,7 @@ const HIDPP_ROOT_FEATURE_INDEX = 0x00;
 const ROOT_GET_FEATURE_FUNCTION_ID = 0x00;
 const HIDPP2_SOFTWARE_ID = 0x01;
 const BATTERY_STATUS_READ_FUNCTION_ID = 0x00;
+const BATTERY_VOLTAGE_READ_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_INFO_FUNCTION_ID = 0x01;
 const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
@@ -82,10 +86,12 @@ export type LogitechHidppFeatureLookupParseResult =
 
 export interface LogitechBatteryReading {
     readonly percent: number;
+    readonly percentSource: "reported" | "voltageEstimated";
     readonly featureId: number;
     readonly statusByte: number;
     readonly nextPercent?: number;
     readonly approximateLevelByte?: number;
+    readonly voltageMillivolts?: number;
 }
 
 export type LogitechBatteryParseResult =
@@ -164,6 +170,17 @@ export function buildLogitechBatteryStatusRequest(
         receiverSlot,
         featureIndex,
         functionId: BATTERY_STATUS_READ_FUNCTION_ID,
+    });
+}
+
+export function buildLogitechBatteryVoltageRequest(
+    receiverSlot: LogitechReceiverSlot,
+    featureIndex: number,
+): LogitechHidppRequest {
+    return buildLogitechShortFeatureRequest({
+        receiverSlot,
+        featureIndex,
+        functionId: BATTERY_VOLTAGE_READ_FUNCTION_ID,
     });
 }
 
@@ -317,8 +334,43 @@ export function parseLogitechBatteryStatusReport(
         reading: {
             featureId: LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
             percent,
+            percentSource: "reported",
             nextPercent: isBatteryPercent(nextPercentByte) && nextPercentByte > 0 ? nextPercentByte : undefined,
             statusByte: report.payload[2],
+        },
+    };
+}
+
+export function parseLogitechBatteryVoltageReport(
+    bytes: readonly number[],
+    expectedResponse: LogitechHidppExpectedResponse,
+): LogitechBatteryParseResult {
+    const report = parseStrictMatchingReport(bytes, expectedResponse);
+    if (report === undefined) {
+        return { state: "unrelated" };
+    }
+
+    if (report.payload.length < 3) {
+        return { state: "malformed" };
+    }
+
+    // BATTERY_VOLTAGE 0x1001 reports a raw millivolt value and flags, not an
+    // explicit percentage. The percentage is a Solaar-derived estimate and is
+    // preserved as a different source so UI can warn users.
+    const voltageMillivolts = (report.payload[0] << 8) | report.payload[1];
+    const percent = estimateSolaarLogitechBatteryPercentFromVoltageMillivolts(voltageMillivolts);
+    if (!isBatteryPercent(percent)) {
+        return { state: "noData", reason: "outOfRange" };
+    }
+
+    return {
+        state: "battery",
+        reading: {
+            featureId: LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
+            percent,
+            percentSource: "voltageEstimated",
+            statusByte: report.payload[2],
+            voltageMillivolts,
         },
     };
 }
@@ -377,6 +429,7 @@ export function parseLogitechUnifiedBatteryInfoReport(
         reading: {
             featureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
             percent,
+            percentSource: "reported",
             approximateLevelByte: report.payload[1],
             statusByte: report.payload[2],
         },

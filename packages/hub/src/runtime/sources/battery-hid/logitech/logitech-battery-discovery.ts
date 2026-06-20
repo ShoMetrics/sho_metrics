@@ -26,6 +26,7 @@ import {
     parseLogitechReceiverPairingInformation,
     parseLogitechReceiverRegisterResponse,
 } from "./logitech-receiver-registers";
+import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 
 const LOGITECH_MANUFACTURER = "Logitech";
 const LOGITECH_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
@@ -38,15 +39,18 @@ const log = logger.for("Source:BatteryHID:Logitech");
  * Files: `crates/openlogi-hid/src/transport.rs`,
  * `crates/openlogi-hid/src/route.rs`
  * Commit: `87a8d21a1fff1c562ff3c0f63445a985a254eebd`
+ * Repository: https://github.com/AprilNEA/OpenLogi
+ * Author: AprilNEA <dev@aprilnea.me>
  * License: MIT OR Apache-2.0
  *
  * Only protocol facts are used here: receiver PIDs, Unifying arrival events,
- * and Bolt pairing-register unit ids. Discovery remains ShoMetrics code and
- * only emits a candidate after a read-only battery feature succeeds.
+ * and Bolt pairing-register unit ids. Solaar adds known LIGHTSPEED receiver
+ * product ids. Discovery remains ShoMetrics code and only emits a candidate
+ * after a read-only battery feature succeeds.
  */
 
 interface LogitechReceiverDescriptor {
-    readonly receiverKind: Extract<SystemPeripheralReceiverKind, "bolt" | "unifying">;
+    readonly receiverKind: Extract<SystemPeripheralReceiverKind, "bolt" | "unifying" | "lightspeed">;
     readonly productId: number;
     readonly displayPrefix: string;
 }
@@ -67,15 +71,22 @@ const LOGITECH_RECEIVERS: readonly LogitechReceiverDescriptor[] = [
         productId: LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
         displayPrefix: "Logitech Unifying device",
     },
+    ...SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES.map(route => ({
+        receiverKind: "lightspeed" as const,
+        productId: route.productId,
+        displayPrefix: route.displayPrefix,
+    })),
 ];
 
 /**
  * Discovers Logitech HID++ battery-capable devices.
  *
- * Receiver-backed devices are addressed by receiver slot 1..6. V1 deliberately
+ * Bolt uses pairing registers and Unifying uses arrival events to find online
+ * slots. Known LIGHTSPEED receiver paths probe slot 1 only and require a
+ * successful battery feature read before becoming candidates. V1 deliberately
  * does not scan direct Bluetooth/wired HID++ collections because Windows HID
- * enumeration does not reliably distinguish BT-classic from wired direct
- * paths; Bluetooth battery should come from OS telemetry instead.
+ * enumeration does not reliably distinguish BT-classic from wired direct paths;
+ * Bluetooth battery should come from OS telemetry instead.
  */
 export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
     constructor(private readonly nativeHidModule: NativeHidModule) {}
@@ -97,8 +108,8 @@ export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer 
             try {
                 const session = new LogitechHidppSession(transport);
                 const scanSummary = createLogitechReceiverScanSummary();
-                for (const onlineSlot of discoverOnlineLogitechReceiverSlots(receiverDeviceGroup, transport)) {
-                    const battery = session.readBattery(onlineSlot.receiverSlot);
+                for (const slotRoute of discoverLogitechReceiverSlotRoutes(receiverDeviceGroup, transport)) {
+                    const battery = session.readBattery(slotRoute.receiverSlot);
                     recordLogitechBatteryRead(scanSummary, battery);
                     if (battery.state !== "battery") {
                         continue;
@@ -106,7 +117,7 @@ export class LogitechBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer 
 
                     candidates.push(buildLogitechBatteryCandidate({
                         receiverDeviceGroup,
-                        onlineSlot,
+                        slotRoute,
                         battery,
                     }));
                 }
@@ -196,7 +207,7 @@ interface LogitechReceiverDeviceGroup {
     readonly deviceInfoList: readonly NativeHidDeviceInfo[];
 }
 
-interface LogitechOnlineReceiverSlot {
+interface LogitechReceiverSlotRoute {
     readonly receiverSlot: number;
     readonly vendorUnitId?: string;
     readonly wirelessProductId?: number;
@@ -241,17 +252,22 @@ function groupLogitechReceiverManagementDevices(
     );
 }
 
-function discoverOnlineLogitechReceiverSlots(
+function discoverLogitechReceiverSlotRoutes(
     receiverDeviceGroup: LogitechReceiverDeviceGroup,
     transport: NativeLogitechHidppTransport,
-): readonly LogitechOnlineReceiverSlot[] {
-    return receiverDeviceGroup.receiver.receiverKind === "bolt"
-        ? discoverOnlineBoltSlots(transport)
-        : discoverOnlineUnifyingSlots(transport);
+): readonly LogitechReceiverSlotRoute[] {
+    switch (receiverDeviceGroup.receiver.receiverKind) {
+        case "bolt":
+            return discoverOnlineBoltSlots(transport);
+        case "unifying":
+            return discoverOnlineUnifyingSlots(transport);
+        case "lightspeed":
+            return discoverLightspeedSlotsToProbe();
+    }
 }
 
-function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): readonly LogitechOnlineReceiverSlot[] {
-    const slots: LogitechOnlineReceiverSlot[] = [];
+function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): readonly LogitechReceiverSlotRoute[] {
+    const slots: LogitechReceiverSlotRoute[] = [];
     for (let receiverSlot = 1; receiverSlot <= 6; receiverSlot += 1) {
         const request = buildLogitechDevicePairingInformationRequest(receiverSlot);
         const result = transport.exchange(request);
@@ -280,7 +296,7 @@ function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): reado
     return slots;
 }
 
-function discoverOnlineUnifyingSlots(transport: NativeLogitechHidppTransport): readonly LogitechOnlineReceiverSlot[] {
+function discoverOnlineUnifyingSlots(transport: NativeLogitechHidppTransport): readonly LogitechReceiverSlotRoute[] {
     const events = transport.drainReceiverConnectionEvents("unifying");
     if (events === undefined) {
         return [];
@@ -295,19 +311,26 @@ function discoverOnlineUnifyingSlots(transport: NativeLogitechHidppTransport): r
         }));
 }
 
+function discoverLightspeedSlotsToProbe(): readonly LogitechReceiverSlotRoute[] {
+    // Solaar models LIGHTSPEED as a receiver family, but most LIGHTSPEED
+    // dongles are single-device routes. Probe slot 1 only and let the HID++2
+    // battery read decide whether a device is online and supported.
+    return [{ receiverSlot: 1 }];
+}
+
 function buildLogitechBatteryCandidate(input: {
     readonly receiverDeviceGroup: LogitechReceiverDeviceGroup;
-    readonly onlineSlot: LogitechOnlineReceiverSlot;
+    readonly slotRoute: LogitechReceiverSlotRoute;
     readonly battery: Extract<ReturnType<LogitechHidppSession["readBattery"]>, { readonly state: "battery" }>;
 }): BatteryDeviceDiscoveryCandidate {
     const representativeDeviceInfo = input.receiverDeviceGroup.deviceInfoList[0];
     const deviceInformation = input.battery.deviceInformation;
-    const displayName = buildDisplayName(input.receiverDeviceGroup.receiver, input.onlineSlot.receiverSlot);
+    const displayName = buildDisplayName(input.receiverDeviceGroup.receiver, input.slotRoute.receiverSlot);
     const bindingTransport: SystemPeripheralBindingTransport = "usbReceiver";
-    const vendorUnitId = deviceInformation?.unitId ?? input.onlineSlot.vendorUnitId;
+    const vendorUnitId = deviceInformation?.unitId ?? input.slotRoute.vendorUnitId;
 
     return {
-        candidateId: `logitech-${input.receiverDeviceGroup.groupId}-slot-${input.onlineSlot.receiverSlot}`,
+        candidateId: `logitech-${input.receiverDeviceGroup.groupId}-slot-${input.slotRoute.receiverSlot}`,
         displayName,
         transport: bindingTransport,
         receiverKind: input.receiverDeviceGroup.receiver.receiverKind,
@@ -326,7 +349,7 @@ function buildLogitechBatteryCandidate(input: {
             receiverKind: input.receiverDeviceGroup.receiver.receiverKind,
             vendorUnitId,
             modelId: deviceInformation?.modelId,
-            receiverSlot: input.onlineSlot.receiverSlot,
+            receiverSlot: input.slotRoute.receiverSlot,
         },
         supportState: "supported",
         isExperimental: true,
@@ -335,7 +358,9 @@ function buildLogitechBatteryCandidate(input: {
             sourcePathId: input.receiverDeviceGroup.deviceInfoList
                 .flatMap(deviceInfo => deviceInfo.path === undefined ? [] : [deviceInfo.path])
                 .join(";"),
-            receiverSlot: input.onlineSlot.receiverSlot,
+            receiverSlot: input.slotRoute.receiverSlot,
+            batteryPercentSource: input.battery.reading.percentSource,
+            batteryVoltageMillivolts: input.battery.reading.voltageMillivolts,
         },
     };
 }

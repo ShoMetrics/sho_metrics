@@ -46,6 +46,7 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
         batteryDevices,
         props.target,
     );
+    const selectedBatteryDevice = batteryDevices.find(descriptor => descriptor.descriptorId === selectedDescriptorId);
     const optionList = buildBatteryDeviceOptions({
         descriptors: batteryDevices,
         selectedDescriptorId,
@@ -73,6 +74,11 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                         });
                     }}
                 />
+                {selectedBatteryDevice?.diagnostics?.batteryPercentSources.includes("voltageEstimated") === true && (
+                    <p className="section-note">
+                        {t(systemMessages.voltageEstimatedBatteryNote)}
+                    </p>
+                )}
                 <InspectorItem label={t(systemMessages.experimentalVendorHidBatterySettingLabel)}>
                     <div className="override-toggle-control">
                         <label className="native-checkbox-row">
