@@ -143,7 +143,11 @@ export class LogitechHidppSession {
         // HID++ battery support is feature-table driven. Fallback is absent-only:
         // a malformed/timeout response means the queue is not trustworthy for
         // this tick, so the source publishes no-data instead of probing another
-        // battery feature.
+        // battery feature. V1 intentionally uses targeted Root.getFeature
+        // lookups for known battery features. OpenLogi FeatureSet (0x0001)
+        // can enumerate the whole table in one pass and may be a better
+        // reliability strategy for slow devices, but switching to it is a
+        // reader policy change, not part of parser provenance migration.
         const unifiedBatteryFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
         if (unifiedBatteryFeature.state === "supported") {
             const batteryResult = this.readUnifiedBattery(receiverSlot, unifiedBatteryFeature.feature.featureIndex);
