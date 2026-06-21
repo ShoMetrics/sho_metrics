@@ -22,10 +22,13 @@ import {
     type NativeLogitechHidppTransport,
 } from "./logitech-hidpp-reader";
 import {
-    buildLogitechDevicePairingInformationRequest,
-    parseLogitechReceiverPairingInformation,
-    parseLogitechReceiverRegisterResponse,
-} from "./logitech-receiver-registers";
+    OPENLOGI_BOLT_MAX_RECEIVER_SLOTS,
+} from "./openlogi-derived/hid/inventory";
+import { parseOpenLogiHidpp10RegisterResponse } from "./openlogi-derived/protocol/v10";
+import {
+    buildOpenLogiBoltDevicePairingInformationRequest,
+    parseOpenLogiBoltDevicePairingInformation,
+} from "./openlogi-derived/receiver/bolt";
 import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 
 const LOGITECH_MANUFACTURER = "Logitech";
@@ -41,7 +44,8 @@ const log = logger.for("Source:BatteryHID:Logitech");
  * Commit: `87a8d21a1fff1c562ff3c0f63445a985a254eebd`
  * Repository: https://github.com/AprilNEA/OpenLogi
  * Author: AprilNEA <dev@aprilnea.me>
- * License: MIT OR Apache-2.0
+ * Original license for cited OpenLogi HID files: MIT OR Apache-2.0
+ * ShoMetrics integration is distributed under the project license.
  *
  * Only protocol facts are used here: receiver PIDs, Unifying arrival events,
  * and Bolt pairing-register unit ids. Solaar adds known LIGHTSPEED receiver
@@ -268,19 +272,19 @@ function discoverLogitechReceiverSlotRoutes(
 
 function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): readonly LogitechReceiverSlotRoute[] {
     const slots: LogitechReceiverSlotRoute[] = [];
-    for (let receiverSlot = 1; receiverSlot <= 6; receiverSlot += 1) {
-        const request = buildLogitechDevicePairingInformationRequest(receiverSlot);
+    for (let receiverSlot = 1; receiverSlot <= OPENLOGI_BOLT_MAX_RECEIVER_SLOTS; receiverSlot += 1) {
+        const request = buildOpenLogiBoltDevicePairingInformationRequest(receiverSlot);
         const result = transport.exchange(request);
         if (result.state !== "response") {
             continue;
         }
 
-        const registerResponse = parseLogitechReceiverRegisterResponse(result.report, request);
+        const registerResponse = parseOpenLogiHidpp10RegisterResponse(result.report, request);
         if (registerResponse.state !== "register") {
             continue;
         }
 
-        const parsed = parseLogitechReceiverPairingInformation("bolt", registerResponse.payload);
+        const parsed = parseOpenLogiBoltDevicePairingInformation(registerResponse.payload);
         if (parsed.state !== "pairingInformation" || !parsed.pairingInformation.online) {
             continue;
         }

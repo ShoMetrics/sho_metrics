@@ -2,12 +2,18 @@ import { monotonicNowMilliseconds } from "../../../../shared/clock";
 import { logger } from "../../../../logging/logger";
 import type { NativeHidDevice, NativeHidDeviceInfo } from "../native-hid-loader-internal";
 import {
-    buildLogitechTriggerDeviceArrivalRequest,
-    parseLogitechReceiverDeviceConnectionEvent,
-    parseLogitechReceiverRegisterResponse,
-    type LogitechReceiverDeviceConnection,
-    type LogitechReceiverProtocolKind,
-} from "./logitech-receiver-registers";
+    buildOpenLogiTriggerDeviceArrivalRequest,
+    OPENLOGI_RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS,
+} from "./openlogi-derived/hid/inventory";
+import {
+    parseOpenLogiHidpp10RegisterResponse,
+} from "./openlogi-derived/protocol/v10";
+import type {
+    OpenLogiReceiverDeviceConnection,
+    OpenLogiReceiverKind,
+} from "./openlogi-derived/receiver/mod";
+import { parseOpenLogiBoltDeviceConnectionEvent } from "./openlogi-derived/receiver/bolt";
+import { parseOpenLogiUnifyingDeviceConnectionEvent } from "./openlogi-derived/receiver/unifying";
 import {
     buildLogitechBatteryStatusRequest,
     buildLogitechBatteryVoltageRequest,
@@ -43,7 +49,7 @@ const READ_SLICE_TIMEOUT_MILLISECONDS = 20;
 // Keep this separate from ordinary feature transactions: Unifying arrival
 // events are the online-slot discovery source, while feature reads can fail as
 // transient no-data and retry on the next low-frequency battery poll.
-const RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS = 1500;
+const RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS = OPENLOGI_RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS;
 const LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
 const log = logger.for("Source:BatteryHID:Logitech");
 
@@ -416,9 +422,9 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
      * a stable per-slot inventory register. Bolt can also emit them, but Bolt
      * still uses pairing registers as the stable unit-id source.
      */
-    drainReceiverConnectionEvents(receiverKind: LogitechReceiverProtocolKind): readonly LogitechReceiverDeviceConnection[] | undefined {
-        const request = buildLogitechTriggerDeviceArrivalRequest();
-        const connections: LogitechReceiverDeviceConnection[] = [];
+    drainReceiverConnectionEvents(receiverKind: OpenLogiReceiverKind): readonly OpenLogiReceiverDeviceConnection[] | undefined {
+        const request = buildOpenLogiTriggerDeviceArrivalRequest();
+        const connections: OpenLogiReceiverDeviceConnection[] = [];
         let unrelatedReportCount = 0;
 
         try {
@@ -432,13 +438,13 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                     continue;
                 }
 
-                const event = parseLogitechReceiverDeviceConnectionEvent(receiverKind, report);
+                const event = parseOpenLogiReceiverDeviceConnectionEvent(receiverKind, report);
                 if (event.state === "deviceConnection") {
                     connections.push(event.connection);
                     continue;
                 }
 
-                const triggerResponse = parseLogitechReceiverRegisterResponse(report, request);
+                const triggerResponse = parseOpenLogiHidpp10RegisterResponse(report, request);
                 if (triggerResponse.state === "register") {
                     triggerAcknowledged = true;
                     continue;
@@ -464,7 +470,7 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                     continue;
                 }
 
-                const event = parseLogitechReceiverDeviceConnectionEvent(receiverKind, report);
+                const event = parseOpenLogiReceiverDeviceConnectionEvent(receiverKind, report);
                 if (event.state === "deviceConnection") {
                     connections.push(event.connection);
                     continue;
@@ -498,6 +504,24 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
 
         return undefined;
     }
+}
+
+function parseOpenLogiReceiverDeviceConnectionEvent(
+    receiverKind: OpenLogiReceiverKind,
+    report: readonly number[],
+) {
+    switch (receiverKind) {
+        case "unifying":
+            return parseOpenLogiUnifyingDeviceConnectionEvent(report);
+        case "bolt":
+            return parseOpenLogiBoltDeviceConnectionEvent(report);
+        default:
+            return assertNever(receiverKind);
+    }
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected Logitech receiver kind: ${value}`);
 }
 
 export function openNativeLogitechHidppTransport(

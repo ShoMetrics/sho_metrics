@@ -8,13 +8,42 @@
  */
 
 import { estimateSolaarLogitechBatteryPercentFromVoltageMillivolts } from "./solaar-derived/solaar-logitech-battery-voltage";
+import { OPENLOGI_BOLT_RECEIVER_PRODUCT_ID } from "./openlogi-derived/receiver/bolt";
+import {
+    OPENLOGI_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
+    OPENLOGI_UNIFYING_RECEIVER_PRODUCT_ID,
+} from "./openlogi-derived/receiver/unifying";
+import {
+    OPENLOGI_HIDPP_CLASSIC_SHORT_USAGE,
+    OPENLOGI_HIDPP_CLASSIC_USAGE_PAGE,
+    OPENLOGI_LOGITECH_VENDOR_ID,
+} from "./openlogi-derived/hid/transport";
+import {
+    LOGITECH_HIDPP_LONG_REPORT_ID,
+    LOGITECH_HIDPP_SHORT_REPORT_ID,
+} from "./logitech-hidpp-frame";
+import type {
+    LogitechHidppExpectedResponse,
+    LogitechHidppRequest,
+    LogitechReceiverSlot,
+} from "./logitech-hidpp-frame";
 
-export const LOGITECH_HIDPP_VENDOR_ID = 0x046D;
-export const LOGITECH_BOLT_RECEIVER_PRODUCT_ID = 0xC548;
-export const LOGITECH_UNIFYING_RECEIVER_PRODUCT_ID = 0xC52B;
-export const LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID = 0xC532;
-export const LOGITECH_HIDPP_CLASSIC_USAGE_PAGE = 0xFF00;
-export const LOGITECH_HIDPP_SHORT_USAGE = 0x0001;
+export {
+    LOGITECH_HIDPP_LONG_REPORT_ID,
+    LOGITECH_HIDPP_SHORT_REPORT_ID,
+} from "./logitech-hidpp-frame";
+export type {
+    LogitechHidppExpectedResponse,
+    LogitechHidppRequest,
+    LogitechReceiverSlot,
+} from "./logitech-hidpp-frame";
+
+export const LOGITECH_HIDPP_VENDOR_ID = OPENLOGI_LOGITECH_VENDOR_ID;
+export const LOGITECH_BOLT_RECEIVER_PRODUCT_ID = OPENLOGI_BOLT_RECEIVER_PRODUCT_ID;
+export const LOGITECH_UNIFYING_RECEIVER_PRODUCT_ID = OPENLOGI_UNIFYING_RECEIVER_PRODUCT_ID;
+export const LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID = OPENLOGI_UNIFYING_NANO_RECEIVER_PRODUCT_ID;
+export const LOGITECH_HIDPP_CLASSIC_USAGE_PAGE = OPENLOGI_HIDPP_CLASSIC_USAGE_PAGE;
+export const LOGITECH_HIDPP_SHORT_USAGE = OPENLOGI_HIDPP_CLASSIC_SHORT_USAGE;
 
 export const LOGITECH_HIDPP_ROOT_FEATURE_ID = 0x0000;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
@@ -22,8 +51,6 @@ export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
 export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = 0x1004;
 
-export const LOGITECH_HIDPP_SHORT_REPORT_ID = 0x10;
-export const LOGITECH_HIDPP_LONG_REPORT_ID = 0x11;
 export const LOGITECH_HIDPP_MAX_RECEIVER_SLOT = 6;
 
 const HIDPP_ROOT_FEATURE_INDEX = 0x00;
@@ -35,21 +62,6 @@ const UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_INFO_FUNCTION_ID = 0x01;
 const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
 const HIDPP_ERROR_FEATURE_INDEX = 0xFF;
-
-/** HID++ receiver paired-device slot, called device index in HID++ framing. */
-export type LogitechReceiverSlot = number;
-
-export interface LogitechHidppRequest {
-    readonly bytes: readonly number[];
-    readonly expectedResponse: LogitechHidppExpectedResponse;
-}
-
-/** Strict response header expected for one HID++ request. */
-export interface LogitechHidppExpectedResponse {
-    readonly receiverSlot: LogitechReceiverSlot;
-    readonly featureIndex: number;
-    readonly functionByte: number;
-}
 
 export interface LogitechHidppReport {
     readonly reportId: number | undefined;
