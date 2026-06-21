@@ -1,9 +1,11 @@
 import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import { SYSTEM_BATTERY_DEVICE_DESCRIPTOR } from "../runtime/sources/battery/battery-device-descriptor";
+import { readVendorHidBatteryDeviceDescriptors } from "../runtime/sources/battery/vendor-hid-battery-source-client";
 import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     buildSystemViewOptions,
@@ -37,10 +39,25 @@ export class System extends MetricAction {
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
-        this.updateRuntimeCache(event, {
-            availableBatteryDevices: [SYSTEM_BATTERY_DEVICE_DESCRIPTOR],
-        }).catch(error => {
+        this.refreshBatteryDevicesForPropertyInspector(event).catch(error => {
             log.error(() => `Failed to publish battery devices: ${String(error)}`);
         });
+    }
+
+    protected async refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        const vendorBatteryDevices = await readVendorHidBatteryDeviceDescriptors({
+            isExperimentalVendorHidEnabled: this.resolveGlobalVendorHidBatteryEnabled(),
+        });
+
+        await this.updateRuntimeCache(event, {
+            availableBatteryDevices: [
+                SYSTEM_BATTERY_DEVICE_DESCRIPTOR,
+                ...vendorBatteryDevices,
+            ],
+        });
+    }
+
+    private resolveGlobalVendorHidBatteryEnabled(): boolean {
+        return pluginGlobalSettingsStore.getResolved().system.experimentalVendorHidBatteryEnabled;
     }
 }

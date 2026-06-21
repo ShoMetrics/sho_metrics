@@ -79,7 +79,7 @@ export class AsusRogBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
                 }
 
                 candidates.push(
-                    buildAsusRogBatteryCandidate(deviceInfo, route),
+                    buildAsusRogBatteryCandidate(deviceInfo, route, battery.reading.percent),
                 );
             } finally {
                 transport.close();
@@ -254,6 +254,7 @@ function isSafeAsusRogVendorCollection(
 function buildAsusRogBatteryCandidate(
     deviceInfo: NativeHidDeviceInfo,
     route: AsusRogBatteryRoute,
+    batteryPercent: number,
 ): BatteryDeviceDiscoveryCandidate {
     // Candidate identity intentionally preserves route diagnostics such as HID
     // interface and usage, but the stable descriptor key later ignores
@@ -282,6 +283,7 @@ function buildAsusRogBatteryCandidate(
         },
         supportState: route.supportState,
         isExperimental: true,
+        batteryPercent,
         batteryTelemetryFreshness: "fresh",
         diagnostics: {
             sourcePathId: deviceInfo.path,

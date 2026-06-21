@@ -55,6 +55,7 @@ export function buildLogitechBatteryCandidate(input: {
         },
         supportState: "supported",
         isExperimental: true,
+        batteryPercent: input.battery.reading.percent,
         batteryTelemetryFreshness: "fresh",
         diagnostics: {
             sourcePathId: input.receiverDeviceGroup.deviceInfoList
