@@ -39,6 +39,15 @@ import {
     OPENLOGI_ROOT_GET_FEATURE_FUNCTION_ID,
     parseOpenLogiRootGetFeatureResponsePayload,
 } from "./openlogi-derived/feature/root";
+import {
+    encodeOpenLogiBatteryLevel,
+    OPENLOGI_UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID,
+    OPENLOGI_UNIFIED_BATTERY_FEATURE_ID,
+    OPENLOGI_UNIFIED_BATTERY_INFO_FUNCTION_ID,
+    parseOpenLogiBatteryCapabilitiesPayload,
+    parseOpenLogiBatteryInfoPayload,
+    type OpenLogiBatteryLevel,
+} from "./openlogi-derived/feature/unified-battery";
 import type {
     LogitechHidppExpectedResponse,
     LogitechHidppRequest,
@@ -66,15 +75,13 @@ export const LOGITECH_HIDPP_ROOT_FEATURE_ID = OPENLOGI_ROOT_FEATURE_ID;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
-export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = 0x1004;
+export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = OPENLOGI_UNIFIED_BATTERY_FEATURE_ID;
 
 export const LOGITECH_HIDPP_MAX_RECEIVER_SLOT = 6;
 
 const HIDPP2_SOFTWARE_ID = 0x01;
 const BATTERY_STATUS_READ_FUNCTION_ID = 0x00;
 const BATTERY_VOLTAGE_READ_FUNCTION_ID = 0x00;
-const UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID = 0x00;
-const UNIFIED_BATTERY_INFO_FUNCTION_ID = 0x01;
 const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
 
 export interface LogitechHidppReport {
@@ -216,7 +223,7 @@ export function buildLogitechUnifiedBatteryCapabilitiesRequest(
     return buildLogitechShortFeatureRequest({
         receiverSlot,
         featureIndex,
-        functionId: UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID,
+        functionId: OPENLOGI_UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID,
     });
 }
 
@@ -227,7 +234,7 @@ export function buildLogitechUnifiedBatteryInfoRequest(
     return buildLogitechShortFeatureRequest({
         receiverSlot,
         featureIndex,
-        functionId: UNIFIED_BATTERY_INFO_FUNCTION_ID,
+        functionId: OPENLOGI_UNIFIED_BATTERY_INFO_FUNCTION_ID,
     });
 }
 
@@ -415,15 +422,13 @@ export function parseLogitechUnifiedBatteryCapabilitiesReport(
         return { state: "malformed" };
     }
 
-    // UNIFIED_BATTERY 0x1004 gates percentage parsing through capabilities.
-    // Devices that only expose approximate levels are handled as no-data for
-    // percent until a tested conversion exists.
+    const capabilities = parseOpenLogiBatteryCapabilitiesPayload(report.payload);
     return {
         state: "capabilities",
         capabilities: {
-            reportedLevelMask: report.payload[0],
-            isRechargeable: (report.payload[1] & 0x01) !== 0,
-            supportsPercentage: (report.payload[1] & 0x02) !== 0,
+            reportedLevelMask: encodeOpenLogiBatteryLevelMask(capabilities.reportedLevels),
+            isRechargeable: capabilities.rechargeable,
+            supportsPercentage: capabilities.percentage,
         },
     };
 }
@@ -446,7 +451,8 @@ export function parseLogitechUnifiedBatteryInfoReport(
         return { state: "noData", reason: "noPercentage" };
     }
 
-    const percent = report.payload[0];
+    const batteryInfo = parseOpenLogiBatteryInfoPayload(report.payload);
+    const percent = batteryInfo.chargingPercentage;
     if (!isBatteryPercent(percent)) {
         return { state: "noData", reason: "outOfRange" };
     }
@@ -457,8 +463,8 @@ export function parseLogitechUnifiedBatteryInfoReport(
             featureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
             percent,
             percentSource: "reported",
-            approximateLevelByte: report.payload[1],
-            statusByte: report.payload[2],
+            approximateLevelByte: batteryInfo.levelByte,
+            statusByte: batteryInfo.statusByte,
         },
     };
 }
@@ -564,6 +570,15 @@ function expectedResponseToOpenLogiHeader(
 
 function isBatteryPercent(value: number): boolean {
     return value >= 0 && value <= 100;
+}
+
+function encodeOpenLogiBatteryLevelMask(reportedLevels: ReadonlySet<OpenLogiBatteryLevel>): number {
+    let mask = 0;
+    for (const level of reportedLevels) {
+        mask |= encodeOpenLogiBatteryLevel(level);
+    }
+
+    return mask;
 }
 
 function formatNonZeroHexBytes(bytes: readonly number[]): string | undefined {

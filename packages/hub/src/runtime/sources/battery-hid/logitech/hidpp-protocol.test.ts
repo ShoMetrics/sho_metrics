@@ -152,6 +152,50 @@ test("Logitech UNIFIED_BATTERY does not invent percentages from approximate leve
     );
 });
 
+test("Logitech UNIFIED_BATTERY keeps percentage for unknown level or status values", () => {
+    const infoRequest = buildLogitechUnifiedBatteryInfoRequest(0x02, 0x09);
+    const capabilities = {
+        reportedLevelMask: 0x0F,
+        isRechargeable: true,
+        supportsPercentage: true,
+    };
+
+    assert.deepEqual(
+        parseLogitechUnifiedBatteryInfoReport(
+            [0x11, 0x02, 0x09, 0x11, 0x5A, 0xFF, 0x00],
+            infoRequest.expectedResponse,
+            capabilities,
+        ),
+        {
+            state: "battery",
+            reading: {
+                featureId: 0x1004,
+                percent: 90,
+                percentSource: "reported",
+                approximateLevelByte: 0xFF,
+                statusByte: 0x00,
+            },
+        },
+    );
+    assert.deepEqual(
+        parseLogitechUnifiedBatteryInfoReport(
+            [0x11, 0x02, 0x09, 0x11, 0x5A, 0x08, 0xFF],
+            infoRequest.expectedResponse,
+            capabilities,
+        ),
+        {
+            state: "battery",
+            reading: {
+                featureId: 0x1004,
+                percent: 90,
+                percentSource: "reported",
+                approximateLevelByte: 0x08,
+                statusByte: 0xFF,
+            },
+        },
+    );
+});
+
 test("Logitech BATTERY_VOLTAGE parses raw voltage as an estimated percentage", () => {
     const request = buildLogitechBatteryVoltageRequest(0x01, 0x07);
 
