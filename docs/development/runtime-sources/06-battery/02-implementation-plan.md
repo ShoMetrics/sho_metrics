@@ -460,8 +460,8 @@ Likely locations:
 - `packages/hub/src/runtime/sources/battery-hid/logitech/**`
 - `packages/hub/src/runtime/sources/battery-hid/native-hid-loader.ts`
 - `packages/hub/src/runtime/sources/battery/**`
-- `scripts/battery/probe-logitech-current-state.mjs`
-- `scripts/battery/stress-logitech-mx-battery.mjs`
+- `packages/hub/scripts/battery/probe-logitech-current-state.mjs`
+- `packages/hub/scripts/battery/stress-logitech-mx-battery.mjs`
 
 Estimated code size: `650-1,000` lines.
 
@@ -516,9 +516,9 @@ Likely locations:
 - `packages/hub/src/runtime/sources/battery-hid/asus-rog/**`
 - `packages/hub/src/runtime/sources/battery-hid/native-hid-loader.ts`
 - `packages/hub/src/runtime/sources/battery/**`
-- `scripts/battery/probe-rog-omni-keyboard-battery.mjs`
-- `scripts/battery/probe-rog-wired-keyboard-battery.mjs`
-- `scripts/battery/stress-rog-rx96-battery.mjs`
+- `packages/hub/scripts/battery/probe-rog-omni-keyboard-battery.mjs`
+- `packages/hub/scripts/battery/probe-rog-wired-keyboard-battery.mjs`
+- `packages/hub/scripts/battery/stress-rog-rx96-battery.mjs`
 
 Estimated code size: `650-1,050` lines.
 
@@ -709,7 +709,7 @@ Likely locations:
 
 - `packages/hub/src/**/*.test.ts`
 - `packages/hub/src/**/*.pi.test.tsx`
-- `scripts/battery/**`
+- `packages/hub/scripts/battery/**`
 - `docs/development/runtime-sources/06-battery/01-hid-battery-experiment-report.md`
 - `docs/development/runtime-sources/06-battery/02-implementation-plan.md`
 
@@ -722,13 +722,13 @@ Work:
   and disabled experimental toggle.
 - Add runtime tests for lazy loading and no startup HID discovery.
 - Keep scripts for manual HID verification:
-  - `scripts/battery/probe-devices.mjs`;
-  - `scripts/battery/probe-rog-omni-keyboard-battery.mjs`;
-  - `scripts/battery/probe-rog-wired-keyboard-battery.mjs`;
-  - `scripts/battery/probe-logitech-current-state.mjs`;
-  - `scripts/battery/stress-rog-rx96-battery.mjs`;
-  - `scripts/battery/stress-logitech-mx-battery.mjs`;
-  - `scripts/battery/keyboard-raw-input-logger.ps1`.
+  - `packages/hub/scripts/battery/probe-devices.mjs`;
+  - `packages/hub/scripts/battery/probe-rog-omni-keyboard-battery.mjs`;
+  - `packages/hub/scripts/battery/probe-rog-wired-keyboard-battery.mjs`;
+  - `packages/hub/scripts/battery/probe-logitech-current-state.mjs`;
+  - `packages/hub/scripts/battery/stress-rog-rx96-battery.mjs`;
+  - `packages/hub/scripts/battery/stress-logitech-mx-battery.mjs`;
+  - `packages/hub/scripts/battery/keyboard-raw-input-logger.ps1`.
 - Run manual Windows validation on:
   - built-in battery if available;
   - RX96/Falchion/Azoth ROG keyboard paths;
