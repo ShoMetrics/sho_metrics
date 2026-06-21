@@ -40,6 +40,12 @@ import {
     parseOpenLogiRootGetFeatureResponsePayload,
 } from "./openlogi-derived/feature/root";
 import {
+    buildOpenLogiDeviceInformationGetDeviceInfoRequestPayload,
+    OPENLOGI_DEVICE_INFORMATION_DEVICE_INFO_FUNCTION_ID,
+    OPENLOGI_DEVICE_INFORMATION_FEATURE_ID,
+    parseOpenLogiDeviceInformationPayload,
+} from "./openlogi-derived/feature/device-information";
+import {
     encodeOpenLogiBatteryLevel,
     OPENLOGI_UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID,
     OPENLOGI_UNIFIED_BATTERY_FEATURE_ID,
@@ -72,7 +78,7 @@ export const LOGITECH_HIDPP_CLASSIC_USAGE_PAGE = OPENLOGI_HIDPP_CLASSIC_USAGE_PA
 export const LOGITECH_HIDPP_SHORT_USAGE = OPENLOGI_HIDPP_CLASSIC_SHORT_USAGE;
 
 export const LOGITECH_HIDPP_ROOT_FEATURE_ID = OPENLOGI_ROOT_FEATURE_ID;
-export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
+export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = OPENLOGI_DEVICE_INFORMATION_FEATURE_ID;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
 export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = OPENLOGI_UNIFIED_BATTERY_FEATURE_ID;
@@ -82,7 +88,6 @@ export const LOGITECH_HIDPP_MAX_RECEIVER_SLOT = 6;
 const HIDPP2_SOFTWARE_ID = 0x01;
 const BATTERY_STATUS_READ_FUNCTION_ID = 0x00;
 const BATTERY_VOLTAGE_READ_FUNCTION_ID = 0x00;
-const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
 
 export interface LogitechHidppReport {
     readonly reportId: number | undefined;
@@ -245,7 +250,8 @@ export function buildLogitechDeviceInformationRequest(
     return buildLogitechShortFeatureRequest({
         receiverSlot,
         featureIndex,
-        functionId: DEVICE_INFORMATION_READ_FUNCTION_ID,
+        functionId: OPENLOGI_DEVICE_INFORMATION_DEVICE_INFO_FUNCTION_ID,
+        parameters: buildOpenLogiDeviceInformationGetDeviceInfoRequestPayload(),
     });
 }
 
@@ -482,18 +488,16 @@ export function parseLogitechDeviceInformationReport(
         return { state: "malformed" };
     }
 
-    // DEVICE_INFORMATION function 0x00 exposes a unit id and transport PIDs.
-    // The unit id is the only Logitech value currently trusted as per-unit
-    // identity; raw HID serial strings are not upgraded here.
+    const deviceInformation = parseOpenLogiDeviceInformationPayload(report.payload);
     return {
         state: "deviceInformation",
         deviceInformation: {
-            entityCount: report.payload[0],
-            unitId: formatNonZeroHexBytes(report.payload.slice(1, 5)),
-            transportFlags: report.payload[6],
-            modelId: formatLogitechModelId(report.payload.slice(7, 13), report.payload[13]),
-            extendedModelId: report.payload[13],
-            hasSerialNumberFunction: (report.payload[14] & 0x01) !== 0,
+            entityCount: deviceInformation.entityCount,
+            unitId: formatNonZeroHexBytes(deviceInformation.unitId),
+            transportFlags: deviceInformation.transportByte,
+            modelId: formatLogitechModelId(deviceInformation.modelId, deviceInformation.extendedModelId),
+            extendedModelId: deviceInformation.extendedModelId,
+            hasSerialNumberFunction: deviceInformation.capabilities.serialNumber,
         },
     };
 }
@@ -592,22 +596,18 @@ function formatNonZeroHexBytes(bytes: readonly number[]): string | undefined {
 }
 
 function formatLogitechModelId(
-    modelBytes: readonly number[],
+    modelId: readonly [number, number, number],
     extendedModelId: number,
 ): string | undefined {
-    if (modelBytes.length < 6 || (modelBytes.every(value => value === 0) && extendedModelId === 0)) {
+    if (modelId.every(value => value === 0) && extendedModelId === 0) {
         return undefined;
     }
 
-    const transportPidParts = [
-        formatU16(modelBytes[0], modelBytes[1]),
-        formatU16(modelBytes[2], modelBytes[3]),
-        formatU16(modelBytes[4], modelBytes[5]),
-    ];
+    const transportPidParts = modelId.map(formatU16);
 
     return `logitech:${transportPidParts.join("-")}:ext-${extendedModelId.toString(16).padStart(2, "0")}`;
 }
 
-function formatU16(highByte: number, lowByte: number): string {
-    return ((highByte << 8) | lowByte).toString(16).padStart(4, "0");
+function formatU16(value: number): string {
+    return value.toString(16).padStart(4, "0");
 }
