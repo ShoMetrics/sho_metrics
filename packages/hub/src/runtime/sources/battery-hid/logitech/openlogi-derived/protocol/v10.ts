@@ -41,11 +41,19 @@ export type OpenLogiHidpp10RegisterParseResult =
         readonly state: "malformed";
     };
 
-interface OpenLogiHidpp10RegisterReport {
+export interface OpenLogiHidpp10Report {
     readonly receiverSlot: LogitechReceiverSlot;
     readonly subId: number;
-    readonly registerAddress?: number;
     readonly payload: readonly number[];
+}
+
+export type OpenLogiHidpp10ReportShape =
+    | "valid"
+    | "malformed"
+    | "unrelated";
+
+interface OpenLogiHidpp10RegisterReport extends OpenLogiHidpp10Report {
+    readonly registerAddress?: number;
 }
 
 /**
@@ -128,6 +136,42 @@ export function parseOpenLogiHidpp10RegisterResponse(
     };
 }
 
+/**
+ * Splits a raw HID++1.0 report into the header/payload shape used by OpenLogi receiver listeners.
+ *
+ * Source: ShoMetrics helper extracted from OpenLogi `v10::Message::from(raw)`
+ * usage in `receiver/bolt.rs` and `receiver/unifying.rs`; OpenLogi has no
+ * direct function with this name.
+ */
+export function parseOpenLogiHidpp10Report(reportBytes: readonly number[]): OpenLogiHidpp10Report | undefined {
+    if (classifyOpenLogiHidpp10ReportShape(reportBytes) !== "valid") {
+        return undefined;
+    }
+
+    return {
+        receiverSlot: reportBytes[1] ?? 0,
+        subId: reportBytes[2] ?? 0,
+        payload: reportBytes.slice(3),
+    };
+}
+
+/**
+ * Classifies whether a raw report belongs to HID++1.0 framing.
+ *
+ * Source: ShoMetrics helper extracted from OpenLogi listener and register
+ * response matching. OpenLogi expresses this through `v10::Message::from(raw)`
+ * plus listener-level filtering rather than a standalone helper.
+ */
+export function classifyOpenLogiHidpp10ReportShape(reportBytes: readonly number[]): OpenLogiHidpp10ReportShape {
+    if (reportBytes[0] !== LOGITECH_HIDPP_SHORT_REPORT_ID && reportBytes[0] !== LOGITECH_HIDPP_LONG_REPORT_ID) {
+        return "unrelated";
+    }
+
+    return reportBytes.length === 7 || reportBytes.length === 20
+        ? "valid"
+        : "malformed";
+}
+
 function buildOpenLogiHidpp10RegisterRequest(input: {
     readonly receiverSlot: LogitechReceiverSlot;
     readonly subId: number;
@@ -154,27 +198,20 @@ function buildOpenLogiHidpp10RegisterRequest(input: {
 }
 
 function parseOpenLogiHidpp10RegisterReport(reportBytes: readonly number[]): OpenLogiHidpp10RegisterReport | undefined {
-    if (reportBytes[0] !== LOGITECH_HIDPP_SHORT_REPORT_ID && reportBytes[0] !== LOGITECH_HIDPP_LONG_REPORT_ID) {
-        return undefined;
-    }
-
-    if (reportBytes.length !== 7 && reportBytes.length !== 20) {
+    const report = parseOpenLogiHidpp10Report(reportBytes);
+    if (report === undefined) {
         return undefined;
     }
 
     return {
-        receiverSlot: reportBytes[1] ?? 0,
-        subId: reportBytes[2] ?? 0,
+        ...report,
         registerAddress: reportBytes[3],
-        payload: reportBytes.slice(3),
     };
 }
 
 function parseRegisterMalformedOrUnrelated(reportBytes: readonly number[]): OpenLogiHidpp10RegisterParseResult {
-    if (reportBytes[0] === LOGITECH_HIDPP_SHORT_REPORT_ID || reportBytes[0] === LOGITECH_HIDPP_LONG_REPORT_ID) {
-        return reportBytes.length === 7 || reportBytes.length === 20
-            ? { state: "unrelated" }
-            : { state: "malformed" };
+    if (classifyOpenLogiHidpp10ReportShape(reportBytes) === "malformed") {
+        return { state: "malformed" };
     }
 
     return { state: "unrelated" };

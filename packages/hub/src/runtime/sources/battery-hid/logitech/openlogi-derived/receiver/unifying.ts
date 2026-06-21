@@ -11,9 +11,9 @@
  */
 
 import {
-    LOGITECH_HIDPP_LONG_REPORT_ID,
-    LOGITECH_HIDPP_SHORT_REPORT_ID,
-} from "../../logitech-hidpp-frame";
+    classifyOpenLogiHidpp10ReportShape,
+    parseOpenLogiHidpp10Report,
+} from "../protocol/v10";
 import {
     parseOpenLogiCommonReceiverDeviceKind,
     type OpenLogiReceiverDeviceKind,
@@ -32,7 +32,7 @@ export const OPENLOGI_UNIFYING_NANO_RECEIVER_PRODUCT_ID = 0xC532;
 export function parseOpenLogiUnifyingDeviceConnectionEvent(
     reportBytes: readonly number[],
 ): OpenLogiReceiverEventParseResult {
-    const report = parseReceiverRegisterReport(reportBytes);
+    const report = parseOpenLogiHidpp10Report(reportBytes);
     if (report === undefined) {
         return parseEventMalformedOrUnrelated(reportBytes);
     }
@@ -95,33 +95,9 @@ function mapUnifyingConnectionPayload(
     };
 }
 
-interface ReceiverRegisterReport {
-    readonly receiverSlot: number;
-    readonly subId: number;
-    readonly payload: readonly number[];
-}
-
-function parseReceiverRegisterReport(reportBytes: readonly number[]): ReceiverRegisterReport | undefined {
-    if (reportBytes[0] !== LOGITECH_HIDPP_SHORT_REPORT_ID && reportBytes[0] !== LOGITECH_HIDPP_LONG_REPORT_ID) {
-        return undefined;
-    }
-
-    if (reportBytes.length !== 7 && reportBytes.length !== 20) {
-        return undefined;
-    }
-
-    return {
-        receiverSlot: reportBytes[1] ?? 0,
-        subId: reportBytes[2] ?? 0,
-        payload: reportBytes.slice(3),
-    };
-}
-
 function parseEventMalformedOrUnrelated(reportBytes: readonly number[]): OpenLogiReceiverEventParseResult {
-    if (reportBytes[0] === LOGITECH_HIDPP_SHORT_REPORT_ID || reportBytes[0] === LOGITECH_HIDPP_LONG_REPORT_ID) {
-        return reportBytes.length === 7 || reportBytes.length === 20
-            ? { state: "unrelated" }
-            : { state: "malformed" };
+    if (classifyOpenLogiHidpp10ReportShape(reportBytes) === "malformed") {
+        return { state: "malformed" };
     }
 
     return { state: "unrelated" };

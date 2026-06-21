@@ -14,7 +14,7 @@ import {
     LOGITECH_HIDPP_VENDOR_ID,
     LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
 } from "./hidpp-protocol";
-import { LogitechBatteryDeviceDiscoverer } from "./logitech-battery-discovery";
+import { LogitechBatteryDeviceDiscoverer } from "./battery-discovery/logitech-battery-discovery";
 import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 
 const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
