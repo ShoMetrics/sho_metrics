@@ -139,7 +139,7 @@ export function parseOpenLogiHidpp10RegisterResponse(
 /**
  * Splits a raw HID++1.0 report into the header/payload shape used by OpenLogi receiver listeners.
  *
- * Source: ShoMetrics helper extracted from OpenLogi `v10::Message::from(raw)`
+ * Derived glue: extracted from OpenLogi `v10::Message::from(raw)`
  * usage in `receiver/bolt.rs` and `receiver/unifying.rs`; OpenLogi has no
  * direct function with this name.
  */
@@ -158,7 +158,7 @@ export function parseOpenLogiHidpp10Report(reportBytes: readonly number[]): Open
 /**
  * Classifies whether a raw report belongs to HID++1.0 framing.
  *
- * Source: ShoMetrics helper extracted from OpenLogi listener and register
+ * Derived glue: extracted from OpenLogi listener and register
  * response matching. OpenLogi expresses this through `v10::Message::from(raw)`
  * plus listener-level filtering rather than a standalone helper.
  */

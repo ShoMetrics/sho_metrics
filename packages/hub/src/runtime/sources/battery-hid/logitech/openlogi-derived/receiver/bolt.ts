@@ -90,7 +90,7 @@ export function parseOpenLogiBoltDevicePairingInformation(
 /**
  * Parses Bolt receiver `0x41` device-connection events.
  *
- * Source: OpenLogi `receiver/bolt.rs:listen_to_device_connection`.
+ * Source: OpenLogi `receiver/bolt.rs:Receiver::new` device-connection listener body.
  */
 export function parseOpenLogiBoltDeviceConnectionEvent(
     reportBytes: readonly number[],

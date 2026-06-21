@@ -22,6 +22,16 @@ import {
     LOGITECH_HIDPP_LONG_REPORT_ID,
     LOGITECH_HIDPP_SHORT_REPORT_ID,
 } from "./logitech-hidpp-frame";
+import {
+    buildOpenLogiHidpp20ShortReportBytes,
+    combineOpenLogiHidpp20Nibbles,
+    matchesOpenLogiHidpp20ResponseHeader,
+    openLogiHidpp20HeadersAreEqual,
+    OPENLOGI_HIDPP20_ERROR_FEATURE_INDEX,
+    parseOpenLogiHidpp20MessageHeader,
+    readOpenLogiHidpp20FeatureErrorCode,
+    type OpenLogiHidpp20MessageHeader,
+} from "./openlogi-derived/protocol/v20";
 import type {
     LogitechHidppExpectedResponse,
     LogitechHidppRequest,
@@ -61,7 +71,6 @@ const BATTERY_VOLTAGE_READ_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID = 0x00;
 const UNIFIED_BATTERY_INFO_FUNCTION_ID = 0x01;
 const DEVICE_INFORMATION_READ_FUNCTION_ID = 0x00;
-const HIDPP_ERROR_FEATURE_INDEX = 0xFF;
 
 export interface LogitechHidppReport {
     readonly reportId: number | undefined;
@@ -240,14 +249,20 @@ export function parseLogitechHidppReport(bytes: readonly number[]): LogitechHidp
         return undefined;
     }
 
-    const functionByte = bytes[headerOffset + 2];
+    const messageBytes = bytes.slice(headerOffset);
+    const header = parseOpenLogiHidpp20MessageHeader(messageBytes);
+    if (header === undefined) {
+        return undefined;
+    }
+
+    const functionByte = combineOpenLogiHidpp20Nibbles(header.functionId, header.softwareId);
     return {
         reportId: hasReportId ? bytes[0] : undefined,
-        receiverSlot: bytes[headerOffset],
-        featureIndex: bytes[headerOffset + 1],
+        receiverSlot: header.deviceIndex,
+        featureIndex: header.featureIndex,
         functionByte,
-        functionId: functionByte >> 4,
-        softwareId: functionByte & 0x0F,
+        functionId: header.functionId,
+        softwareId: header.softwareId,
         payload: bytes.slice(headerOffset + 3),
     };
 }
@@ -264,19 +279,18 @@ export function parseLogitechHidppErrorCode(
     bytes: readonly number[],
     expectedResponse: LogitechHidppExpectedResponse,
 ): number | undefined {
-    // HID++ errors use feature index 0xFF. The first payload byte echoes the
-    // function byte that failed, so match it against the pending request before
-    // treating the report as this transaction's device error.
     const report = parseLogitechHidppReport(bytes);
     if (report === undefined ||
-        report.receiverSlot !== expectedResponse.receiverSlot ||
-        report.featureIndex !== HIDPP_ERROR_FEATURE_INDEX ||
-        report.functionByte !== expectedResponse.featureIndex ||
-        report.payload[0] !== expectedResponse.functionByte) {
+        report.featureIndex !== OPENLOGI_HIDPP20_ERROR_FEATURE_INDEX ||
+        !matchesOpenLogiHidpp20ResponseHeader({
+            responseHeader: reportToOpenLogiHeader(report),
+            responsePayload: report.payload,
+            requestHeader: expectedResponseToOpenLogiHeader(expectedResponse),
+        })) {
         return undefined;
     }
 
-    return report.payload[1];
+    return readOpenLogiHidpp20FeatureErrorCode(report.payload);
 }
 
 export function parseLogitechFeatureLookupReport(
@@ -484,20 +498,18 @@ function buildLogitechShortFeatureRequest(input: {
     readonly softwareId?: number;
     readonly parameters?: readonly number[];
 }): LogitechHidppRequest {
-    // HID++2.0 requests carry a four-bit software id. OpenLogi uses 1 for all
-    // application-originated requests; using the same id avoids devices treating
-    // later feature reads differently from the Root lookup.
-    const functionByte = ((input.functionId & 0x0F) << 4) | ((input.softwareId ?? HIDPP2_SOFTWARE_ID) & 0x0F);
+    const softwareId = input.softwareId ?? HIDPP2_SOFTWARE_ID;
+    const functionByte = combineOpenLogiHidpp20Nibbles(input.functionId, softwareId);
     const parameters = input.parameters ?? [];
-    const bytes = [
-        LOGITECH_HIDPP_SHORT_REPORT_ID,
-        input.receiverSlot,
-        input.featureIndex,
-        functionByte,
-        parameters[0] ?? 0x00,
-        parameters[1] ?? 0x00,
-        parameters[2] ?? 0x00,
-    ];
+    const bytes = buildOpenLogiHidpp20ShortReportBytes({
+        header: {
+            deviceIndex: input.receiverSlot,
+            featureIndex: input.featureIndex,
+            functionId: input.functionId,
+            softwareId,
+        },
+        payload: parameters,
+    });
 
     return {
         bytes,
@@ -523,9 +535,30 @@ function matchesExpectedReport(
     report: LogitechHidppReport,
     expectedResponse: LogitechHidppExpectedResponse,
 ): boolean {
-    return report.receiverSlot === expectedResponse.receiverSlot &&
-        report.featureIndex === expectedResponse.featureIndex &&
-        report.functionByte === expectedResponse.functionByte;
+    return openLogiHidpp20HeadersAreEqual(
+        reportToOpenLogiHeader(report),
+        expectedResponseToOpenLogiHeader(expectedResponse),
+    );
+}
+
+function reportToOpenLogiHeader(report: LogitechHidppReport): OpenLogiHidpp20MessageHeader {
+    return {
+        deviceIndex: report.receiverSlot,
+        featureIndex: report.featureIndex,
+        functionId: report.functionId,
+        softwareId: report.softwareId,
+    };
+}
+
+function expectedResponseToOpenLogiHeader(
+    expectedResponse: LogitechHidppExpectedResponse,
+): OpenLogiHidpp20MessageHeader {
+    return {
+        deviceIndex: expectedResponse.receiverSlot,
+        featureIndex: expectedResponse.featureIndex,
+        functionId: expectedResponse.functionByte >> 4,
+        softwareId: expectedResponse.functionByte & 0x0F,
+    };
 }
 
 function isBatteryPercent(value: number): boolean {
