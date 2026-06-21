@@ -32,6 +32,13 @@ import {
     readOpenLogiHidpp20FeatureErrorCode,
     type OpenLogiHidpp20MessageHeader,
 } from "./openlogi-derived/protocol/v20";
+import {
+    buildOpenLogiRootGetFeatureRequestPayload,
+    OPENLOGI_ROOT_FEATURE_ID,
+    OPENLOGI_ROOT_FEATURE_INDEX,
+    OPENLOGI_ROOT_GET_FEATURE_FUNCTION_ID,
+    parseOpenLogiRootGetFeatureResponsePayload,
+} from "./openlogi-derived/feature/root";
 import type {
     LogitechHidppExpectedResponse,
     LogitechHidppRequest,
@@ -55,7 +62,7 @@ export const LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID = OPENLOGI_UNIFYING_NANO
 export const LOGITECH_HIDPP_CLASSIC_USAGE_PAGE = OPENLOGI_HIDPP_CLASSIC_USAGE_PAGE;
 export const LOGITECH_HIDPP_SHORT_USAGE = OPENLOGI_HIDPP_CLASSIC_SHORT_USAGE;
 
-export const LOGITECH_HIDPP_ROOT_FEATURE_ID = 0x0000;
+export const LOGITECH_HIDPP_ROOT_FEATURE_ID = OPENLOGI_ROOT_FEATURE_ID;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = 0x0003;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
@@ -63,8 +70,6 @@ export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = 0x1004;
 
 export const LOGITECH_HIDPP_MAX_RECEIVER_SLOT = 6;
 
-const HIDPP_ROOT_FEATURE_INDEX = 0x00;
-const ROOT_GET_FEATURE_FUNCTION_ID = 0x00;
 const HIDPP2_SOFTWARE_ID = 0x01;
 const BATTERY_STATUS_READ_FUNCTION_ID = 0x00;
 const BATTERY_VOLTAGE_READ_FUNCTION_ID = 0x00;
@@ -85,7 +90,6 @@ export interface LogitechHidppReport {
 export interface LogitechHidppFeatureLookup {
     readonly featureId: number;
     readonly featureIndex: number;
-    readonly featureType: number;
     readonly featureVersion: number;
 }
 
@@ -176,10 +180,10 @@ export function buildLogitechFeatureLookupRequest(
 ): LogitechHidppRequest {
     return buildLogitechShortFeatureRequest({
         receiverSlot,
-        featureIndex: HIDPP_ROOT_FEATURE_INDEX,
-        functionId: ROOT_GET_FEATURE_FUNCTION_ID,
+        featureIndex: OPENLOGI_ROOT_FEATURE_INDEX,
+        functionId: OPENLOGI_ROOT_GET_FEATURE_FUNCTION_ID,
         softwareId: HIDPP2_SOFTWARE_ID,
-        parameters: [(featureId >> 8) & 0xFF, featureId & 0xFF, 0x00],
+        parameters: buildOpenLogiRootGetFeatureRequestPayload(featureId),
     });
 }
 
@@ -311,10 +315,8 @@ export function parseLogitechFeatureLookupReport(
         return { state: "malformed" };
     }
 
-    // Root.getFeature returns index/type/version for a supported feature. A
-    // zero index is the HID++ "feature not present" response, not malformed.
-    const featureIndex = report.payload[0];
-    if (featureIndex === 0) {
+    const featureInformation = parseOpenLogiRootGetFeatureResponsePayload(report.payload);
+    if (featureInformation === undefined) {
         return { state: "unsupported", featureId };
     }
 
@@ -322,9 +324,8 @@ export function parseLogitechFeatureLookupReport(
         state: "supported",
         feature: {
             featureId,
-            featureIndex,
-            featureType: report.payload[1],
-            featureVersion: report.payload[2],
+            featureIndex: featureInformation.index,
+            featureVersion: featureInformation.version,
         },
     };
 }
