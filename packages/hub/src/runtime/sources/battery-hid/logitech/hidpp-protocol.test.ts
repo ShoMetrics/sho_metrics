@@ -40,7 +40,6 @@ test("Logitech HID++ feature lookup parses supported and unsupported features", 
             feature: {
                 featureId: LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
                 featureIndex: 0x09,
-                featureType: 0x00,
                 featureVersion: 0x02,
             },
         },
