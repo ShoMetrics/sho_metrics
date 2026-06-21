@@ -1,10 +1,16 @@
 /**
- * HID++2.0 protocol facts used by the Logitech battery reader.
+ * ShoMetrics adapter over Logitech HID++ protocol facts.
  *
- * The framing, feature ids, function ids, and payload offsets are cross-checked
- * against local `scripts/battery/probe-logitech-current-state.mjs` runs plus
- * OpenLogi, Mouser, and Solaar references. Solaar-derived expression is kept
- * in `solaar-derived/`.
+ * OpenLogi-derived framing, feature ids, function ids, and payload offsets
+ * live under `openlogi-derived/`. This file owns ShoMetrics reader policy:
+ * strict response matching, no-data states, fallback-facing result shapes,
+ * percent source tagging, and app identity/display formatting.
+ *
+ * Non-OpenLogi facts intentionally remain here or in source-specific files:
+ * `0x1000` is a ShoMetrics/local-probe fallback because OpenLogi only names
+ * BatteryStatus in its registry and does not implement its payload parser,
+ * while `0x1001` voltage to percent conversion is Solaar-derived and kept in
+ * `solaar-derived/`.
  */
 
 import { estimateSolaarLogitechBatteryPercentFromVoltageMillivolts } from "./solaar-derived/solaar-logitech-battery-voltage";
