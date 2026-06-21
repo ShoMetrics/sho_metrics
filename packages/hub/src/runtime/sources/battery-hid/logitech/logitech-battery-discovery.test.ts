@@ -9,6 +9,7 @@ import {
     LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
     LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
+    LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     LOGITECH_HIDPP_VENDOR_ID,
@@ -29,7 +30,7 @@ test("Logitech discovery emits Bolt receiver candidates from online pairing regi
     const candidates = await discoverer.discoverBatteryDevices();
 
     assert.equal(candidates.length, 1);
-    assert.equal(candidates[0].displayName, "Logitech Bolt device slot 2");
+    assert.equal(candidates[0].displayName, "MX Master 3S");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "bolt");
     assert.equal(candidates[0].identity.vendorUnitId, "12345678");
@@ -58,7 +59,7 @@ test("Logitech discovery uses Unifying arrival events as the online slot source"
     const candidates = await discoverer.discoverBatteryDevices();
 
     assert.equal(candidates.length, 1);
-    assert.equal(candidates[0].displayName, "Logitech Unifying device slot 1");
+    assert.equal(candidates[0].displayName, "Logitech Unifying mouse (slot 1)");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "unifying");
     assert.equal(candidates[0].identity.vendorUnitId, "12345678");
@@ -75,7 +76,7 @@ test("Logitech discovery emits LIGHTSPEED candidates from responsive slot 1", as
     const candidates = await discoverer.discoverBatteryDevices();
 
     assert.equal(candidates.length, 1);
-    assert.equal(candidates[0].displayName, "Logitech LIGHTSPEED device slot 1");
+    assert.equal(candidates[0].displayName, "G502 X PLUS");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "lightspeed");
     assert.equal(candidates[0].identity.vendorUnitId, "12345678");
@@ -149,7 +150,10 @@ function responseReportsForBoltDiscovery(
         return [buildPairingInformationResponse(writeBytes, pairingSlot === onlineSlot)];
     }
 
-    return responseReportsForBatteryRead(writeBytes, onlineSlot);
+    return responseReportsForBatteryRead(writeBytes, onlineSlot, {
+        deviceTypeAndNameFeatureIndex: 0x05,
+        marketingName: "MX Master 3S",
+    });
 }
 
 function responseReportsForUnifyingDiscovery(
@@ -163,7 +167,10 @@ function responseReportsForUnifyingDiscovery(
         ];
     }
 
-    return responseReportsForBatteryRead(writeBytes, onlineSlot);
+    return responseReportsForBatteryRead(writeBytes, onlineSlot, {
+        deviceTypeAndNameFeatureIndex: 0x00,
+        marketingName: undefined,
+    });
 }
 
 function responseReportsForLightspeedDiscovery(
@@ -176,6 +183,11 @@ function responseReportsForLightspeedDiscovery(
     const featureId = readFeatureLookupRequestFeatureId(writeBytes);
     if (featureId !== undefined) {
         return [buildFeatureResponse(writeBytes, lightspeedFeatureLookupPayload(featureId))];
+    }
+
+    const deviceTypeAndNameResponse = responseReportsForDeviceTypeAndName(writeBytes, "G502 X PLUS");
+    if (deviceTypeAndNameResponse.length !== 0) {
+        return deviceTypeAndNameResponse;
     }
 
     if (writeBytes[2] === 0x07 && writeBytes[3] === 0x01) {
@@ -200,6 +212,10 @@ function responseReportsForLightspeedDiscovery(
 function responseReportsForBatteryRead(
     writeBytes: readonly number[],
     supportedSlot: number | undefined,
+    options: {
+        readonly deviceTypeAndNameFeatureIndex: number;
+        readonly marketingName: string | undefined;
+    },
 ): readonly (readonly number[])[] {
     const receiverSlot = writeBytes[1];
     if (receiverSlot !== supportedSlot) {
@@ -208,7 +224,12 @@ function responseReportsForBatteryRead(
 
     const featureId = readFeatureLookupRequestFeatureId(writeBytes);
     if (featureId !== undefined) {
-        return [buildFeatureResponse(writeBytes, featureLookupPayload(featureId))];
+        return [buildFeatureResponse(writeBytes, featureLookupPayload(featureId, options.deviceTypeAndNameFeatureIndex))];
+    }
+
+    const deviceTypeAndNameResponse = responseReportsForDeviceTypeAndName(writeBytes, options.marketingName);
+    if (deviceTypeAndNameResponse.length !== 0) {
+        return deviceTypeAndNameResponse;
     }
 
     if (writeBytes[2] === 0x09 && writeBytes[3] === 0x01) {
@@ -238,7 +259,7 @@ function responseReportsForBatteryRead(
     return [];
 }
 
-function featureLookupPayload(featureId: number): readonly number[] {
+function featureLookupPayload(featureId: number, deviceTypeAndNameFeatureIndex: number): readonly number[] {
     switch (featureId) {
         case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
             return [0x09, 0x00, 0x02];
@@ -246,6 +267,8 @@ function featureLookupPayload(featureId: number): readonly number[] {
             return [0x07, 0x00, 0x02];
         case 0x0003:
             return [0x03, 0x00, 0x04];
+        case LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID:
+            return [deviceTypeAndNameFeatureIndex, 0x00, 0x00];
         default:
             return [0x00, 0x00, 0x00];
     }
@@ -257,9 +280,36 @@ function lightspeedFeatureLookupPayload(featureId: number): readonly number[] {
             return [0x07, 0x00, 0x02];
         case 0x0003:
             return [0x03, 0x00, 0x04];
+        case LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID:
+            return [0x05, 0x00, 0x00];
         default:
             return [0x00, 0x00, 0x00];
     }
+}
+
+function responseReportsForDeviceTypeAndName(
+    writeBytes: readonly number[],
+    marketingName: string | undefined,
+): readonly (readonly number[])[] {
+    if (marketingName === undefined || writeBytes[2] !== 0x05) {
+        return [];
+    }
+
+    const marketingNameBytes = [...new TextEncoder().encode(marketingName)];
+    if (writeBytes[3] === 0x01) {
+        return [buildFeatureResponse(writeBytes, [marketingNameBytes.length, 0x00, 0x00])];
+    }
+
+    if (writeBytes[3] === 0x11) {
+        const startIndex = writeBytes[4] ?? 0;
+        return [buildFeatureResponse(writeBytes, marketingNameBytes.slice(startIndex))];
+    }
+
+    if (writeBytes[3] === 0x21) {
+        return [buildFeatureResponse(writeBytes, [0x03, 0x00, 0x00])];
+    }
+
+    return [];
 }
 
 function buildPairingInformationResponse(

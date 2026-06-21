@@ -18,6 +18,9 @@ import {
     buildLogitechBatteryStatusRequest,
     buildLogitechBatteryVoltageRequest,
     buildLogitechDeviceInformationRequest,
+    buildLogitechDeviceNameChunkRequest,
+    buildLogitechDeviceNameCountRequest,
+    buildLogitechDeviceTypeRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
     buildLogitechUnifiedBatteryInfoRequest,
@@ -25,12 +28,16 @@ import {
     LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
+    LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID,
     LOGITECH_HIDPP_SHORT_USAGE,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     matchesLogitechHidppExpectedResponse,
     parseLogitechBatteryStatusReport,
     parseLogitechBatteryVoltageReport,
     parseLogitechDeviceInformationReport,
+    parseLogitechDeviceNameChunkReport,
+    parseLogitechDeviceNameCountReport,
+    parseLogitechDeviceTypeReport,
     parseLogitechFeatureLookupReport,
     parseLogitechHidppErrorCode,
     parseLogitechUnifiedBatteryCapabilitiesReport,
@@ -38,6 +45,7 @@ import {
     type LogitechBatteryReading,
     type LogitechBatteryParseResult,
     type LogitechDeviceInformation,
+    type LogitechDeviceTypeAndName,
     type LogitechHidppFeatureLookup,
     type LogitechHidppRequest,
     type LogitechReceiverSlot,
@@ -51,6 +59,7 @@ const READ_SLICE_TIMEOUT_MILLISECONDS = 20;
 // transient no-data and retry on the next low-frequency battery poll.
 const RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS = OPENLOGI_RECEIVER_ARRIVAL_DRAIN_TIMEOUT_MILLISECONDS;
 const LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
+const MAX_LOGITECH_DEVICE_MARKETING_NAME_BYTE_COUNT = 64;
 const log = logger.for("Source:BatteryHID:Logitech");
 
 /** Performs short write/read HID++ transactions for one opened Logitech route. */
@@ -97,6 +106,7 @@ export type LogitechBatteryReadResult =
         readonly state: "battery";
         readonly reading: LogitechBatteryReading;
         readonly deviceInformation?: LogitechDeviceInformation;
+        readonly deviceTypeAndName?: LogitechDeviceTypeAndName;
         readonly unrelatedReportCount: number;
     }
     | {
@@ -127,15 +137,34 @@ export type LogitechDeviceInformationReadResult =
         readonly reason: "timeout" | "deviceError" | "malformed" | "ioError";
     };
 
+export type LogitechDeviceTypeAndNameReadResult =
+    | {
+        readonly state: "deviceTypeAndName";
+        readonly deviceTypeAndName: LogitechDeviceTypeAndName;
+    }
+    | {
+        readonly state: "unsupported";
+    }
+    | {
+        readonly state: "noData";
+        readonly reason: "timeout" | "deviceError" | "malformed" | "ioError";
+    };
+
 type LogitechExchangeNoDataResult = {
     readonly state: "noData";
     readonly reason: "timeout" | "deviceError" | "ioError";
+};
+
+type LogitechDeviceTypeAndNameNoDataResult = {
+    readonly state: "noData";
+    readonly reason: "timeout" | "deviceError" | "malformed" | "ioError";
 };
 
 /** Caches HID++ feature table lookups for one plugin session and one transport route. */
 export class LogitechHidppSession {
     private readonly featureLookupBySlotAndFeatureId = new Map<string, LogitechFeatureReadResult>();
     private readonly deviceInformationBySlot = new Map<LogitechReceiverSlot, LogitechDeviceInformationReadResult>();
+    private readonly deviceTypeAndNameBySlot = new Map<LogitechReceiverSlot, LogitechDeviceTypeAndNameReadResult>();
 
     constructor(private readonly transport: LogitechHidppTransport) {}
 
@@ -154,6 +183,7 @@ export class LogitechHidppSession {
             return appendOptionalTelemetry(
                 batteryResult,
                 this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
+                this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
             );
         }
 
@@ -171,6 +201,7 @@ export class LogitechHidppSession {
             return appendOptionalTelemetry(
                 batteryResult,
                 this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
+                this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
             );
         }
 
@@ -199,6 +230,7 @@ export class LogitechHidppSession {
         return appendOptionalTelemetry(
             batteryResult,
             this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
+            this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
         );
     }
 
@@ -247,6 +279,56 @@ export class LogitechHidppSession {
             deviceInformation: parsed.deviceInformation,
         } satisfies LogitechDeviceInformationReadResult;
         this.deviceInformationBySlot.set(receiverSlot, result);
+        return result;
+    }
+
+    readDeviceTypeAndName(receiverSlot: LogitechReceiverSlot): LogitechDeviceTypeAndNameReadResult {
+        const cached = this.deviceTypeAndNameBySlot.get(receiverSlot);
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        const feature = this.readFeature(receiverSlot, LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID);
+        if (feature.state === "unsupported") {
+            const result = { state: "unsupported" } satisfies LogitechDeviceTypeAndNameReadResult;
+            this.deviceTypeAndNameBySlot.set(receiverSlot, result);
+            return result;
+        }
+
+        if (feature.state === "noData") {
+            const result = {
+                state: "noData",
+                reason: feature.reason,
+            } satisfies LogitechDeviceTypeAndNameReadResult;
+            this.deviceTypeAndNameBySlot.set(receiverSlot, result);
+            return result;
+        }
+
+        const marketingName = this.readDeviceMarketingName(receiverSlot, feature.feature.featureIndex);
+        const deviceType = this.readDeviceType(receiverSlot, feature.feature.featureIndex);
+        const deviceTypeAndName = {
+            marketingName: marketingName.state === "name" ? marketingName.marketingName : undefined,
+            deviceType: deviceType.state === "deviceType" ? deviceType.deviceType : undefined,
+        } satisfies LogitechDeviceTypeAndName;
+        if (deviceTypeAndName.marketingName !== undefined || deviceTypeAndName.deviceType !== undefined) {
+            const result = {
+                state: "deviceTypeAndName",
+                deviceTypeAndName,
+            } satisfies LogitechDeviceTypeAndNameReadResult;
+            this.deviceTypeAndNameBySlot.set(receiverSlot, result);
+            return result;
+        }
+
+        const reason = marketingName.state === "noData"
+            ? marketingName.reason
+            : deviceType.state === "noData"
+                ? deviceType.reason
+                : "malformed";
+        const result = {
+            state: "noData",
+            reason,
+        } satisfies LogitechDeviceTypeAndNameReadResult;
+        this.deviceTypeAndNameBySlot.set(receiverSlot, result);
         return result;
     }
 
@@ -354,6 +436,109 @@ export class LogitechHidppSession {
         return batteryResult.state === "battery"
             ? this.readDeviceInformation(receiverSlot)
             : { state: "unsupported" };
+    }
+
+    private readDeviceTypeAndNameForBatteryResult(
+        receiverSlot: LogitechReceiverSlot,
+        batteryResult: LogitechBatteryReadResult,
+    ): LogitechDeviceTypeAndNameReadResult {
+        return batteryResult.state === "battery"
+            ? this.readDeviceTypeAndName(receiverSlot)
+            : { state: "unsupported" };
+    }
+
+    /**
+     * Retrieves the whole marketing name by first reading the count once and
+     * then repeatedly reading name chunks until all characters were received.
+     *
+     * Source: OpenLogi `feature/device_type_and_name/mod.rs:DeviceTypeAndNameFeature::get_whole_device_name`.
+     * Adapter note: this loop performs multiple HID transactions, so it lives
+     * in the ShoMetrics reader instead of the derived payload parser.
+     */
+    private readDeviceMarketingName(
+        receiverSlot: LogitechReceiverSlot,
+        featureIndex: number,
+    ): { readonly state: "name"; readonly marketingName?: string } | LogitechDeviceTypeAndNameNoDataResult {
+        const countRequest = buildLogitechDeviceNameCountRequest(receiverSlot, featureIndex);
+        const countExchange = this.transport.exchange(countRequest);
+        if (countExchange.state !== "response") {
+            return mapExchangeFailure(countExchange);
+        }
+
+        const count = parseLogitechDeviceNameCountReport(countExchange.report, countRequest.expectedResponse);
+        if (count.state !== "nameCount") {
+            return {
+                state: "noData",
+                reason: count.state === "malformed" ? "malformed" : "timeout",
+            };
+        }
+
+        if (count.count === 0) {
+            return { state: "name", marketingName: undefined };
+        }
+
+        // DeviceTypeAndName is optional display telemetry. A corrupt count must
+        // not turn one cosmetic read into dozens of sequential HID transactions.
+        if (count.count > MAX_LOGITECH_DEVICE_MARKETING_NAME_BYTE_COUNT) {
+            return { state: "noData", reason: "malformed" };
+        }
+
+        const nameBytes: number[] = [];
+        while (nameBytes.length < count.count) {
+            const chunkRequest = buildLogitechDeviceNameChunkRequest(receiverSlot, featureIndex, nameBytes.length);
+            const chunkExchange = this.transport.exchange(chunkRequest);
+            if (chunkExchange.state !== "response") {
+                return mapExchangeFailure(chunkExchange);
+            }
+
+            const chunk = parseLogitechDeviceNameChunkReport(chunkExchange.report, chunkRequest.expectedResponse);
+            if (chunk.state !== "nameChunk") {
+                return {
+                    state: "noData",
+                    reason: chunk.state === "malformed" ? "malformed" : "timeout",
+                };
+            }
+
+            if (chunk.bytes.length === 0) {
+                return { state: "noData", reason: "malformed" };
+            }
+
+            nameBytes.push(...chunk.bytes);
+        }
+
+        try {
+            const decodedName = new TextDecoder("utf-8", { fatal: true })
+                .decode(Uint8Array.from(nameBytes.slice(0, count.count)))
+                .replace(/\0+$/u, "");
+            return {
+                state: "name",
+                marketingName: decodedName === "" ? undefined : decodedName,
+            };
+        } catch {
+            return { state: "noData", reason: "malformed" };
+        }
+    }
+
+    private readDeviceType(
+        receiverSlot: LogitechReceiverSlot,
+        featureIndex: number,
+    ): { readonly state: "deviceType"; readonly deviceType: NonNullable<LogitechDeviceTypeAndName["deviceType"]> } | LogitechDeviceTypeAndNameNoDataResult {
+        const request = buildLogitechDeviceTypeRequest(receiverSlot, featureIndex);
+        const exchangeResult = this.transport.exchange(request);
+        if (exchangeResult.state !== "response") {
+            return mapExchangeFailure(exchangeResult);
+        }
+
+        const parsed = parseLogitechDeviceTypeReport(exchangeResult.report, request.expectedResponse);
+        return parsed.state === "deviceType"
+            ? {
+                state: "deviceType",
+                deviceType: parsed.deviceType,
+            }
+            : {
+                state: "noData",
+                reason: parsed.state === "malformed" ? "malformed" : "timeout",
+            };
     }
 }
 
@@ -657,6 +842,7 @@ function mapBatteryParseResult(
 function appendOptionalTelemetry(
     batteryResult: LogitechBatteryReadResult,
     deviceInformationResult: LogitechDeviceInformationReadResult,
+    deviceTypeAndNameResult: LogitechDeviceTypeAndNameReadResult,
 ): LogitechBatteryReadResult {
     if (batteryResult.state !== "battery") {
         return batteryResult;
@@ -667,6 +853,9 @@ function appendOptionalTelemetry(
         deviceInformation: deviceInformationResult.state === "deviceInformation"
             ? deviceInformationResult.deviceInformation
             : undefined,
+        ...(deviceTypeAndNameResult.state === "deviceTypeAndName"
+            ? { deviceTypeAndName: deviceTypeAndNameResult.deviceTypeAndName }
+            : {}),
     };
 }
 

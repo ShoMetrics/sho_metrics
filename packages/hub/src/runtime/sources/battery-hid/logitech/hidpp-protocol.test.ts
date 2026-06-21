@@ -4,6 +4,9 @@ import {
     buildLogitechBatteryStatusRequest,
     buildLogitechBatteryVoltageRequest,
     buildLogitechDeviceInformationRequest,
+    buildLogitechDeviceNameChunkRequest,
+    buildLogitechDeviceNameCountRequest,
+    buildLogitechDeviceTypeRequest,
     buildLogitechFeatureLookupRequest,
     buildLogitechUnifiedBatteryCapabilitiesRequest,
     buildLogitechUnifiedBatteryInfoRequest,
@@ -12,6 +15,9 @@ import {
     parseLogitechBatteryVoltageReport,
     parseLogitechBatteryStatusReport,
     parseLogitechDeviceInformationReport,
+    parseLogitechDeviceNameChunkReport,
+    parseLogitechDeviceNameCountReport,
+    parseLogitechDeviceTypeReport,
     parseLogitechFeatureLookupReport,
     parseLogitechUnifiedBatteryCapabilitiesReport,
     parseLogitechUnifiedBatteryInfoReport,
@@ -270,6 +276,62 @@ test("Logitech DEVICE_INFORMATION ignores all-zero unit and model ids", () => {
                 hasSerialNumberFunction: false,
             },
         },
+    );
+});
+
+test("Logitech DEVICE_TYPE_AND_NAME parses marketing name count and chunks", () => {
+    const countRequest = buildLogitechDeviceNameCountRequest(0x02, 0x05);
+    const chunkRequest = buildLogitechDeviceNameChunkRequest(0x02, 0x05, 0x03);
+
+    assert.deepEqual(countRequest.bytes, [0x10, 0x02, 0x05, 0x01, 0x00, 0x00, 0x00]);
+    assert.deepEqual(chunkRequest.bytes, [0x10, 0x02, 0x05, 0x11, 0x03, 0x00, 0x00]);
+    assert.deepEqual(
+        parseLogitechDeviceNameCountReport(
+            [0x11, 0x02, 0x05, 0x01, 0x0C, 0x00, 0x00],
+            countRequest.expectedResponse,
+        ),
+        {
+            state: "nameCount",
+            count: 12,
+        },
+    );
+    assert.deepEqual(
+        parseLogitechDeviceNameChunkReport(
+            [0x11, 0x02, 0x05, 0x11, 0x4D, 0x58, 0x20],
+            chunkRequest.expectedResponse,
+        ),
+        {
+            state: "nameChunk",
+            bytes: [0x4D, 0x58, 0x20],
+        },
+    );
+});
+
+test("Logitech DEVICE_TYPE_AND_NAME parses known device types", () => {
+    const request = buildLogitechDeviceTypeRequest(0x02, 0x05);
+
+    assert.deepEqual(request.bytes, [0x10, 0x02, 0x05, 0x21, 0x00, 0x00, 0x00]);
+    assert.deepEqual(
+        parseLogitechDeviceTypeReport(
+            [0x11, 0x02, 0x05, 0x21, 0x03, 0x00, 0x00],
+            request.expectedResponse,
+        ),
+        {
+            state: "deviceType",
+            deviceType: "mouse",
+        },
+    );
+});
+
+test("Logitech DEVICE_TYPE_AND_NAME rejects unknown device types", () => {
+    const request = buildLogitechDeviceTypeRequest(0x02, 0x05);
+
+    assert.deepEqual(
+        parseLogitechDeviceTypeReport(
+            [0x11, 0x02, 0x05, 0x21, 0xFF, 0x00, 0x00],
+            request.expectedResponse,
+        ),
+        { state: "malformed" },
     );
 });
 

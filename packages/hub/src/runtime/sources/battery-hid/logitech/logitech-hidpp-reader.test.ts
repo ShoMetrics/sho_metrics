@@ -6,6 +6,7 @@ import {
     LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID,
     LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID,
     LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID,
+    LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID,
     LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID,
     type LogitechHidppRequest,
 } from "./hidpp-protocol";
@@ -21,6 +22,7 @@ test("Logitech HID++ session reads UNIFIED_BATTERY with device identity", () => 
         unifiedBatteryFeatureIndex: 0x09,
         batteryStatusFeatureIndex: 0x00,
         deviceInformationFeatureIndex: 0x03,
+        deviceTypeAndNameFeatureIndex: 0x05,
     }));
     const session = new LogitechHidppSession(transport);
 
@@ -36,6 +38,10 @@ test("Logitech HID++ session reads UNIFIED_BATTERY with device identity", () => 
     assert.equal(result.reading.statusByte, 0);
     assert.equal(result.deviceInformation?.unitId, "12345678");
     assert.equal(result.deviceInformation?.modelId, "logitech:1a83-1a85-0000:ext-01");
+    assert.deepEqual(result.deviceTypeAndName, {
+        marketingName: "MX Master 3S",
+        deviceType: "mouse",
+    });
 });
 
 test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS", () => {
@@ -169,6 +175,106 @@ test("Logitech HID++ session reads device information once per receiver slot", (
     assert.equal(deviceInformationReads.length, 1);
 });
 
+test("Logitech HID++ session reads device type and name once per receiver slot", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x09,
+        batteryStatusFeatureIndex: 0x00,
+        deviceInformationFeatureIndex: 0x00,
+        deviceTypeAndNameFeatureIndex: 0x05,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    session.readBattery(0x02);
+    session.readBattery(0x02);
+
+    const nameCountReads = transport.requests.filter(request =>
+        request[2] === 0x05 &&
+        request[3] === 0x01,
+    );
+    const deviceTypeReads = transport.requests.filter(request =>
+        request[2] === 0x05 &&
+        request[3] === 0x21,
+    );
+    assert.equal(nameCountReads.length, 1);
+    assert.equal(deviceTypeReads.length, 1);
+});
+
+test("Logitech HID++ session caps malformed device name counts", () => {
+    const transport = new ScriptedLogitechTransport(request => {
+        const lookupFeatureId = readFeatureLookupRequestFeatureId(request.bytes);
+        if (lookupFeatureId !== undefined) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [
+                    featureIndexForId(lookupFeatureId, {
+                        unifiedBatteryFeatureIndex: 0x09,
+                        batteryStatusFeatureIndex: 0x00,
+                        deviceInformationFeatureIndex: 0x00,
+                        deviceTypeAndNameFeatureIndex: 0x05,
+                    }),
+                    0x00,
+                    featureVersionForId(lookupFeatureId),
+                ]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[2] === 0x09 && request.bytes[3] === 0x01) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0x0F, 0x03, 0x00]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[2] === 0x09 && request.bytes[3] === 0x11) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0x5A, 0x08, 0x00]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[2] === 0x05 && request.bytes[3] === 0x01) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0xFF, 0x00, 0x00]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[2] === 0x05 && request.bytes[3] === 0x21) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0x03, 0x00, 0x00]),
+                unrelatedReports: [],
+            };
+        }
+
+        return {
+            state: "timeout",
+            unrelatedReports: [],
+        };
+    });
+    const session = new LogitechHidppSession(transport);
+
+    const result = session.readBattery(0x02);
+
+    assert.equal(result.state, "battery");
+    if (result.state !== "battery") {
+        throw new Error("Expected battery reading.");
+    }
+    assert.deepEqual(result.deviceTypeAndName, {
+        deviceType: "mouse",
+        marketingName: undefined,
+    });
+    const nameChunkReads = transport.requests.filter(request =>
+        request[2] === 0x05 &&
+        request[3] === 0x11,
+    );
+    assert.equal(nameChunkReads.length, 0);
+});
+
 test("Logitech HID++ session returns no-data on timeout", () => {
     const transport = new ScriptedLogitechTransport(() => ({
         state: "timeout",
@@ -232,6 +338,7 @@ interface ScriptedLogitechFeatureIndexes {
     readonly batteryStatusFeatureIndex: number;
     readonly batteryVoltageFeatureIndex?: number;
     readonly deviceInformationFeatureIndex: number;
+    readonly deviceTypeAndNameFeatureIndex?: number;
 }
 
 function responseForRequest(
@@ -245,7 +352,7 @@ function responseForRequest(
             report: buildResponse(request.bytes, [
                 featureIndexForId(lookupFeatureId, featureIndexes),
                 0x00,
-                lookupFeatureId === LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID ? 0x04 : 0x02,
+                featureVersionForId(lookupFeatureId),
             ]),
             unrelatedReports: [],
         };
@@ -265,6 +372,38 @@ function responseForRequest(
             ]),
             unrelatedReports: [],
         };
+    }
+
+    if (featureIndexes.deviceTypeAndNameFeatureIndex !== undefined &&
+        featureIndexes.deviceTypeAndNameFeatureIndex !== 0 &&
+        request.bytes[2] === featureIndexes.deviceTypeAndNameFeatureIndex) {
+        if (request.bytes[3] === 0x01) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0x0C, 0x00, 0x00]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[3] === 0x11) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [
+                    0x4D, 0x58, 0x20, 0x4D,
+                    0x61, 0x73, 0x74, 0x65,
+                    0x72, 0x20, 0x33, 0x53,
+                ]),
+                unrelatedReports: [],
+            };
+        }
+
+        if (request.bytes[3] === 0x21) {
+            return {
+                state: "response",
+                report: buildResponse(request.bytes, [0x03, 0x00, 0x00]),
+                unrelatedReports: [],
+            };
+        }
     }
 
     if (request.bytes[2] === featureIndexes.unifiedBatteryFeatureIndex && request.bytes[3] === 0x01) {
@@ -318,6 +457,8 @@ function featureIndexForId(
     switch (featureId) {
         case LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID:
             return featureIndexes.deviceInformationFeatureIndex;
+        case LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID:
+            return featureIndexes.deviceTypeAndNameFeatureIndex ?? 0;
         case LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID:
             return featureIndexes.unifiedBatteryFeatureIndex;
         case LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID:
@@ -327,6 +468,14 @@ function featureIndexForId(
         default:
             return 0;
     }
+}
+
+function featureVersionForId(featureId: number): number {
+    if (featureId === LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID) {
+        return 0x04;
+    }
+
+    return featureId === LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID ? 0x00 : 0x02;
 }
 
 function buildResponse(requestBytes: readonly number[], payload: readonly number[]): readonly number[] {
