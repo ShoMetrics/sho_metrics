@@ -27,7 +27,7 @@ export const OPENLOGI_UNIFYING_NANO_RECEIVER_PRODUCT_ID = 0xC532;
 /**
  * Parses Unifying receiver `0x41` device-connection events.
  *
- * Source: OpenLogi `receiver/unifying.rs:listen_to_device_connection`.
+ * Source: OpenLogi `receiver/unifying.rs:Receiver::new` device-connection listener body.
  */
 export function parseOpenLogiUnifyingDeviceConnectionEvent(
     reportBytes: readonly number[],
