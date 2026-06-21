@@ -34,6 +34,13 @@ export const nodeHidNativeAddonSha256ByRelativePath = {
     "prebuilds/HID-win32-x64/node-napi-v4.node": "C1781ADCE3FBF61A4D7ADDD8AEA052A6CC162DA6BBC48E476086A9E2B4EA43F8",
 };
 
+export const nodeHidNativeAddonRelativePathByTarget = {
+    "darwin-arm64": "prebuilds/HID-darwin-arm64/node-napi-v4.node",
+    "darwin-x64": "prebuilds/HID-darwin-x64/node-napi-v4.node",
+    "win32-arm64": "prebuilds/HID-win32-arm64/node-napi-v4.node",
+    "win32-x64": "prebuilds/HID-win32-x64/node-napi-v4.node",
+};
+
 export async function assertNodeHidDependencyPinned(options = {}) {
     const packageJson = await readJson(options.packageJsonPath ?? packageJsonPath);
     const packageLock = await readJson(options.packageLockPath ?? packageLockPath);
@@ -50,6 +57,9 @@ export async function assertNodeHidDependencyPinned(options = {}) {
 }
 
 export async function stageNodeHidRuntimeDependency(options) {
+    const nativeAddonRelativePath = resolveNodeHidNativeAddonRelativePath(
+        options.nativeAddonTarget ?? resolveHostNodeHidNativeAddonTarget(),
+    );
     const sourceNodeModulesDirectory = join(options.packageDirectory, "node_modules");
     const targetNodeModulesDirectory = join(options.stagingPluginDirectory, "bin", "node_modules");
 
@@ -58,7 +68,7 @@ export async function stageNodeHidRuntimeDependency(options) {
         targetPackageDirectory: join(targetNodeModulesDirectory, NODE_HID_PACKAGE_NAME),
         relativeFileList: [
             ...nodeHidRuntimeFileList,
-            ...Object.keys(nodeHidNativeAddonSha256ByRelativePath),
+            nativeAddonRelativePath,
         ],
     });
 
@@ -70,13 +80,16 @@ export async function stageNodeHidRuntimeDependency(options) {
 }
 
 export async function assertStagedNodeHidNativeAddons(options) {
+    const expectedNativeAddonRelativePath = resolveNodeHidNativeAddonRelativePath(
+        options.nativeAddonTarget ?? resolveHostNodeHidNativeAddonTarget(),
+    );
     const nodeHidPackageDirectory = join(
         options.stagingPluginDirectory,
         "bin",
         "node_modules",
         NODE_HID_PACKAGE_NAME,
     );
-    const expectedPathSet = new Set(Object.keys(nodeHidNativeAddonSha256ByRelativePath));
+    const expectedPathSet = new Set([expectedNativeAddonRelativePath]);
     const actualPathList = await findNodeNativeModuleRelativePaths(nodeHidPackageDirectory);
 
     for (const expectedPath of expectedPathSet) {
@@ -86,15 +99,48 @@ export async function assertStagedNodeHidNativeAddons(options) {
     }
 
     for (const actualPath of actualPathList) {
-        const expectedHash = nodeHidNativeAddonSha256ByRelativePath[actualPath];
-        if (expectedHash === undefined) {
+        if (!expectedPathSet.has(actualPath)) {
             throw new Error(`Unexpected staged ${NODE_HID_PACKAGE_NAME} native addon: ${actualPath}.`);
         }
 
+        const expectedHash = nodeHidNativeAddonSha256ByRelativePath[actualPath];
         const actualHash = await sha256File(join(nodeHidPackageDirectory, actualPath));
         if (actualHash !== expectedHash) {
             throw new Error(
                 `Unexpected SHA-256 for staged ${NODE_HID_PACKAGE_NAME} native addon ${actualPath}: ${actualHash}.`,
+            );
+        }
+    }
+}
+
+export function resolveHostNodeHidNativeAddonTarget() {
+    return resolveSupportedNodeHidNativeAddonTarget(`${process.platform}-${process.arch}`);
+}
+
+export function resolveSupportedNodeHidNativeAddonTarget(nativeAddonTarget) {
+    assertNodeHidNativeAddonTargetHashesComplete();
+
+    if (Object.hasOwn(nodeHidNativeAddonRelativePathByTarget, nativeAddonTarget)) {
+        return nativeAddonTarget;
+    }
+
+    throw new Error(
+        `Unsupported ${NODE_HID_PACKAGE_NAME} native addon target: ${nativeAddonTarget}. ` +
+        `Supported targets: ${Object.keys(nodeHidNativeAddonRelativePathByTarget).join(", ")}.`,
+    );
+}
+
+function resolveNodeHidNativeAddonRelativePath(nativeAddonTarget) {
+    const supportedNativeAddonTarget = resolveSupportedNodeHidNativeAddonTarget(nativeAddonTarget);
+    return nodeHidNativeAddonRelativePathByTarget[supportedNativeAddonTarget];
+}
+
+function assertNodeHidNativeAddonTargetHashesComplete() {
+    for (const [nativeAddonTarget, nativeAddonRelativePath] of Object.entries(nodeHidNativeAddonRelativePathByTarget)) {
+        if (!Object.hasOwn(nodeHidNativeAddonSha256ByRelativePath, nativeAddonRelativePath)) {
+            throw new Error(
+                `${NODE_HID_PACKAGE_NAME} native addon target ${nativeAddonTarget} is missing ` +
+                `a SHA-256 allowlist entry for ${nativeAddonRelativePath}.`,
             );
         }
     }
@@ -143,12 +189,13 @@ async function readJson(path) {
 async function main() {
     const stagingPluginDirectory = process.argv[2];
     if (typeof stagingPluginDirectory !== "string" || stagingPluginDirectory.length === 0) {
-        throw new Error("Usage: node scripts/packaging/node-hid-native-addons.mjs <staging-plugin-directory>");
+        throw new Error("Usage: node scripts/packaging/node-hid-native-addons.mjs <staging-plugin-directory> [native-addon-target]");
     }
 
+    const nativeAddonTarget = process.argv[3] ?? resolveHostNodeHidNativeAddonTarget();
     await access(stagingPluginDirectory);
     await assertNodeHidDependencyPinned();
-    await assertStagedNodeHidNativeAddons({ stagingPluginDirectory });
+    await assertStagedNodeHidNativeAddons({ stagingPluginDirectory, nativeAddonTarget });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 import {
     assertNodeHidDependencyPinned,
     assertStagedNodeHidNativeAddons,
+    NODE_HID_PACKAGE_NAME,
+    resolveHostNodeHidNativeAddonTarget,
+    resolveSupportedNodeHidNativeAddonTarget,
     stageNodeHidRuntimeDependency,
 } from "./node-hid-native-addons.mjs";
 
@@ -41,6 +44,8 @@ const hostNativeRuntimeDependencyPackageName = resolveHostNativeRuntimeDependenc
 await packStreamDeckPlugin(process.argv.slice(2));
 
 async function packStreamDeckPlugin(argumentList) {
+    const packOptions = parsePackOptions(argumentList);
+
     await rm(stagingRootDirectory, { recursive: true, force: true });
     await rm(packageOutputDirectory, { recursive: true, force: true });
     await rm(legacyPackagePath, { force: true });
@@ -52,16 +57,21 @@ async function packStreamDeckPlugin(argumentList) {
         filter: sourcePath => shouldStagePluginPath(sourcePath),
     });
     await assertNodeHidDependencyPinned({ packageJsonPath, packageLockPath });
-    await stageRuntimeDependencies();
-    await assertRuntimeDependenciesComplete();
+    await stageRuntimeDependencies({ nativeAddonTarget: packOptions.nativeAddonTarget });
+    await assertRuntimeDependenciesComplete({ nativeAddonTarget: packOptions.nativeAddonTarget });
     assertHostRuntimeDependencyCanLoad();
+    assertHostNodeHidRuntimeDependencyCanLoad(packOptions.nativeAddonTarget);
 
-    await runStreamDeckPack(argumentList);
+    await runStreamDeckPack(packOptions.streamDeckPackArgumentList);
 }
 
-async function stageRuntimeDependencies() {
+async function stageRuntimeDependencies(options) {
     await stageResvgRuntimeDependencies();
-    await stageNodeHidRuntimeDependency({ packageDirectory, stagingPluginDirectory });
+    await stageNodeHidRuntimeDependency({
+        packageDirectory,
+        stagingPluginDirectory,
+        nativeAddonTarget: options.nativeAddonTarget,
+    });
 }
 
 async function stageResvgRuntimeDependencies() {
@@ -129,9 +139,12 @@ async function readPackageLock() {
     return JSON.parse(await readFile(packageLockPath, "utf8"));
 }
 
-async function assertRuntimeDependenciesComplete() {
+async function assertRuntimeDependenciesComplete(options) {
     await assertResvgRuntimeDependenciesComplete();
-    await assertStagedNodeHidNativeAddons({ stagingPluginDirectory });
+    await assertStagedNodeHidNativeAddons({
+        stagingPluginDirectory,
+        nativeAddonTarget: options.nativeAddonTarget,
+    });
 }
 
 async function assertResvgRuntimeDependenciesComplete() {
@@ -187,6 +200,18 @@ function assertHostRuntimeDependencyCanLoad() {
     }
 }
 
+function assertHostNodeHidRuntimeDependencyCanLoad(nativeAddonTarget) {
+    if (nativeAddonTarget !== resolveHostNodeHidNativeAddonTarget()) {
+        return;
+    }
+
+    const stagingPluginRequire = createRequire(join(stagingPluginDirectory, "bin", "plugin.js"));
+    const nativeHidModule = stagingPluginRequire(NODE_HID_PACKAGE_NAME);
+    if (typeof nativeHidModule.HID !== "function" || typeof nativeHidModule.devices !== "function") {
+        throw new Error(`Staged ${NODE_HID_PACKAGE_NAME} did not expose the expected module surface.`);
+    }
+}
+
 function resolveHostNativeRuntimeDependencyPackageName() {
     if (process.platform === "win32" && process.arch === "x64") {
         return "resvg-js-win32-x64-msvc";
@@ -205,6 +230,38 @@ function resolveHostNativeRuntimeDependencyPackageName() {
     }
 
     return undefined;
+}
+
+function parsePackOptions(argumentList) {
+    const streamDeckPackArgumentList = [];
+    let nativeAddonTarget = resolveHostNodeHidNativeAddonTarget();
+
+    for (let argumentIndex = 0; argumentIndex < argumentList.length; argumentIndex += 1) {
+        const argument = argumentList[argumentIndex];
+        if (argument === "--native-addon-target") {
+            const value = argumentList[argumentIndex + 1];
+            if (typeof value !== "string" || value.startsWith("--")) {
+                throw new Error("--native-addon-target requires a target value.");
+            }
+
+            nativeAddonTarget = resolveSupportedNodeHidNativeAddonTarget(value);
+            argumentIndex += 1;
+            continue;
+        }
+
+        const nativeAddonTargetPrefix = "--native-addon-target=";
+        if (argument.startsWith(nativeAddonTargetPrefix)) {
+            nativeAddonTarget = resolveSupportedNodeHidNativeAddonTarget(argument.slice(nativeAddonTargetPrefix.length));
+            continue;
+        }
+
+        streamDeckPackArgumentList.push(argument);
+    }
+
+    return {
+        nativeAddonTarget,
+        streamDeckPackArgumentList,
+    };
 }
 
 function readLockedPackageVersion(packageLock, packageName) {

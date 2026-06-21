@@ -7,12 +7,9 @@ import test from "node:test";
 
 import { loadNativeHidModuleWithRequire } from "./native-hid-loader-internal";
 
-const NODE_HID_NATIVE_ADDON_PATHS = [
-    "prebuilds/HID-darwin-arm64/node-napi-v4.node",
-    "prebuilds/HID-darwin-x64/node-napi-v4.node",
-    "prebuilds/HID-win32-arm64/node-napi-v4.node",
-    "prebuilds/HID-win32-x64/node-napi-v4.node",
-];
+const TEST_NODE_HID_NATIVE_ADDON_TARGET = "win32-x64";
+const TEST_NODE_HID_NATIVE_ADDON_PATH = "prebuilds/HID-win32-x64/node-napi-v4.node";
+const NON_TARGET_NODE_HID_NATIVE_ADDON_PATH = "prebuilds/HID-darwin-x64/node-napi-v4.node";
 
 test("native HID module is requested only by the lazy loader", async () => {
     const productionFileList = await listProductionSourceFiles(resolve("src"));
@@ -96,6 +93,7 @@ test("node-hid staged native addon validation accepts expected binaries", async 
         execFileSync(process.execPath, [
             "scripts/packaging/node-hid-native-addons.mjs",
             join(temporaryDirectory, "com.ez.sho-metrics.sdPlugin"),
+            TEST_NODE_HID_NATIVE_ADDON_TARGET,
         ], { cwd: process.cwd(), stdio: "pipe" });
     } finally {
         await rm(temporaryDirectory, { recursive: true, force: true });
@@ -112,9 +110,7 @@ test("node-hid staged native addon validation rejects unexpected binaries", asyn
             "bin",
             "node_modules",
             "node-hid",
-            "prebuilds",
-            "HID-linux-x64",
-            "node-napi-v4.node",
+            NON_TARGET_NODE_HID_NATIVE_ADDON_PATH,
         );
         await mkdir(dirname(unexpectedNativeAddonPath), { recursive: true });
         await writeFile(unexpectedNativeAddonPath, "unexpected");
@@ -123,12 +119,48 @@ test("node-hid staged native addon validation rejects unexpected binaries", asyn
             () => execFileSync(process.execPath, [
                 "scripts/packaging/node-hid-native-addons.mjs",
                 join(temporaryDirectory, "com.ez.sho-metrics.sdPlugin"),
+                TEST_NODE_HID_NATIVE_ADDON_TARGET,
             ], { cwd: process.cwd(), stdio: "pipe" }),
             /Unexpected staged node-hid native addon/u,
         );
     } finally {
         await rm(temporaryDirectory, { recursive: true, force: true });
     }
+});
+
+test("node-hid native addon target validation rejects Object prototype names", async () => {
+    const temporaryDirectory = await createStagedNodeHidFixture();
+
+    try {
+        assert.throws(
+            () => execFileSync(process.execPath, [
+                "scripts/packaging/node-hid-native-addons.mjs",
+                join(temporaryDirectory, "com.ez.sho-metrics.sdPlugin"),
+                "toString",
+            ], { cwd: process.cwd(), stdio: "pipe" }),
+            /Unsupported node-hid native addon target/u,
+        );
+    } finally {
+        await rm(temporaryDirectory, { recursive: true, force: true });
+    }
+});
+
+test("node-hid native addon target map points only to hash-allowlisted binaries", () => {
+    const serializedResult = execFileSync(process.execPath, [
+        "--input-type=module",
+        "-e",
+        [
+            "import {",
+            "nodeHidNativeAddonRelativePathByTarget,",
+            "nodeHidNativeAddonSha256ByRelativePath",
+            "} from './scripts/packaging/node-hid-native-addons.mjs';",
+            "const missing = Object.entries(nodeHidNativeAddonRelativePathByTarget)",
+            ".filter(([, relativePath]) => !Object.hasOwn(nodeHidNativeAddonSha256ByRelativePath, relativePath));",
+            "process.stdout.write(JSON.stringify(missing));",
+        ].join(" "),
+    ], { cwd: process.cwd(), encoding: "utf8" });
+
+    assert.deepEqual(JSON.parse(serializedResult), []);
 });
 
 test("node-hid staged native addon validation rejects changed hashes", async () => {
@@ -142,7 +174,7 @@ test("node-hid staged native addon validation rejects changed hashes", async () 
                 "bin",
                 "node_modules",
                 "node-hid",
-                NODE_HID_NATIVE_ADDON_PATHS[0],
+                TEST_NODE_HID_NATIVE_ADDON_PATH,
             ),
             "changed",
         );
@@ -151,6 +183,7 @@ test("node-hid staged native addon validation rejects changed hashes", async () 
             () => execFileSync(process.execPath, [
                 "scripts/packaging/node-hid-native-addons.mjs",
                 join(temporaryDirectory, "com.ez.sho-metrics.sdPlugin"),
+                TEST_NODE_HID_NATIVE_ADDON_TARGET,
             ], { cwd: process.cwd(), stdio: "pipe" }),
             /Unexpected SHA-256/u,
         );
@@ -169,12 +202,10 @@ async function createStagedNodeHidFixture(): Promise<string> {
         "node-hid",
     );
 
-    for (const relativeNativeAddonPath of NODE_HID_NATIVE_ADDON_PATHS) {
-        const sourcePath = join("node_modules", "node-hid", relativeNativeAddonPath);
-        const targetPath = join(stagedNodeHidDirectory, relativeNativeAddonPath);
-        await mkdir(dirname(targetPath), { recursive: true });
-        await copyFile(sourcePath, targetPath);
-    }
+    const sourcePath = join("node_modules", "node-hid", TEST_NODE_HID_NATIVE_ADDON_PATH);
+    const targetPath = join(stagedNodeHidDirectory, TEST_NODE_HID_NATIVE_ADDON_PATH);
+    await mkdir(dirname(targetPath), { recursive: true });
+    await copyFile(sourcePath, targetPath);
 
     return temporaryDirectory;
 }
