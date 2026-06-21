@@ -46,6 +46,19 @@ import {
     parseOpenLogiDeviceInformationPayload,
 } from "./openlogi-derived/feature/device-information";
 import {
+    buildOpenLogiDeviceNameChunkRequestPayload,
+    buildOpenLogiDeviceNameCountRequestPayload,
+    buildOpenLogiDeviceTypeRequestPayload,
+    OPENLOGI_DEVICE_TYPE_AND_NAME_CHUNK_FUNCTION_ID,
+    OPENLOGI_DEVICE_TYPE_AND_NAME_COUNT_FUNCTION_ID,
+    OPENLOGI_DEVICE_TYPE_AND_NAME_FEATURE_ID,
+    OPENLOGI_DEVICE_TYPE_AND_NAME_TYPE_FUNCTION_ID,
+    parseOpenLogiDeviceNameChunkPayload,
+    parseOpenLogiDeviceNameCountPayload,
+    parseOpenLogiDeviceTypePayload,
+    type OpenLogiDeviceType,
+} from "./openlogi-derived/feature/device-type-and-name";
+import {
     encodeOpenLogiBatteryLevel,
     OPENLOGI_UNIFIED_BATTERY_CAPABILITIES_FUNCTION_ID,
     OPENLOGI_UNIFIED_BATTERY_FEATURE_ID,
@@ -79,6 +92,7 @@ export const LOGITECH_HIDPP_SHORT_USAGE = OPENLOGI_HIDPP_CLASSIC_SHORT_USAGE;
 
 export const LOGITECH_HIDPP_ROOT_FEATURE_ID = OPENLOGI_ROOT_FEATURE_ID;
 export const LOGITECH_HIDPP_DEVICE_INFORMATION_FEATURE_ID = OPENLOGI_DEVICE_INFORMATION_FEATURE_ID;
+export const LOGITECH_HIDPP_DEVICE_TYPE_AND_NAME_FEATURE_ID = OPENLOGI_DEVICE_TYPE_AND_NAME_FEATURE_ID;
 export const LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID = 0x1000;
 export const LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID = 0x1001;
 export const LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID = OPENLOGI_UNIFIED_BATTERY_FEATURE_ID;
@@ -174,10 +188,51 @@ export interface LogitechDeviceInformation {
     readonly hasSerialNumberFunction: boolean;
 }
 
+export interface LogitechDeviceTypeAndName {
+    readonly marketingName?: string;
+    readonly deviceType?: OpenLogiDeviceType;
+}
+
 export type LogitechDeviceInformationParseResult =
     | {
         readonly state: "deviceInformation";
         readonly deviceInformation: LogitechDeviceInformation;
+    }
+    | {
+        readonly state: "unrelated";
+    }
+    | {
+        readonly state: "malformed";
+    };
+
+export type LogitechDeviceNameCountParseResult =
+    | {
+        readonly state: "nameCount";
+        readonly count: number;
+    }
+    | {
+        readonly state: "unrelated";
+    }
+    | {
+        readonly state: "malformed";
+    };
+
+export type LogitechDeviceNameChunkParseResult =
+    | {
+        readonly state: "nameChunk";
+        readonly bytes: readonly number[];
+    }
+    | {
+        readonly state: "unrelated";
+    }
+    | {
+        readonly state: "malformed";
+    };
+
+export type LogitechDeviceTypeParseResult =
+    | {
+        readonly state: "deviceType";
+        readonly deviceType: OpenLogiDeviceType;
     }
     | {
         readonly state: "unrelated";
@@ -252,6 +307,43 @@ export function buildLogitechDeviceInformationRequest(
         featureIndex,
         functionId: OPENLOGI_DEVICE_INFORMATION_DEVICE_INFO_FUNCTION_ID,
         parameters: buildOpenLogiDeviceInformationGetDeviceInfoRequestPayload(),
+    });
+}
+
+export function buildLogitechDeviceNameCountRequest(
+    receiverSlot: LogitechReceiverSlot,
+    featureIndex: number,
+): LogitechHidppRequest {
+    return buildLogitechShortFeatureRequest({
+        receiverSlot,
+        featureIndex,
+        functionId: OPENLOGI_DEVICE_TYPE_AND_NAME_COUNT_FUNCTION_ID,
+        parameters: buildOpenLogiDeviceNameCountRequestPayload(),
+    });
+}
+
+export function buildLogitechDeviceNameChunkRequest(
+    receiverSlot: LogitechReceiverSlot,
+    featureIndex: number,
+    index: number,
+): LogitechHidppRequest {
+    return buildLogitechShortFeatureRequest({
+        receiverSlot,
+        featureIndex,
+        functionId: OPENLOGI_DEVICE_TYPE_AND_NAME_CHUNK_FUNCTION_ID,
+        parameters: buildOpenLogiDeviceNameChunkRequestPayload(index),
+    });
+}
+
+export function buildLogitechDeviceTypeRequest(
+    receiverSlot: LogitechReceiverSlot,
+    featureIndex: number,
+): LogitechHidppRequest {
+    return buildLogitechShortFeatureRequest({
+        receiverSlot,
+        featureIndex,
+        functionId: OPENLOGI_DEVICE_TYPE_AND_NAME_TYPE_FUNCTION_ID,
+        parameters: buildOpenLogiDeviceTypeRequestPayload(),
     });
 }
 
@@ -500,6 +592,62 @@ export function parseLogitechDeviceInformationReport(
             hasSerialNumberFunction: deviceInformation.capabilities.serialNumber,
         },
     };
+}
+
+export function parseLogitechDeviceNameCountReport(
+    bytes: readonly number[],
+    expectedResponse: LogitechHidppExpectedResponse,
+): LogitechDeviceNameCountParseResult {
+    const report = parseStrictMatchingReport(bytes, expectedResponse);
+    if (report === undefined) {
+        return { state: "unrelated" };
+    }
+
+    if (report.payload.length < 1) {
+        return { state: "malformed" };
+    }
+
+    return {
+        state: "nameCount",
+        count: parseOpenLogiDeviceNameCountPayload(report.payload),
+    };
+}
+
+export function parseLogitechDeviceNameChunkReport(
+    bytes: readonly number[],
+    expectedResponse: LogitechHidppExpectedResponse,
+): LogitechDeviceNameChunkParseResult {
+    const report = parseStrictMatchingReport(bytes, expectedResponse);
+    if (report === undefined) {
+        return { state: "unrelated" };
+    }
+
+    return {
+        state: "nameChunk",
+        bytes: parseOpenLogiDeviceNameChunkPayload(report.payload),
+    };
+}
+
+export function parseLogitechDeviceTypeReport(
+    bytes: readonly number[],
+    expectedResponse: LogitechHidppExpectedResponse,
+): LogitechDeviceTypeParseResult {
+    const report = parseStrictMatchingReport(bytes, expectedResponse);
+    if (report === undefined) {
+        return { state: "unrelated" };
+    }
+
+    if (report.payload.length < 1) {
+        return { state: "malformed" };
+    }
+
+    const deviceType = parseOpenLogiDeviceTypePayload(report.payload);
+    return deviceType === undefined
+        ? { state: "malformed" }
+        : {
+            state: "deviceType",
+            deviceType,
+        };
 }
 
 function buildLogitechShortFeatureRequest(input: {

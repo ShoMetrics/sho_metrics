@@ -22,7 +22,12 @@ export function buildLogitechBatteryCandidate(input: {
 }): BatteryDeviceDiscoveryCandidate {
     const representativeDeviceInfo = input.receiverDeviceGroup.deviceInfoList[0];
     const deviceInformation = input.battery.deviceInformation;
-    const displayName = buildDisplayName(input.receiverDeviceGroup.receiver, input.slotRoute.receiverSlot);
+    const displayName = buildDisplayName({
+        receiver: input.receiverDeviceGroup.receiver,
+        receiverSlot: input.slotRoute.receiverSlot,
+        marketingName: input.battery.deviceTypeAndName?.marketingName,
+        deviceKind: input.battery.deviceTypeAndName?.deviceType ?? input.slotRoute.deviceKind,
+    });
     const bindingTransport: SystemPeripheralBindingTransport = "usbReceiver";
     const vendorUnitId = deviceInformation?.unitId ?? input.slotRoute.vendorUnitId;
 
@@ -62,9 +67,29 @@ export function buildLogitechBatteryCandidate(input: {
     };
 }
 
-function buildDisplayName(
-    receiver: LogitechReceiverDescriptor,
-    receiverSlot: number,
-): string {
-    return `${receiver.displayPrefix} slot ${receiverSlot}`;
+function buildDisplayName(input: {
+    readonly receiver: LogitechReceiverDescriptor;
+    readonly receiverSlot: number;
+    readonly marketingName?: string;
+    readonly deviceKind?: string;
+}): string {
+    if (input.marketingName !== undefined) {
+        return input.marketingName;
+    }
+
+    if (input.deviceKind !== undefined) {
+        return `${formatReceiverFamilyLabel(input.receiver)} ${formatDeviceKind(input.deviceKind)} (slot ${input.receiverSlot})`;
+    }
+
+    return `${input.receiver.displayPrefix} slot ${input.receiverSlot}`;
+}
+
+function formatReceiverFamilyLabel(receiver: LogitechReceiverDescriptor): string {
+    return receiver.displayPrefix.endsWith(" device")
+        ? receiver.displayPrefix.slice(0, -" device".length)
+        : receiver.displayPrefix;
+}
+
+function formatDeviceKind(deviceKind: string): string {
+    return deviceKind.replace(/[A-Z]/gu, match => ` ${match.toLowerCase()}`);
 }
