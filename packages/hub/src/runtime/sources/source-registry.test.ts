@@ -7,6 +7,7 @@ import { createDefaultSourceRegistry, DefaultSourceRegistry } from "./source-reg
 import {
     CUSTOM_HTTP_SOURCE_ID,
     NODE_SYSTEM_SOURCE_ID,
+    VENDOR_HID_BATTERY_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "./source-ids";
 
@@ -26,6 +27,10 @@ test("default source registry registers the Windows helper before fallback on Wi
             sourceRegistry.resolveSourceClient(CUSTOM_HTTP_SOURCE_ID)?.sourceId,
             CUSTOM_HTTP_SOURCE_ID,
         );
+        assert.equal(
+            sourceRegistry.resolveSourceClient(VENDOR_HID_BATTERY_SOURCE_ID)?.sourceId,
+            VENDOR_HID_BATTERY_SOURCE_ID,
+        );
     } finally {
         sourceRegistry.dispose();
     }
@@ -43,6 +48,10 @@ test("default source registry excludes the Windows helper outside Windows", () =
         assert.equal(
             sourceRegistry.resolveSourceClient(CUSTOM_HTTP_SOURCE_ID)?.sourceId,
             CUSTOM_HTTP_SOURCE_ID,
+        );
+        assert.equal(
+            sourceRegistry.resolveSourceClient(VENDOR_HID_BATTERY_SOURCE_ID)?.sourceId,
+            VENDOR_HID_BATTERY_SOURCE_ID,
         );
     } finally {
         sourceRegistry.dispose();

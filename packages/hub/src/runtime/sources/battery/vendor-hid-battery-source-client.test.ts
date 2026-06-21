@@ -1,0 +1,225 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { MetricUnit, type MetricValue } from "../metric-source";
+import type { NativeHidDevice, NativeHidDeviceInfo, NativeHidModule } from "../battery-hid/native-hid-loader-internal";
+import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";
+import { buildBatteryMetricKeyFromIdentity } from "./battery-metric-key";
+import type { BatteryDeviceDiscoveryCandidate } from "./battery-device-discovery";
+import { VendorHidBatterySourceClient, readVendorHidBatteryDeviceDescriptors } from "./vendor-hid-battery-source-client";
+
+test("vendor HID battery source does not load native HID during construction or planning", () => {
+    let loadNativeHidCalls = 0;
+    const client = new VendorHidBatterySourceClient({
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "unavailable", error: new Error("unexpected") };
+        },
+    });
+
+    const pollingGroups = client.resolveMetricPollingGroups([buildTestMetricKey(), "cpu.usage_percent"]);
+
+    assert.equal(client.sourceId, VENDOR_HID_BATTERY_SOURCE_ID);
+    assert.equal(loadNativeHidCalls, 0);
+    assert.deepEqual(pollingGroups.get(buildTestMetricKey()), {
+        state: "owned",
+        pollingGroupId: "vendor-hid-battery",
+    });
+    assert.deepEqual(pollingGroups.get("cpu.usage_percent"), { state: "unsupported" });
+});
+
+test("vendor HID battery source leaves status unchanged when no vendor battery keys are requested", async () => {
+    let loadNativeHidCalls = 0;
+    const client = new VendorHidBatterySourceClient({
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "unavailable", error: new Error("unexpected") };
+        },
+        wallClockNow: () => 1122,
+    });
+
+    const result = await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(loadNativeHidCalls, 0);
+    assert.deepEqual(result.snapshot.metrics, {});
+    assert.deepEqual(result.unavailableMetrics, []);
+    assert.deepEqual(client.getCachedStatus(), { state: "unknown" });
+});
+
+test("vendor HID battery source returns no scalar and does not load native HID when disabled", async () => {
+    let loadNativeHidCalls = 0;
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => false,
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "loaded", module: fakeNativeHidModule };
+        },
+        wallClockNow: () => 1234,
+    });
+
+    const result = await client.readSnapshot([buildTestMetricKey()]);
+
+    assert.equal(loadNativeHidCalls, 0);
+    assert.deepEqual(result.snapshot.metrics, {});
+    assert.deepEqual(result.unavailableMetrics, [{
+        metricId: buildTestMetricKey(),
+        reason: "noSourceReading",
+    }]);
+    assert.deepEqual(client.getCachedStatus(), { state: "unsupported" });
+});
+
+test("vendor HID battery source maps discovered candidate battery percent to requested metric", async () => {
+    const candidate = buildTestCandidate({ batteryPercent: 87 });
+    let loadNativeHidCalls = 0;
+    let discoverCandidatesCalls = 0;
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => true,
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "loaded", module: fakeNativeHidModule };
+        },
+        discoverCandidates: nativeHidModule => {
+            discoverCandidatesCalls += 1;
+            assert.equal(nativeHidModule, fakeNativeHidModule);
+            return Promise.resolve([candidate]);
+        },
+        wallClockNow: () => 2345,
+    });
+
+    const result = await client.readSnapshot([buildTestMetricKey()]);
+
+    assert.equal(loadNativeHidCalls, 1);
+    assert.equal(discoverCandidatesCalls, 1);
+    assert.equal(readScalarMetricValue(result.snapshot.metrics[buildTestMetricKey()]), 87);
+    assert.equal(result.snapshot.metrics[buildTestMetricKey()]?.unit, MetricUnit.PERCENT);
+    assert.deepEqual(result.unavailableMetrics, []);
+    assert.deepEqual(result.valueMetadata[0]?.displayHint, {
+        label: "Logitech Test Mouse",
+        unit: MetricUnit.PERCENT,
+        maximum: 100,
+    });
+    assert.equal(result.valueMetadata[0]?.rawSensorIdentity?.hardwareName, "Logitech Test Mouse");
+    assert.equal(client.getCachedStatus().state, "available");
+});
+
+test("vendor HID battery source omits scalar when native HID is unavailable", async () => {
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => true,
+        loadNativeHid: () => ({ state: "unavailable", error: new Error("missing addon") }),
+        wallClockNow: () => 3456,
+    });
+
+    const result = await client.readSnapshot([buildTestMetricKey()]);
+
+    assert.deepEqual(result.snapshot.metrics, {});
+    assert.deepEqual(result.unavailableMetrics, [{
+        metricId: buildTestMetricKey(),
+        reason: "noSourceReading",
+    }]);
+    assert.deepEqual(client.getCachedStatus(), {
+        state: "unavailable",
+        reason: "driverUnavailable",
+        lastFailureAtTimestampMilliseconds: 3456,
+        lastErrorMessage: "missing addon",
+    });
+});
+
+test("vendor HID descriptor discovery respects the experimental toggle before native loading", async () => {
+    let loadNativeHidCalls = 0;
+
+    const descriptors = await readVendorHidBatteryDeviceDescriptors({
+        isExperimentalVendorHidEnabled: false,
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "loaded", module: fakeNativeHidModule };
+        },
+    });
+
+    assert.deepEqual(descriptors, []);
+    assert.equal(loadNativeHidCalls, 0);
+});
+
+test("vendor HID descriptor discovery resolves descriptors from discovered candidates", async () => {
+    const candidate = buildTestCandidate({ batteryPercent: 55 });
+
+    const descriptors = await readVendorHidBatteryDeviceDescriptors({
+        isExperimentalVendorHidEnabled: true,
+        loadNativeHid: () => ({ state: "loaded", module: fakeNativeHidModule }),
+        discoverCandidates: () => Promise.resolve([candidate]),
+    });
+
+    assert.equal(descriptors.length, 1);
+    assert.equal(descriptors[0]?.displayName, "Logitech Test Mouse");
+    assert.equal(descriptors[0]?.metricKey, buildTestMetricKey());
+});
+
+function buildTestCandidate(options: {
+    readonly batteryPercent: number | undefined;
+}): BatteryDeviceDiscoveryCandidate {
+    return {
+        candidateId: "logitech-test-candidate",
+        displayName: "Logitech Test Mouse",
+        transport: "usbReceiver",
+        receiverKind: "bolt",
+        identity: testIdentity,
+        supportState: "experimental",
+        isExperimental: true,
+        batteryPercent: options.batteryPercent,
+        batteryTelemetryFreshness: "fresh",
+        diagnostics: {
+            sourcePathId: "path:test",
+            receiverSlot: 1,
+            batteryPercentSource: "reported",
+        },
+    };
+}
+
+function buildTestMetricKey(): string {
+    return buildBatteryMetricKeyFromIdentity(testIdentity);
+}
+
+function readScalarMetricValue(metricValue: MetricValue | undefined): number | undefined {
+    return metricValue?.value.case === "scalar" ? metricValue.value.value : undefined;
+}
+
+const testIdentity = {
+    vendorId: 0x046D,
+    productId: 0xC548,
+    manufacturer: "Logitech",
+    productName: "Test Mouse",
+    serialNumber: undefined,
+    interfaceNumber: 2,
+    usagePage: 0xFF00,
+    usageId: undefined,
+    bindingTransport: "usbReceiver",
+    receiverKind: "bolt",
+    vendorUnitId: "unit-test",
+    modelId: "test-mouse",
+    receiverSlot: 1,
+} satisfies BatteryDeviceDiscoveryCandidate["identity"];
+
+class FakeNativeHidDevice implements NativeHidDevice {
+    constructor(readonly path: string) {}
+
+    close(): void {}
+
+    readTimeout(): number[] {
+        return [];
+    }
+
+    write(): number {
+        return 0;
+    }
+
+    getFeatureReport(): number[] {
+        return [];
+    }
+
+    sendFeatureReport(): number {
+        return 0;
+    }
+}
+
+const fakeNativeHidModule = {
+    HID: FakeNativeHidDevice,
+    devices: (): NativeHidDeviceInfo[] => [],
+} satisfies NativeHidModule;

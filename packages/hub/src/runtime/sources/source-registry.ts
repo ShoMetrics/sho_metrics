@@ -3,8 +3,7 @@ import { createMetricSourceClient, type SourceClient, type SourceClientStatus } 
 import { CustomHttpSourceClient } from "./custom-http/custom-http-source-client";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import { WindowsHelperSourceClient } from "./windows-helper/windows-helper-source-client";
-import { NoDataBatterySourceClient } from "./battery/no-data-battery-source-client";
-import { VENDOR_HID_BATTERY_SOURCE_ID } from "./source-ids";
+import { VendorHidBatterySourceClient } from "./battery/vendor-hid-battery-source-client";
 
 /** Options for default source registry creation. */
 export interface DefaultSourceRegistryOptions {
@@ -85,7 +84,7 @@ export function createDefaultSourceRegistry(options: DefaultSourceRegistryOption
 
     sourceClients.push(createMetricSourceClient(new NodeSystemSource({ platform })));
     sourceClients.push(new CustomHttpSourceClient());
-    sourceClients.push(new NoDataBatterySourceClient(VENDOR_HID_BATTERY_SOURCE_ID));
+    sourceClients.push(new VendorHidBatterySourceClient());
 
     return new DefaultSourceRegistry(sourceClients);
 }

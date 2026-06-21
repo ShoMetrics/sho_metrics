@@ -474,7 +474,9 @@ Work:
 - Support Bolt and Unifying discovery first.
 - Keep G-series/LIGHTSPEED as best-effort if known receiver/device collections
   are discovered and feature discovery succeeds.
-- Show Easy-Switch slot number when available.
+- Defer Easy-Switch slot display. Battery reads, receiver identity, and
+  user-facing device names are v1 requirements; Easy-Switch remains a future
+  diagnostic/display enhancement and must stay read-only when added.
 - Do not read or write Logitech host names in v1.
 
 Required feature behavior:
@@ -483,7 +485,8 @@ Required feature behavior:
   id.
 - `UNIFIED_BATTERY 0x1004`: parse only matching slot, feature index, and
   function id.
-- `CHANGE_HOST 0x1814`: read current Easy-Switch slot number only.
+- `CHANGE_HOST 0x1814`: deferred for v1. When implemented, read current
+  Easy-Switch slot number only.
 - `DEVICE_INFORMATION 0x0003`: read unit identity once during discovery when
   needed, then cache for the session.
 
@@ -497,8 +500,8 @@ Rules:
 
 Done when:
 
-- Unit tests cover feature lookup, battery status, unified battery, Easy-Switch
-  slot, unrelated interleaved reports, timeout, malformed reports, and no-data.
+- Unit tests cover feature lookup, battery status, unified battery, unrelated
+  interleaved reports, timeout, malformed reports, and no-data.
 - Tests prove a discovered non-MX Logitech device with a supported feature can
   pass through the same parser.
 - Tests prove unsupported Logitech devices are hidden from normal UI.

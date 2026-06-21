@@ -25,7 +25,7 @@ test("native HID module is requested only by the lazy loader", async () => {
         }
 
         const relativeSourcePath = relative(resolve("src"), filePath).replaceAll("\\", "/");
-        if (relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader.ts" ||
+        if (relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader.mjs" ||
             relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader-internal.ts") {
             continue;
         }
@@ -36,10 +36,11 @@ test("native HID module is requested only by the lazy loader", async () => {
     assert.deepEqual(violatingFileList, []);
 });
 
-test("native HID loader uses the module URL as its package resolution anchor", async () => {
-    const source = await readFile(resolve("src/runtime/sources/battery-hid/native-hid-loader.ts"), "utf8");
+test("native HID loader anchors native package resolution to this module", async () => {
+    const source = await readFile(resolve("src/runtime/sources/battery-hid/native-hid-loader.mjs"), "utf8");
 
     assert.match(source, /createRequire\(import\.meta\.url\)/u);
+    assert.doesNotMatch(source, /process\.argv|process\.cwd/u);
 });
 
 test("native HID loader returns unavailable when node-hid cannot load", () => {
@@ -189,9 +190,10 @@ async function listProductionSourceFiles(directoryPath: string): Promise<string[
         }
 
         if (directoryEntry.isFile() &&
-            entryPath.endsWith(".ts") &&
+            (entryPath.endsWith(".ts") || entryPath.endsWith(".mjs")) &&
             !entryPath.endsWith(".test.ts") &&
-            !entryPath.endsWith(".d.ts")) {
+            !entryPath.endsWith(".d.ts") &&
+            !entryPath.endsWith(".d.mts")) {
             fileList.push(entryPath);
         }
     }

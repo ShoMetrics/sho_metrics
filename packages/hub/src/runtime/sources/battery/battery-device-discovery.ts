@@ -46,6 +46,7 @@ export interface BatteryDeviceDiscoveryCandidate {
     readonly identity: ResolvedSystemPeripheralIdentity;
     readonly supportState: BatteryDeviceDiscoveryCandidateSupportState;
     readonly isExperimental: boolean;
+    readonly batteryPercent?: number;
     readonly batteryTelemetryFreshness?: BatteryDeviceTelemetryFreshness;
     readonly diagnostics?: BatteryDeviceDiscoveryCandidateDiagnostics;
 }
