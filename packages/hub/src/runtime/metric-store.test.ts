@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { MetricStore } from "./metric-store";
 import { LOCAL_SOURCE_SCOPE_ID } from "./source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue, MetricUnit } from "./sources/metric-source";

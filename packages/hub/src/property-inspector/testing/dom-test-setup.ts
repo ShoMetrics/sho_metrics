@@ -1,6 +1,6 @@
-import { after, afterEach } from "node:test";
 import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
+import { afterAll, afterEach } from "vitest";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
     pretendToBeVisual: true,
@@ -34,7 +34,7 @@ type DomGlobal = typeof globalThis & {
 };
 
 const testGlobal = globalThis as DomGlobal;
-const requireFromSetup = createRequire(__filename);
+const requireFromSetup = createRequire(import.meta.url);
 const pointerEventConstructor = (dom.window.PointerEvent ?? dom.window.MouseEvent) as unknown as typeof PointerEvent;
 
 defineGlobal("window", dom.window as unknown as Window & typeof globalThis);
@@ -77,7 +77,7 @@ afterEach(() => {
     testGlobal.document.body.replaceChildren();
 });
 
-after(() => {
+afterAll(() => {
     dom.window.close();
 });
 

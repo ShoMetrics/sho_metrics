@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
 import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../runtime/metric-keys";

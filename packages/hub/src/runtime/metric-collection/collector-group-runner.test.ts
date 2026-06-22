@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { CollectorGroupRunner } from "./collector-group-runner";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import type { CollectorGroupNoDataObserver } from "./collector-group-no-data-observer";

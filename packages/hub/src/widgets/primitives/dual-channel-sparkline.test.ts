@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import {
     DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,

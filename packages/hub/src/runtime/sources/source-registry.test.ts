@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { SourceClient, SourceSnapshotReadResult } from "./source-client";
 import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import type { SourceMetricPollingGroupResolution } from "./source-polling-groups";

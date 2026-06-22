@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { renderMetricFrame } from "../../view-rendering/metric-frame";
 import { renderSingleMetricBodyView } from "../../view-rendering/single-metric-view";
 import type { WidgetData } from "../../view-rendering/widget-data";

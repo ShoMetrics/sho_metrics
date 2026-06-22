@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { resolveMetricImageDeliveryPolicy } from "./metric-image-delivery-policy";
 
 test("first render schedules near-term and trailing key image resends", () => {

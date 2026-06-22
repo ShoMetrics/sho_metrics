@@ -364,8 +364,6 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
-      '**/.test-dist/**',
-      '**/.pi-test-dist/**',
       '**/package-lock.json',
       'src/generated/**',
       'scripts/benchmark/protobuf/generated/**',

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import {
     dispatchMetricViewImage,

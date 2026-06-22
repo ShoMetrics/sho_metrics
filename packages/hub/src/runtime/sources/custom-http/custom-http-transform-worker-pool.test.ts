@@ -1,22 +1,28 @@
 import assert from "node:assert/strict";
-import path from "node:path";
-import test from "node:test";
-import { pathToFileURL } from "node:url";
-import { CUSTOM_HTTP_TRANSFORM_WORKER_THREAD_ENTRY } from "./custom-http-transform-worker-thread";
+import { test } from "vitest";
+import { CUSTOM_HTTP_TRANSFORM_WORKER_THREAD_ENTRY } from "./custom-http-transform-worker-contract";
 import { CustomHttpTransformWorkerPool } from "./custom-http-transform-worker-pool";
 
-const TEST_WORKER_SCRIPT_URL = pathToFileURL(path.resolve(
-    ".test-dist/src/runtime/sources/custom-http/custom-http-transform-worker-thread.js",
-));
+const TEST_WORKER_SCRIPT_URL = new URL("./custom-http-transform-worker-thread.test-fixture.mjs", import.meta.url);
+
+function createTestWorkerPool(options: {
+    readonly outputLimitBytes?: number;
+    readonly poolSize?: number;
+    readonly timeoutMilliseconds?: number;
+} = {}): CustomHttpTransformWorkerPool {
+    return new CustomHttpTransformWorkerPool({
+        ...options,
+        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
+    });
+}
 
 test("Custom HTTP transform worker test entry stays linked into test output", () => {
     assert.equal(CUSTOM_HTTP_TRANSFORM_WORKER_THREAD_ENTRY, "custom-http-transform-worker");
 });
 
 test("CustomHttpTransformWorkerPool runs jq transforms in a reusable bounded worker", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         poolSize: 1,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {
@@ -52,9 +58,8 @@ test("CustomHttpTransformWorkerPool runs jq transforms in a reusable bounded wor
 });
 
 test("CustomHttpTransformWorkerPool rejects multi-output jq transforms deterministically", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         poolSize: 1,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {
@@ -72,9 +77,8 @@ test("CustomHttpTransformWorkerPool rejects multi-output jq transforms determini
 });
 
 test("CustomHttpTransformWorkerPool can return raw stdout for source editor exploration", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         poolSize: 1,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {
@@ -92,10 +96,9 @@ test("CustomHttpTransformWorkerPool can return raw stdout for source editor expl
 });
 
 test("CustomHttpTransformWorkerPool rejects output before schema validation when output is too large", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         outputLimitBytes: 8,
         poolSize: 1,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {
@@ -113,10 +116,9 @@ test("CustomHttpTransformWorkerPool rejects output before schema validation when
 });
 
 test("CustomHttpTransformWorkerPool terminates a timed-out worker and keeps the pool usable", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         poolSize: 1,
         timeoutMilliseconds: 500,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {
@@ -148,10 +150,9 @@ test("CustomHttpTransformWorkerPool terminates a timed-out worker and keeps the 
 });
 
 test("CustomHttpTransformWorkerPool absorbs the workerpool replacement race after timeout", async () => {
-    const pool = new CustomHttpTransformWorkerPool({
+    const pool = createTestWorkerPool({
         poolSize: 1,
         timeoutMilliseconds: 500,
-        workerScriptUrl: TEST_WORKER_SCRIPT_URL,
     });
 
     try {

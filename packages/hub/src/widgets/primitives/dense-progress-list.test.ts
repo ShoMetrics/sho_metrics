@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { DenseMetricWidgetData } from "../../actions/dense-multi-metric/row-data";
 import { TOUCH_STRIP_LOGICAL_SIZE, WIDGET_LOGICAL_SIZE, type WidgetData } from "../../view-rendering/widget-data";
 import {

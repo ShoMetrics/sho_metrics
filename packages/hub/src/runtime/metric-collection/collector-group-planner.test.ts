@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import type { MetricSubscription } from "./metric-subscription-registry";
 import type { SourceClient, SourceSnapshotReadResult } from "../sources/source-client";

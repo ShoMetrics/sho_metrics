@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
     resolveStreamDeckActionKind,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { applyColorCompensationToRgb, resolveColorCompensationFilterValues } from "./transform";
 import {
     DEFAULT_COLOR_COMPENSATION_PROFILE,

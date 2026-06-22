@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { buildWidgetDataFixture } from "../../tests/testing/widget-data-fixtures";
 import { buildPowerWidgetData } from "./power-widget-data";
 

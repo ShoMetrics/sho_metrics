@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
-import test from "node:test";
+import { test } from "vitest";
 import { prepareCustomHttpRequest, type CustomHttpPreparedAuth } from "./custom-http-auth";
 import { NodeCustomHttpFetcher } from "./custom-http-fetcher";
 

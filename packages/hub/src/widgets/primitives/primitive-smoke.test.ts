@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES, PIXEL_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";

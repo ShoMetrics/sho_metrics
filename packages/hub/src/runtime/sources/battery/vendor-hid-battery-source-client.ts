@@ -9,6 +9,7 @@ import type {
     NativeHidLoadResult,
     NativeHidModule,
 } from "../battery-hid/native-hid-loader-internal";
+import { loadNativeHidModule } from "../battery-hid/native-hid-loader";
 import { AsusRogBatteryReader } from "../battery-hid/asus-rog/asus-rog-battery-discovery";
 import { LogitechBatteryReader } from "../battery-hid/logitech/battery-discovery/logitech-battery-discovery";
 import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";
@@ -475,32 +476,6 @@ export async function readVendorHidBatteryDeviceDescriptorSnapshot(options: {
         descriptors: discoveryResult.descriptors,
         diagnostics: discoveryResult.diagnostics,
     };
-}
-
-async function loadNativeHidModule(): Promise<NativeHidLoadResult> {
-    try {
-        // Keep import.meta.url in the ESM wrapper so native package resolution stays anchored to the loader module.
-        const nativeHidLoaderModule: unknown = await import("../battery-hid/native-hid-loader.mjs");
-        if (!isNativeHidLoaderModule(nativeHidLoaderModule)) {
-            return {
-                state: "unavailable",
-                error: new TypeError("Native HID loader module did not export loadNativeHidModule()."),
-            };
-        }
-
-        return nativeHidLoaderModule.loadNativeHidModule();
-    } catch (error) {
-        return { state: "unavailable", error };
-    }
-}
-
-function isNativeHidLoaderModule(value: unknown): value is {
-    loadNativeHidModule(): NativeHidLoadResult;
-} {
-    return typeof value === "object" &&
-        value !== null &&
-        "loadNativeHidModule" in value &&
-        typeof value.loadNativeHidModule === "function";
 }
 
 async function discoverVendorHidBatteryDevices(options: {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { RefreshableCache } from "./refreshable-cache";
 
 test("refreshable cache returns fresh cached values without refreshing", async () => {

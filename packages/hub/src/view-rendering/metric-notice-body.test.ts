@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS, type MetricRenderAppearance } from "./render-appearance";
 import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "./render-svg-effects";
 import { DEFAULT_RENDER_TEXT_STYLES } from "./render-text-style";

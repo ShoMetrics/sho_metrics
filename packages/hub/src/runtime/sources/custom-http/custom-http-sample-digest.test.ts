@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { buildCustomHttpJsonDigest } from "./custom-http-sample-digest";
 
 test("Custom HTTP JSON digest keeps real keys and reports large array metadata separately", () => {

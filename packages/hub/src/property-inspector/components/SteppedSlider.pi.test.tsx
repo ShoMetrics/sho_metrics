@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { test } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SteppedSlider } from "./SteppedSlider";
 

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 
 import { loadNativeHidModuleWithRequire } from "./native-hid-loader-internal";
 
@@ -22,7 +22,7 @@ test("native HID module is requested only by the lazy loader", async () => {
         }
 
         const relativeSourcePath = relative(resolve("src"), filePath).replaceAll("\\", "/");
-        if (relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader.mjs" ||
+        if (relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader.ts" ||
             relativeSourcePath === "runtime/sources/battery-hid/native-hid-loader-internal.ts") {
             continue;
         }
@@ -34,7 +34,7 @@ test("native HID module is requested only by the lazy loader", async () => {
 });
 
 test("native HID loader anchors native package resolution to this module", async () => {
-    const source = await readFile(resolve("src/runtime/sources/battery-hid/native-hid-loader.mjs"), "utf8");
+    const source = await readFile(resolve("src/runtime/sources/battery-hid/native-hid-loader.ts"), "utf8");
 
     assert.match(source, /createRequire\(import\.meta\.url\)/u);
     assert.doesNotMatch(source, /process\.argv|process\.cwd/u);

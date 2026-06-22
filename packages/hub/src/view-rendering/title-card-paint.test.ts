@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { RenderPaintTokens } from "./render-appearance";
 import { resolveTitleCardStaticTextColor } from "./title-card-paint";
 

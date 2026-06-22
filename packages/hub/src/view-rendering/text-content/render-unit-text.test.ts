@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { formatCompactDataRateUnitText, formatRenderUnitText } from "./render-unit-text";
 
 test("render unit text formats temperature units strictly", () => {

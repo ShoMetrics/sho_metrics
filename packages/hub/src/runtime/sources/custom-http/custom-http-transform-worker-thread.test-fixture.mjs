@@ -1,41 +1,12 @@
 import { raw as runJqRaw } from "jq-wasm";
 import * as workerpool from "workerpool";
-import { CUSTOM_HTTP_TRANSFORM_WORKER_THREAD_ENTRY } from "./custom-http-transform-worker-contract";
 
-export { CUSTOM_HTTP_TRANSFORM_WORKER_THREAD_ENTRY };
-
-type CustomHttpTransformFailureReason =
-    | "jqFailure"
-    | "timeout"
-    | "outputTooLarge"
-    | "malformedOutput"
-    | "workerFailure";
-
-type CustomHttpTransformWorkerResult =
-    | {
-        readonly ok: true;
-        readonly output: unknown;
-    }
-    | {
-        readonly ok: false;
-        readonly reason: CustomHttpTransformFailureReason;
-        readonly detail: string;
-    };
-
-// Mirrors the pool-side mode union inside the isolated worker entry. The editor
-// uses raw stdout for exploration queries; runtime polling keeps strict output.
-type CustomHttpTransformOutputMode = "singleJsonValue" | "rawStdout";
-
-async function runCustomHttpTransform(
-    inputJson: unknown,
-    jqTransform: string,
-    outputLimitBytes: number,
-    outputMode: CustomHttpTransformOutputMode = "singleJsonValue",
-): Promise<CustomHttpTransformWorkerResult> {
+// Vitest runs source files directly, so there is no precompiled worker entry
+// entry for workerpool to launch. This fixture mirrors the production worker's
+// public workerpool method so pool lifecycle tests can stay source-based.
+async function runCustomHttpTransform(inputJson, jqTransform, outputLimitBytes, outputMode = "singleJsonValue") {
     try {
         const result = await runJqRaw(normalizeJqInput(inputJson), jqTransform, ["-c"]);
-        // Treat stderr as failure even with exitCode 0. jq debug output goes to
-        // stderr, and V1 requires transform-only output for predictable support.
         if (result.exitCode !== 0 || result.stderr.trim().length > 0) {
             return {
                 ok: false,
@@ -73,7 +44,7 @@ async function runCustomHttpTransform(
 
         return {
             ok: true,
-            output: JSON.parse(lines[0]) as unknown,
+            output: JSON.parse(lines[0]),
         };
     } catch (error) {
         return {
@@ -84,20 +55,16 @@ async function runCustomHttpTransform(
     }
 }
 
-function normalizeJqInput(inputJson: unknown): string | object {
-    // jq-wasm accepts object input directly, but primitive input must be passed
-    // as JSON text so jq sees the original JSON value rather than a host string.
+function normalizeJqInput(inputJson) {
     return typeof inputJson === "object" && inputJson !== null
         ? inputJson
         : JSON.stringify(inputJson);
 }
 
-function limitDetail(detail: string): string {
+function limitDetail(detail) {
     return detail.length > 300 ? `${detail.slice(0, 300)}...` : detail;
 }
 
-if (!workerpool.isMainThread) {
-    workerpool.worker({
-        runCustomHttpTransform,
-    });
-}
+workerpool.worker({
+    runCustomHttpTransform,
+});

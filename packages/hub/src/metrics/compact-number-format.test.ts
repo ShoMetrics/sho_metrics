@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { formatCompactNumber } from "./compact-number-format";
 
 test("compact number format preserves fractions that fit the display budget", () => {

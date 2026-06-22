@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { renderDiskThroughputDirectionIconFragment } from "./disk";
 
 test("disk throughput direction icons render read as up and write as down", () => {

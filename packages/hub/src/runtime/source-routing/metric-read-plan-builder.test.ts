@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { ResolvedMetricSourcePolicy } from "../../settings/resolved-settings";
 import {
     RAM_TOTAL_METRIC_KEY,

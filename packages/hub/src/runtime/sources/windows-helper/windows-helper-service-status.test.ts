@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { isWindowsServiceNotInstalledQueryError } from "./windows-helper-service-status";
 
 test("Windows helper service status recognizes SC 1060 exit code", () => {
