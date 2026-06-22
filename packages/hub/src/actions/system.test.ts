@@ -17,6 +17,10 @@ import {
     resolveSystemMetricKeys,
 } from "./system/view-builder";
 import type { WidgetData } from "../view-rendering/widget-data";
+import {
+    resolveBatteryDeviceCachePatchForPropertyInspector,
+} from "./system";
+import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 
 test("System action subscribes to the selected battery metric", () => {
     assert.deepEqual(
@@ -115,6 +119,42 @@ test("System view renders selected peripheral battery no-data safely", () => {
     assert.equal(read.calls[0]?.maxValue, 100);
     assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, undefined);
     assert.equal(viewOptions.noticeText, undefined);
+});
+
+test("System PI cache publish keeps selected peripheral pending while the battery device cache is initially empty", () => {
+    const patch = resolveBatteryDeviceCachePatchForPropertyInspector(
+        {
+            availableBatteryDevices: [],
+            batteryDeviceDiscoveryDiagnostics: undefined,
+            runtimeMaximumDownloadSpeedMbps: 123,
+        },
+        buildPeripheralIdentity(),
+    );
+
+    assert.equal(Object.hasOwn(patch, "availableBatteryDevices"), false);
+    assert.equal(Object.hasOwn(patch, "batteryDeviceDiscoveryDiagnostics"), false);
+    assert.equal(patch.runtimeMaximumDownloadSpeedMbps, 123);
+});
+
+test("System PI cache publish keeps completed empty battery device refreshes", () => {
+    const completedPatch: WidgetRuntimeCachePatch = {
+        availableBatteryDevices: [],
+        batteryDeviceDiscoveryDiagnostics: {
+            detectedCandidateCount: 0,
+            displayedDescriptorCount: 0,
+            hiddenCandidates: [],
+        },
+    };
+
+    assert.equal(
+        resolveBatteryDeviceCachePatchForPropertyInspector(completedPatch, buildPeripheralIdentity()),
+        completedPatch,
+    );
+    assert.equal(
+        resolveBatteryDeviceCachePatchForPropertyInspector({ availableBatteryDevices: [] }, undefined)
+            .availableBatteryDevices?.length,
+        0,
+    );
 });
 
 function buildSystemTarget(

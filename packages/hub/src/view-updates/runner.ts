@@ -30,6 +30,11 @@ import {
 import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
 import { hasColorCompensationProfileEffect } from "../color-compensation/types";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import {
+    MetricImageDeliveryCoordinator,
+    type MetricImageDeliveryPolicyResolver,
+} from "./image-delivery/metric-image-delivery-coordinator";
+import type { MetricImageResender } from "./image-delivery/metric-image-resender";
 
 const log = logger.for("MetricViewUpdateRunner");
 
@@ -48,6 +53,9 @@ export type MetricViewOptions = MetricRenderOptions & MetricViewEvent;
 
 export interface MetricViewUpdateRunnerOptions {
     readonly maxConcurrentMetricViewUpdates?: number | undefined;
+    readonly imageDeliveryPolicyResolver?: MetricImageDeliveryPolicyResolver | undefined;
+    readonly imageResendJitterWindowMilliseconds?: number | undefined;
+    readonly imageResender?: MetricImageResender | undefined;
 }
 
 interface MetricViewActionState {
@@ -62,18 +70,25 @@ interface MetricViewActionState {
     touchStripMetricLayoutState: TouchStripMetricLayoutState;
     lastRenderedSvgSignature: string | null;
     lastScheduledSettingsSignature: string | null;
+    pollingIntervalMilliseconds: number;
 }
 
 export class MetricViewUpdateRunner {
     private readonly metricViewActionStates = new Map<string, MetricViewActionState>();
     private readonly metricViewActionQueue = new MetricViewUpdateQueue();
     private readonly maxConcurrentMetricViewUpdates: number;
+    private readonly imageDeliveryCoordinator: MetricImageDeliveryCoordinator;
     private activeMetricViewUpdateCount = 0;
     private isMetricViewQueueDrainScheduled = false;
 
     constructor(options: MetricViewUpdateRunnerOptions = {}) {
         this.maxConcurrentMetricViewUpdates = options.maxConcurrentMetricViewUpdates
             ?? MAX_CONCURRENT_METRIC_VIEW_UPDATES;
+        this.imageDeliveryCoordinator = new MetricImageDeliveryCoordinator({
+            imageDeliveryPolicyResolver: options.imageDeliveryPolicyResolver,
+            imageResender: options.imageResender,
+            jitterWindowMilliseconds: options.imageResendJitterWindowMilliseconds,
+        });
     }
 
     setMetricView(options: MetricViewOptions): void {
@@ -83,6 +98,7 @@ export class MetricViewUpdateRunner {
 
         const metricViewActionState = this.getOrCreateMetricViewActionState(options.event.action.id);
 
+        this.imageDeliveryCoordinator.cancel(metricViewActionState.actionId);
         this.recordMetricViewUpdate(metricViewActionState, options);
         metricViewActionState.pendingOptions = options;
         this.enqueueMetricViewAction(metricViewActionState);
@@ -103,8 +119,22 @@ export class MetricViewUpdateRunner {
         metricViewActionState.pendingSettingsSignature = null;
         metricViewActionState.touchStripMetricLayoutState.layoutPromise = null;
         metricViewActionState.touchStripMetricLayoutState.layoutPath = null;
+        this.imageDeliveryCoordinator.delete(metricViewActionState.actionId);
         this.metricViewActionQueue.remove(actionId);
         this.metricViewActionStates.delete(actionId);
+    }
+
+    /**
+     * Updates the action's collection interval used by image delivery policy.
+     *
+     * Rendering only receives the latest widget data. The collection interval
+     * is reported separately so long-poll actions can get bounded resend
+     * protection without treating every rendered image as long-lived.
+     */
+    setMetricViewPollingInterval(actionId: string, pollingIntervalMilliseconds: number): void {
+        const metricViewActionState = this.getOrCreateMetricViewActionState(actionId);
+
+        metricViewActionState.pollingIntervalMilliseconds = pollingIntervalMilliseconds;
     }
 
     private runMetricViewUpdate(
@@ -115,6 +145,7 @@ export class MetricViewUpdateRunner {
         const updateReason = metricViewActionState.pendingUpdateReason;
         const settingsSignature = metricViewActionState.pendingSettingsSignature;
 
+        this.imageDeliveryCoordinator.cancel(metricViewActionState.actionId);
         metricViewActionState.isRenderInFlight = true;
         metricViewActionState.pendingOptions = null;
         metricViewActionState.pendingUpdateTimestampMilliseconds = null;
@@ -130,6 +161,12 @@ export class MetricViewUpdateRunner {
         const renderPlan = frame.renderPlan;
         const renderContext = buildMetricViewPerformanceRenderContext(options, renderPlan.renderAppearance);
         const renderedMetricData = frame.renderedMetricData;
+        const imageDeliveryDecision = this.imageDeliveryCoordinator.decideInitialDelivery({
+            actionId: metricViewActionState.actionId,
+            updateReason,
+            pollingIntervalMilliseconds: metricViewActionState.pollingIntervalMilliseconds,
+            widgetData: options.widgetData,
+        });
         const colorCompensationProfile = resolveHardwareColorCompensationProfile({
             actionId: options.event.action.id,
             streamDeckDeviceId: options.event.action.device.id,
@@ -171,19 +208,10 @@ export class MetricViewUpdateRunner {
 
         const composeEndTimestampMilliseconds = wallClockNowMilliseconds();
 
-        if (renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature) {
-            if (updateReason === "settings-change") {
-                log.debug(() => [
-                    "settingsViewSkippedUnchanged",
-                    `actionId=${options.event.action.id}`,
-                    `metricKey=${options.metricKey}`,
-                    `renderPrimitive=${renderPlan.renderAppearance.renderPrimitive}`,
-                    `queuedMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, renderStartTimestampMilliseconds)}`,
-                    `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
-                    `totalMs=${formatElapsedMilliseconds(updateTimestampMilliseconds, composeEndTimestampMilliseconds)}`,
-                ].join(" "));
-            }
-
+        if (
+            renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature
+            && !imageDeliveryDecision.policy.forceSendUnchangedImage
+        ) {
             log.debug(() => [
                 "skippedUnchanged",
                 `actionId=${options.event.action.id}`,
@@ -306,6 +334,19 @@ export class MetricViewUpdateRunner {
 
                 if (dispatchResult.status === "rendered") {
                     metricViewActionState.lastRenderedSvgSignature = renderedSvgSignature;
+                    this.imageDeliveryCoordinator.recordInitialRendered({
+                        actionId: metricViewActionState.actionId,
+                        slot: formatMetricViewActionSlot(options),
+                        metricKey: options.metricKey,
+                        event: options.event,
+                        softwarePngDataUrl,
+                        hardwareSvg,
+                        pngSize: renderPlan.pngSize,
+                        touchStripMetricLayout: renderPlan.touchStripMetricLayout,
+                        touchStripMetricLayoutState: metricViewActionState.touchStripMetricLayoutState,
+                        deliveryDecision: imageDeliveryDecision,
+                        isActionActive: () => metricViewActionState.active,
+                    });
                 }
 
                 recordMetricViewPerformanceSample({
@@ -392,6 +433,9 @@ export class MetricViewUpdateRunner {
             },
             lastRenderedSvgSignature: null,
             lastScheduledSettingsSignature: null,
+            // Default to the shortest normal poll until the collection layer publishes the real interval.
+            // This keeps image delivery conservative and avoids accidental long-poll resends during action startup.
+            pollingIntervalMilliseconds: 1000,
         };
         this.metricViewActionStates.set(actionId, metricViewActionState);
         return metricViewActionState;
@@ -528,6 +572,17 @@ export function clearMetricViewState(actionId: string): void {
     metricViewUpdateRunner.clearMetricViewState(actionId);
 }
 
+/**
+ * Publishes an action's resolved polling cadence to image delivery.
+ *
+ * The runner sees render requests, not the collection subscription that produced
+ * them. Delivery policy needs this interval to decide whether a lost key image
+ * would remain stale long enough to justify delayed resend attempts.
+ */
+export function setMetricViewPollingInterval(actionId: string, pollingIntervalMilliseconds: number): void {
+    metricViewUpdateRunner.setMetricViewPollingInterval(actionId, pollingIntervalMilliseconds);
+}
+
 function logMetricViewRasterizeFailure(options: {
     readonly actionId: string;
     readonly metricKey: string;
@@ -645,6 +700,20 @@ function resolveMetricViewPerformanceRenderVariant(renderAppearance: MetricRende
         case "bar":
             return "default";
     }
+}
+
+function formatMetricViewActionSlot(options: MetricViewOptions): string {
+    if (!options.event.action.isKey()) {
+        return "dial";
+    }
+
+    const coordinates = options.event.action.coordinates;
+
+    if (coordinates === undefined) {
+        return "key:unknown";
+    }
+
+    return `key:${coordinates.row}:${coordinates.column}`;
 }
 
 function formatAgeMilliseconds(

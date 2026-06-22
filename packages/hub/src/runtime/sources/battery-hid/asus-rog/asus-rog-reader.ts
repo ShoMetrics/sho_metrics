@@ -44,6 +44,7 @@ export class NativeAsusRogHidTransport {
         request: AsusRogBatteryRequest,
         parseReport: AsusRogBatteryParser,
     ): AsusRogBatteryReadResult {
+        const startedAtMonotonicMilliseconds = this.monotonicNow();
         let unrelatedReportCount = 0;
 
         try {
@@ -76,6 +77,7 @@ export class NativeAsusRogHidTransport {
                             request,
                             "response",
                             unrelatedReportCount,
+                            this.monotonicNow() - startedAtMonotonicMilliseconds,
                         );
                         return {
                             state: "battery",
@@ -87,6 +89,7 @@ export class NativeAsusRogHidTransport {
                             request,
                             parsed.reason,
                             unrelatedReportCount,
+                            this.monotonicNow() - startedAtMonotonicMilliseconds,
                         );
                         return {
                             state: "noData",
@@ -98,6 +101,7 @@ export class NativeAsusRogHidTransport {
                             request,
                             "malformed",
                             unrelatedReportCount,
+                            this.monotonicNow() - startedAtMonotonicMilliseconds,
                         );
                         return {
                             state: "noData",
@@ -112,7 +116,12 @@ export class NativeAsusRogHidTransport {
                 }
             }
 
-            logAsusRogExchangeOutcome(request, "timeout", unrelatedReportCount);
+            logAsusRogExchangeOutcome(
+                request,
+                "timeout",
+                unrelatedReportCount,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return {
                 state: "noData",
                 reason: "timeout",
@@ -123,7 +132,12 @@ export class NativeAsusRogHidTransport {
             // The source owner reports only a bounded outcome. HID errors are
             // noisy and often transient when devices are unplugged or another
             // ASUS process is active.
-            logAsusRogExchangeOutcome(request, "ioError", unrelatedReportCount);
+            logAsusRogExchangeOutcome(
+                request,
+                "ioError",
+                unrelatedReportCount,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return {
                 state: "noData",
                 reason: "ioError",
@@ -158,8 +172,9 @@ function logAsusRogExchangeOutcome(
         | "timeout"
         | "ioError",
     unrelatedReportCount: number,
+    durationMilliseconds: number,
 ): void {
-    log.atDebug()
+    log.atInfo()
         .everyMs(
             `asus-rog-exchange:${request.kind}:${outcome}`,
             ASUS_ROG_DEBUG_LOG_INTERVAL_MILLISECONDS,
@@ -169,6 +184,7 @@ function logAsusRogExchangeOutcome(
                 "ASUS ROG battery exchange",
                 `kind=${request.kind}`,
                 `outcome=${outcome}`,
+                `durationMs=${durationMilliseconds}`,
                 `unrelatedReports=${unrelatedReportCount}`,
             ].join(" "),
         );

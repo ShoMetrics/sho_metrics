@@ -13,7 +13,10 @@ import {
     type MetricReadPlan,
 } from "../runtime/source-routing/metric-read-plan";
 import { buildMetricReadPlanFromSourcePolicy } from "../runtime/source-routing/metric-read-plan-builder";
-import { clearMetricViewState } from "../view-updates/runner";
+import {
+    clearMetricViewState,
+    setMetricViewPollingInterval,
+} from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -323,6 +326,7 @@ export abstract class MetricAction extends SingletonAction {
         const { event } = activeActionState;
         const pollingFrequencySeconds = this.resolveSettings(event).preferences.pollingFrequencySeconds;
         const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(this.actionKind, pollingFrequencySeconds);
+        setMetricViewPollingInterval(event.action.id, pollingIntervalMilliseconds);
         const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
             this.actionKind,
             pollingFrequencySeconds,

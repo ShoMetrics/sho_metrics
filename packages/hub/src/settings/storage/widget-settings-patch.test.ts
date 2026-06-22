@@ -858,6 +858,7 @@ test("widget patch writes selected System peripheral battery identity", () => {
                     modelId: "mx-master-4",
                     receiverSlot: 2,
                 },
+                detectedPeripheralDisplayName: "MX Master 4",
             },
         },
     );
@@ -878,6 +879,7 @@ test("widget patch writes selected System peripheral battery identity", () => {
         assert.equal(identity?.vendorUnitId, "unit-2");
         assert.equal(identity?.modelId, "mx-master-4");
         assert.equal(identity?.receiverSlot, 2);
+        assert.equal(target.value.reading.value.detectedPeripheralDisplayName, "MX Master 4");
     }
 });
 

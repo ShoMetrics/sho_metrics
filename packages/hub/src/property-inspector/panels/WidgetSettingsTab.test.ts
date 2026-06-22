@@ -9,7 +9,10 @@ import {
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/patch/widget-settings-patch";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
-import type { BatteryDeviceDescriptor } from "../../runtime/sources/battery/battery-device-descriptor";
+import type {
+    BatteryDeviceDescriptor,
+    BatteryDeviceDiscoveryDiagnostics,
+} from "../../runtime/sources/battery/battery-device-descriptor";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     MetricIdKind,
@@ -1591,6 +1594,61 @@ test("system widget settings render battery selector and experimental vendor HID
     assert.match(markup, /60m/);
 });
 
+test("system widget settings keep selected battery snapshot while descriptors refresh", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+            },
+        }),
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "pending",
+        },
+    });
+
+    assert.match(markup, /Searching\.\.\. \[Dongle\] MX Master 4/);
+    assert.doesNotMatch(markup, /Unavailable: \[Dongle\] MX Master 4/);
+    assert.doesNotMatch(markup, /The selected device is not currently connected or responding/);
+});
+
+test("system widget settings explain unavailable selected battery after refresh completes", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+            },
+        }),
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Unavailable: \[Dongle\] MX Master 4/);
+    assert.match(markup, /The selected device is currently sleeping, or not currently connected/);
+});
+
+test("system widget settings show hidden battery device diagnostics entry point", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        runtimeCache: {
+            availableBatteryDevices: [],
+            batteryDeviceDiscoveryDiagnostics: buildBatteryDeviceDiscoveryDiagnostics(),
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Some USB HID devices were detected but not shown in the Battery list/);
+    assert.match(markup, /Details\.\.\./);
+});
+
 test("system widget settings hide vendor HID battery options when the global toggle is disabled", () => {
     const markup = renderWidgetSettings({
         actionKind: "system",
@@ -1769,6 +1827,33 @@ function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
             modelId: "mx-master-4",
             receiverSlot: 2,
         },
+    };
+}
+
+function buildBatteryDeviceDiscoveryDiagnostics(): BatteryDeviceDiscoveryDiagnostics {
+    return {
+        detectedCandidateCount: 2,
+        displayedDescriptorCount: 1,
+        hiddenCandidates: [
+            {
+                candidateId: "asus-unsupported",
+                displayName: "ASUS unsupported HID",
+                transport: "usbReceiver",
+                receiverKind: "rogOmni",
+                supportState: "unsupported",
+                reason: "unsupported",
+                vendorId: 0x0B05,
+                productId: 0x1B7A,
+                modelId: undefined,
+                manufacturer: "ASUS",
+                productName: "ASUS ROG Omni",
+                interfaceNumber: 1,
+                usagePage: 0xFF31,
+                usageId: 0x0076,
+                receiverSlot: 1,
+                sourcePathId: "hid-path-key",
+            },
+        ],
     };
 }
 

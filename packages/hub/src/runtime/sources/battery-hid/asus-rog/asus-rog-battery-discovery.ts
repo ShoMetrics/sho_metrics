@@ -3,14 +3,15 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../../settings/resolved-settings";
 import { logger } from "../../../../logging/logger";
+import { monotonicNowMilliseconds } from "../../../../shared/clock";
+import { buildBatteryMetricKeyFromIdentity } from "../../battery/battery-metric-key";
 import type {
+    NativeHidDevice,
     NativeHidDeviceInfo,
     NativeHidModule,
 } from "../native-hid-loader-internal";
-import type {
-    BatteryDeviceDiscoverer,
-    BatteryDeviceDiscoveryCandidate,
-} from "../../battery/battery-device-discovery";
+import type { BatteryDeviceDiscoveryCandidate } from "../../battery/battery-device-discovery";
+import type { VendorHidBatteryReader } from "../../battery/vendor-hid-battery-reader";
 import {
     ASUS_ROG_KEYBOARD_VENDOR_USAGE_PAGE,
     ASUS_ROG_OMNI_RECEIVER_PRODUCT_ID,
@@ -29,7 +30,10 @@ import {
     openNativeAsusRogHidTransport,
     type AsusRogBatteryReadResult,
 } from "./asus-rog-reader";
-import { ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES } from "./asus-rog-keyboard-routes";
+import {
+    ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES,
+    ASUS_ROG_KNOWN_OMNI_KEYBOARD_PRODUCT_ROUTES,
+} from "./asus-rog-keyboard-routes";
 import { ASUS_ROG_KNOWN_MOUSE_DIRECT_PID_ROUTES } from "./asus-rog-mouse-routes";
 
 const ASUS_MANUFACTURER = "ASUS";
@@ -43,21 +47,31 @@ const log = logger.for("Source:BatteryHID:AsusROG");
  * tables. Every path here must be backed by local probes or a named reference
  * model file; unknown ASUS PIDs are skipped without opening the device.
  */
-export class AsusRogBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
+export class AsusRogBatteryReader implements VendorHidBatteryReader {
+    private readonly bindingByMetricKey = new Map<string, AsusRogBatteryRouteBinding>();
+
     constructor(private readonly nativeHidModule: NativeHidModule) {}
 
-    discoverBatteryDevices(): Promise<
-        readonly BatteryDeviceDiscoveryCandidate[]
-    > {
+    discoverBatteryDevices(
+        deviceInfoList: readonly NativeHidDeviceInfo[],
+    ): Promise<readonly BatteryDeviceDiscoveryCandidate[]> {
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         const candidates: BatteryDeviceDiscoveryCandidate[] = [];
         const scanSummary = createAsusRogScanSummary();
+        scanSummary.enumeratedDeviceCount = deviceInfoList.length;
+        const omniPairingByReceiverInstanceKey = readAsusRogOmniPairingByReceiverInstanceKey(
+            deviceInfoList,
+            (path) =>
+                new this.nativeHidModule.HID(path, { nonExclusive: true }),
+        );
 
-        for (const deviceInfo of this.nativeHidModule.devices()) {
-            const route = resolveAsusRogBatteryRoute(deviceInfo);
+        for (const deviceInfo of deviceInfoList) {
+            const route = resolveAsusRogBatteryRoute(deviceInfo, omniPairingByReceiverInstanceKey);
             if (route === undefined) {
                 continue;
             }
             scanSummary.matchedRouteCount += 1;
+            recordAsusRogRouteDiagnostic(scanSummary, route, deviceInfo, "matched");
 
             const transport = this.openBatteryRoute(
                 deviceInfo,
@@ -74,20 +88,61 @@ export class AsusRogBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
                     route.parseReport,
                 );
                 recordAsusRogBatteryRead(scanSummary, battery);
+                recordAsusRogRouteDiagnostic(
+                    scanSummary,
+                    route,
+                    deviceInfo,
+                    battery.state === "battery" ? "battery" : battery.reason,
+                );
                 if (battery.state !== "battery") {
                     continue;
                 }
 
-                candidates.push(
-                    buildAsusRogBatteryCandidate(deviceInfo, route, battery.reading.percent),
-                );
+                const candidate = buildAsusRogBatteryCandidate(deviceInfo, route, battery.reading.percent);
+                candidates.push(candidate);
+                this.bindingByMetricKey.set(buildBatteryMetricKeyFromIdentity(candidate.identity), {
+                    deviceInfo,
+                    route,
+                });
             } finally {
                 transport.close();
             }
         }
 
-        logAsusRogScanSummary(scanSummary);
+        logAsusRogScanSummary(scanSummary, monotonicNowMilliseconds() - startedAtMonotonicMilliseconds);
         return Promise.resolve(candidates);
+    }
+
+    readBatteryDevice(metricKey: string): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        const binding = this.bindingByMetricKey.get(metricKey);
+        if (binding === undefined) {
+            return Promise.resolve(undefined);
+        }
+
+        const scanSummary = createAsusRogScanSummary();
+        const transport = this.openBatteryRoute(binding.deviceInfo, binding.route, scanSummary);
+        if (transport === undefined) {
+            return Promise.resolve(undefined);
+        }
+
+        try {
+            const battery = transport.exchange(binding.route.request, binding.route.parseReport);
+            if (battery.state !== "battery") {
+                return Promise.resolve(undefined);
+            }
+
+            // ASUS battery reports do not expose a live per-unit identity. Stale-binding protection here is the
+            // exact cached HID path/VID/PID/interface route plus the ASUS battery report parser rejecting unrelated
+            // responses, not a second identity read. Do not add a cached identity self-compare; it looks safer than
+            // it is and cannot detect that the live device changed.
+            return Promise.resolve(buildAsusRogBatteryCandidate(
+                binding.deviceInfo,
+                binding.route,
+                battery.reading.percent,
+            ));
+        } finally {
+            transport.close();
+        }
     }
 
     private openBatteryRoute(
@@ -108,10 +163,62 @@ export class AsusRogBatteryDeviceDiscoverer implements BatteryDeviceDiscoverer {
             // Treat it like a transient no-data tick rather than aborting the
             // whole vendor scan.
             scanSummary.noDataCounts.ioError += 1;
+            recordAsusRogRouteDiagnostic(scanSummary, route, deviceInfo, "openError");
             logAsusRogRouteOpenFailure(route);
             return undefined;
         }
     }
+}
+
+function readAsusRogOmniPairingByReceiverInstanceKey(
+    deviceInfoList: readonly NativeHidDeviceInfo[],
+    openDevice: (path: string) => NativeHidDevice,
+): ReadonlyMap<string, readonly number[]> {
+    const pairingByReceiverInstanceKey = new Map<string, readonly number[]>();
+    const omniPairingCollections = deviceInfoList.filter((deviceInfo): deviceInfo is NativeHidDeviceInfo & { readonly path: string } =>
+        deviceInfo.vendorId === ASUS_ROG_VENDOR_ID &&
+        deviceInfo.productId === ASUS_ROG_OMNI_RECEIVER_PRODUCT_ID &&
+        deviceInfo.path !== undefined &&
+        deviceInfo.path.toLowerCase().includes("mi_02&col01"));
+
+    for (const [index, deviceInfo] of omniPairingCollections.entries()) {
+        let device: NativeHidDevice | undefined;
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        try {
+            device = openDevice(deviceInfo.path);
+            device.write(padAsusRogDiagnosticReport([0x01, 0xa0, 0x00, 0x00]));
+            const report = device.readTimeout(500);
+            const pairedProductIds = readAsusRogOmniPairedProductIds(report);
+            pairingByReceiverInstanceKey.set(
+                formatAsusRogReceiverInstanceKey(deviceInfo.path),
+                pairedProductIds,
+            );
+            log.atInfo()
+                .everyMs(`asus-rog-omni-pairing-probe:${index}`, ASUS_ROG_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS)
+                .log(() => [
+                    "asusRogOmniPairingProbe",
+                    `index=${index}`,
+                    `pathKey=${formatAsusRogPathKey(deviceInfo.path)}`,
+                    `outcome=${report.length === 0 ? "timeout" : "response"}`,
+                    `pairedPids=${formatAsusRogProductIds(pairedProductIds)}`,
+                    `durationMs=${monotonicNowMilliseconds() - startedAtMonotonicMilliseconds}`,
+                ].join(" "));
+        } catch {
+            log.atInfo()
+                .everyMs(`asus-rog-omni-pairing-probe:${index}`, ASUS_ROG_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS)
+                .log(() => [
+                    "asusRogOmniPairingProbe",
+                    `index=${index}`,
+                    `pathKey=${formatAsusRogPathKey(deviceInfo.path)}`,
+                    "outcome=ioError",
+                    `durationMs=${monotonicNowMilliseconds() - startedAtMonotonicMilliseconds}`,
+                ].join(" "));
+        } finally {
+            device?.close();
+        }
+    }
+
+    return pairingByReceiverInstanceKey;
 }
 
 interface AsusRogBatteryRoute {
@@ -133,8 +240,14 @@ interface AsusRogBatteryRoute {
     readonly parseReport: AsusRogBatteryParser;
 }
 
+interface AsusRogBatteryRouteBinding {
+    readonly deviceInfo: NativeHidDeviceInfo;
+    readonly route: AsusRogBatteryRoute;
+}
+
 function resolveAsusRogBatteryRoute(
     deviceInfo: NativeHidDeviceInfo,
+    omniPairingByReceiverInstanceKey: ReadonlyMap<string, readonly number[]>,
 ): AsusRogBatteryRoute | undefined {
     if (!isSafeAsusRogVendorCollection(deviceInfo)) {
         return undefined;
@@ -142,15 +255,22 @@ function resolveAsusRogBatteryRoute(
 
     const path = deviceInfo.path.toLowerCase();
     if (isAsusRogOmniKeyboardCollection(deviceInfo, path)) {
-        // Omni exposes a shared receiver PID rather than a keyboard PID. Local
-        // probes verified this exact MI_02 Col02 collection for keyboard
-        // battery reads, but it still cannot identify which keyboard model is
-        // paired. Keep the display/model generic until a paired-device lookup
-        // exists.
+        const pairedProductId = omniPairingByReceiverInstanceKey
+            .get(formatAsusRogReceiverInstanceKey(deviceInfo.path))?.[0];
+        const pairedProduct = pairedProductId === undefined
+            ? undefined
+            : ASUS_ROG_KNOWN_OMNI_KEYBOARD_PRODUCT_ROUTES.find(route => route.productId === pairedProductId);
+        const formattedPairedProductId = pairedProductId === undefined
+            ? undefined
+            : formatProductId(pairedProductId);
         return {
-            routeId: "keyboard-omni",
-            displayName: "ASUS ROG Omni keyboard",
-            modelId: "asus-rog-keyboard:omni",
+            routeId: `keyboard-omni-${formattedPairedProductId ?? "generic"}`,
+            displayName: pairedProduct?.displayName
+                ?? (formattedPairedProductId === undefined
+                    ? "Generic ROG Omni Keyboard"
+                    : `Generic ROG Omni Keyboard ${formattedPairedProductId}`),
+            modelId: pairedProduct?.modelId
+                ?? `asus-rog-keyboard:omni-${formattedPairedProductId ?? "generic"}`,
             transport: "usbReceiver",
             receiverKind: "rogOmni",
             supportState: "supported",
@@ -298,16 +418,29 @@ type AsusRogNoDataReason = Extract<
 
 interface AsusRogScanSummary {
     readonly noDataCounts: Record<AsusRogNoDataReason, number>;
+    readonly routeDiagnostics: Map<string, AsusRogRouteDiagnostic>;
+    enumeratedDeviceCount: number;
     matchedRouteCount: number;
     batteryCandidateCount: number;
     unrelatedReportCount: number;
 }
 
+interface AsusRogRouteDiagnostic {
+    readonly routeId: string;
+    readonly displayName: string;
+    readonly supportState: string;
+    readonly transport: string;
+    readonly collectionSummaries: Set<string>;
+    readonly outcomes: Map<string, number>;
+}
+
 function createAsusRogScanSummary(): AsusRogScanSummary {
     return {
+        enumeratedDeviceCount: 0,
         matchedRouteCount: 0,
         batteryCandidateCount: 0,
         unrelatedReportCount: 0,
+        routeDiagnostics: new Map(),
         noDataCounts: {
             knownNoData: 0,
             timeout: 0,
@@ -331,19 +464,42 @@ function recordAsusRogBatteryRead(
     summary.noDataCounts[result.reason] += 1;
 }
 
-function logAsusRogScanSummary(summary: AsusRogScanSummary): void {
-    log.atDebug()
+function recordAsusRogRouteDiagnostic(
+    summary: AsusRogScanSummary,
+    route: AsusRogBatteryRoute,
+    deviceInfo: NativeHidDeviceInfo,
+    outcome: string,
+): void {
+    const existing = summary.routeDiagnostics.get(route.routeId);
+    const diagnostic = existing ?? {
+        routeId: route.routeId,
+        displayName: route.displayName,
+        supportState: route.supportState,
+        transport: route.transport,
+        collectionSummaries: new Set<string>(),
+        outcomes: new Map<string, number>(),
+    };
+    diagnostic.collectionSummaries.add(formatAsusRogCollectionSummary(deviceInfo));
+    diagnostic.outcomes.set(outcome, (diagnostic.outcomes.get(outcome) ?? 0) + 1);
+    summary.routeDiagnostics.set(route.routeId, diagnostic);
+}
+
+function logAsusRogScanSummary(summary: AsusRogScanSummary, durationMilliseconds: number): void {
+    log.atInfo()
         .everyMs(
             "asus-rog-scan",
             ASUS_ROG_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS,
         )
         .log(() =>
             [
-                "ASUS ROG battery scan",
+                "asusRogBatteryScan",
+                `enumeratedDevices=${summary.enumeratedDeviceCount}`,
                 `matchedRoutes=${summary.matchedRouteCount}`,
                 `candidates=${summary.batteryCandidateCount}`,
                 `noData=${formatNoDataCounts(summary.noDataCounts)}`,
                 `unrelatedReports=${summary.unrelatedReportCount}`,
+                `durationMs=${durationMilliseconds}`,
+                `routes=${formatRouteDiagnostics(summary.routeDiagnostics)}`,
             ].join(" "),
         );
 }
@@ -374,6 +530,39 @@ function formatNoDataCounts(
     );
 }
 
+function formatRouteDiagnostics(routeDiagnostics: ReadonlyMap<string, AsusRogRouteDiagnostic>): string {
+    return [...routeDiagnostics.values()]
+        .sort((left, right) => left.routeId.localeCompare(right.routeId))
+        .slice(0, 12)
+        .map(diagnostic => [
+            diagnostic.routeId,
+            diagnostic.transport,
+            diagnostic.supportState,
+            diagnostic.displayName,
+            [...diagnostic.collectionSummaries].sort().slice(0, 4).join("&"),
+            formatStringCounts(diagnostic.outcomes),
+        ].join("/"))
+        .join("|") || "none";
+}
+
+function formatAsusRogCollectionSummary(deviceInfo: NativeHidDeviceInfo): string {
+    return [
+        `pid=${formatProductId(deviceInfo.productId ?? 0)}`,
+        `interface=${deviceInfo.interface ?? "none"}`,
+        `usagePage=${formatProductId(deviceInfo.usagePage ?? 0)}`,
+        `usage=${formatProductId(deviceInfo.usage ?? 0)}`,
+        `product=${deviceInfo.product ?? "none"}`,
+        `pathKey=${formatAsusRogPathKey(deviceInfo.path)}`,
+    ].join(",");
+}
+
+function formatStringCounts(counts: ReadonlyMap<string, number>): string {
+    return [...counts.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(",") || "none";
+}
+
 function isStandardKeyboardCollection(
     deviceInfo: NativeHidDeviceInfo,
 ): boolean {
@@ -398,6 +587,49 @@ function sanitizeCandidateIdPart(value: string): string {
             .replace(/^[-._]+|[-._]+$/gu, "")
             .slice(0, 96) || "unknown"
     );
+}
+
+function padAsusRogDiagnosticReport(bytes: readonly number[]): number[] {
+    return [
+        ...bytes,
+        ...Array.from({ length: Math.max(0, 64 - bytes.length) }, () => 0x00),
+    ];
+}
+
+function readAsusRogOmniPairedProductIds(report: readonly number[]): readonly number[] {
+    if (report.length === 0) {
+        return [];
+    }
+
+    const productIds: number[] = [];
+    for (let offset = 5; offset + 1 < report.length && productIds.length < 8; offset += 4) {
+        const productId = report[offset] | (report[offset + 1] << 8);
+        if (productId === 0) {
+            break;
+        }
+
+        productIds.push(productId);
+    }
+
+    return productIds;
+}
+
+function formatAsusRogProductIds(productIds: readonly number[]): string {
+    return productIds.map(formatProductId).join(",") || "none";
+}
+
+function formatAsusRogPathKey(path: string | undefined): string {
+    if (path === undefined) {
+        return "none";
+    }
+
+    const normalizedPath = path.toLowerCase();
+    const match = /mi_[0-9a-f]{2}&col[0-9a-f]{2}#([^#]+)/u.exec(normalizedPath);
+    return match?.[1]?.replace(/[^a-z0-9&_-]+/gu, "-").slice(0, 48) ?? "unknown";
+}
+
+function formatAsusRogReceiverInstanceKey(path: string | undefined): string {
+    return formatAsusRogPathKey(path).replace(/&[0-9a-f]{4}$/u, "");
 }
 
 function formatProductId(productId: number): string {

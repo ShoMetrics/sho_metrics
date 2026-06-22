@@ -599,6 +599,15 @@ body {
     opacity: 0.6;
 }
 
+.battery-hidden-devices-note {
+    display: grid;
+    gap: 8px;
+}
+
+.battery-hidden-devices-details-button {
+    justify-self: start;
+}
+
 .secret-input-wrapper {
     min-width: 0;
     position: relative;

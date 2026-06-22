@@ -15,7 +15,7 @@ import {
     LOGITECH_HIDPP_VENDOR_ID,
     LOGITECH_UNIFYING_NANO_RECEIVER_PRODUCT_ID,
 } from "./hidpp-protocol";
-import { LogitechBatteryDeviceDiscoverer } from "./battery-discovery/logitech-battery-discovery";
+import { LogitechBatteryReader } from "./battery-discovery/logitech-battery-discovery";
 import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 
 const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
@@ -25,9 +25,9 @@ test("Logitech discovery emits Bolt receiver candidates from online pairing regi
         [buildBoltReceiverDeviceInfo()],
         writeBytes => responseReportsForBoltDiscovery(writeBytes, 2),
     );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new LogitechBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "MX Master 3S");
@@ -44,9 +44,9 @@ test("Logitech discovery hides offline Bolt receiver slots", async () => {
         [buildBoltReceiverDeviceInfo()],
         writeBytes => responseReportsForBoltDiscovery(writeBytes, undefined),
     );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new LogitechBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
 });
 
 test("Logitech discovery uses Unifying arrival events as the online slot source", async () => {
@@ -54,9 +54,9 @@ test("Logitech discovery uses Unifying arrival events as the online slot source"
         [buildUnifyingNanoReceiverDeviceInfo()],
         writeBytes => responseReportsForUnifyingDiscovery(writeBytes, 1),
     );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new LogitechBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "Logitech Unifying mouse (slot 1)");
@@ -71,9 +71,9 @@ test("Logitech discovery emits LIGHTSPEED candidates from responsive slot 1", as
         [buildLightspeedReceiverDeviceInfo()],
         writeBytes => responseReportsForLightspeedDiscovery(writeBytes),
     );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new LogitechBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "G502 X PLUS");
@@ -90,9 +90,9 @@ test("Logitech discovery leaves direct HID++ paths to OS or future wired support
         [buildDirectHidppLongDeviceInfo()],
         () => [],
     );
-    const discoverer = new LogitechBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new LogitechBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
 });
 
 function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {

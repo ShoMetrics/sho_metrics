@@ -39,6 +39,36 @@ export interface BatteryDeviceDescriptorDiagnostics {
     readonly coalescing: BatteryDeviceCoalescingDiagnostic;
 }
 
+export interface BatteryDeviceDiscoveryDiagnostics {
+    readonly detectedCandidateCount: number;
+    readonly displayedDescriptorCount: number;
+    readonly hiddenCandidates: readonly BatteryDeviceHiddenCandidateDiagnostic[];
+}
+
+export interface BatteryDeviceHiddenCandidateDiagnostic {
+    readonly candidateId: string;
+    readonly displayName: string;
+    readonly transport: BatteryDeviceTransport;
+    readonly receiverKind: SystemPeripheralReceiverKind | undefined;
+    readonly supportState: BatteryDeviceSupportState | "unknown";
+    readonly reason: BatteryDeviceHiddenCandidateReason;
+    readonly vendorId: number | undefined;
+    readonly productId: number | undefined;
+    readonly modelId: string | undefined;
+    readonly manufacturer: string | undefined;
+    readonly productName: string | undefined;
+    readonly interfaceNumber: number | undefined;
+    readonly usagePage: number | undefined;
+    readonly usageId: number | undefined;
+    readonly receiverSlot: number | undefined;
+    readonly sourcePathId: string | undefined;
+}
+
+export type BatteryDeviceHiddenCandidateReason =
+    | "experimentalDisabled"
+    | "unsupported"
+    | "unknownSupport";
+
 export type BatteryDeviceBatteryPercentSource =
     | "reported"
     | "voltageEstimated";

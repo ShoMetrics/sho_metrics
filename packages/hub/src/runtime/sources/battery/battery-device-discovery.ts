@@ -3,6 +3,7 @@ import type {
     SystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
+import { logger } from "../../../logging/logger";
 import {
     buildBatteryDeviceFallbackIdentityKey,
     buildBatteryDeviceDescriptorIdFromIdentity,
@@ -15,7 +16,13 @@ import type {
     BatteryDeviceDescriptor,
     BatteryDeviceBatteryPercentSource,
     BatteryDeviceSupportState,
+    BatteryDeviceDiscoveryDiagnostics,
+    BatteryDeviceHiddenCandidateDiagnostic,
+    BatteryDeviceHiddenCandidateReason,
 } from "./battery-device-descriptor";
+
+const log = logger.for("Source:BatteryHID:Discovery");
+const BATTERY_DEVICE_DISCOVERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 30_000;
 
 export type BatteryDeviceDiscoveryCandidateSupportState =
     | "supported"
@@ -121,10 +128,27 @@ export function resolveBatteryDeviceDescriptors(
         conflictPairSet,
         options.verifiedRouteRules ?? [],
     );
-
-    return groups
+    const descriptors = groups
         .map(group => buildBatteryDeviceDescriptor(group))
         .sort(compareBatteryDeviceDescriptors);
+    logBatteryDescriptorResolveSummary(candidates, visibleCandidates, groups, descriptors);
+    return descriptors;
+}
+
+/** Builds the static diagnostics snapshot shown from the Property Inspector details page. */
+export function buildBatteryDeviceDiscoveryDiagnostics(
+    candidates: readonly BatteryDeviceDiscoveryCandidate[],
+    descriptors: readonly BatteryDeviceDescriptor[],
+    options: BatteryDeviceDiscoveryOptions,
+): BatteryDeviceDiscoveryDiagnostics {
+    return {
+        detectedCandidateCount: candidates.length,
+        displayedDescriptorCount: descriptors.length,
+        hiddenCandidates: candidates
+            .filter(candidate => !isVisibleCandidate(candidate, options))
+            .map(candidate => buildHiddenCandidateDiagnostic(candidate, options))
+            .sort(compareHiddenCandidateDiagnostics),
+    };
 }
 
 function isVisibleCandidate(
@@ -136,6 +160,73 @@ function isVisibleCandidate(
     }
 
     return options.isExperimentalVendorHidEnabled || !candidate.isExperimental;
+}
+
+function buildHiddenCandidateDiagnostic(
+    candidate: BatteryDeviceDiscoveryCandidate,
+    options: BatteryDeviceDiscoveryOptions,
+): BatteryDeviceHiddenCandidateDiagnostic {
+    return {
+        candidateId: candidate.candidateId,
+        displayName: candidate.displayName,
+        transport: candidate.transport,
+        receiverKind: candidate.receiverKind,
+        supportState: mapCandidateSupportState(candidate.supportState),
+        reason: resolveHiddenCandidateReason(candidate, options),
+        vendorId: candidate.identity.vendorId,
+        productId: candidate.identity.productId,
+        modelId: candidate.identity.modelId,
+        manufacturer: candidate.identity.manufacturer,
+        productName: candidate.identity.productName,
+        interfaceNumber: candidate.identity.interfaceNumber,
+        usagePage: candidate.identity.usagePage,
+        usageId: candidate.identity.usageId,
+        receiverSlot: candidate.diagnostics?.receiverSlot,
+        sourcePathId: candidate.diagnostics?.sourcePathId,
+    };
+}
+
+function mapCandidateSupportState(
+    supportState: BatteryDeviceDiscoveryCandidateSupportState,
+): BatteryDeviceSupportState | "unknown" {
+    switch (supportState) {
+        case "supported":
+        case "experimental":
+        case "unsupported":
+        case "offline":
+            return supportState;
+        case "unknown":
+            return "unknown";
+    }
+}
+
+function resolveHiddenCandidateReason(
+    candidate: BatteryDeviceDiscoveryCandidate,
+    options: BatteryDeviceDiscoveryOptions,
+): BatteryDeviceHiddenCandidateReason {
+    if (!options.isExperimentalVendorHidEnabled && candidate.isExperimental) {
+        return "experimentalDisabled";
+    }
+
+    switch (candidate.supportState) {
+        case "unsupported":
+            return "unsupported";
+        case "unknown":
+            return "unknownSupport";
+        case "offline":
+        case "supported":
+        case "experimental":
+            return "unknownSupport";
+    }
+}
+
+function compareHiddenCandidateDiagnostics(
+    left: BatteryDeviceHiddenCandidateDiagnostic,
+    right: BatteryDeviceHiddenCandidateDiagnostic,
+): number {
+    return left.reason.localeCompare(right.reason)
+        || left.displayName.localeCompare(right.displayName)
+        || left.candidateId.localeCompare(right.candidateId);
 }
 
 interface BatteryDeviceCandidateGroup {
@@ -552,4 +643,72 @@ function uniqueSorted<TValue extends string>(values: readonly TValue[]): readonl
 
 function uniqueSortedNumbers(values: readonly number[]): readonly number[] {
     return [...new Set(values)].sort((left, right) => left - right);
+}
+
+function logBatteryDescriptorResolveSummary(
+    candidates: readonly BatteryDeviceDiscoveryCandidate[],
+    visibleCandidates: readonly BatteryDeviceDiscoveryCandidate[],
+    groups: readonly BatteryDeviceCandidateGroup[],
+    descriptors: readonly BatteryDeviceDescriptor[],
+): void {
+    log.atInfo()
+        .everyMs("battery-descriptor-resolve", BATTERY_DEVICE_DISCOVERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "batteryDescriptorResolve",
+            `candidates=${candidates.length}`,
+            `visibleCandidates=${visibleCandidates.length}`,
+            `hiddenCandidates=${candidates.length - visibleCandidates.length}`,
+            `candidateStates=${formatCandidateSupportCounts(candidates)}`,
+            `groups=${groups.length}`,
+            `coalescing=${formatCoalescingCounts(groups)}`,
+            `descriptors=${descriptors.length}`,
+            `descriptorStates=${formatDescriptorSupportCounts(descriptors)}`,
+            `descriptorLabels=${formatDescriptorLabels(descriptors)}`,
+        ].join(" "));
+}
+
+function formatCandidateSupportCounts(candidates: readonly BatteryDeviceDiscoveryCandidate[]): string {
+    const counts = new Map<BatteryDeviceDiscoveryCandidateSupportState, number>();
+    for (const candidate of candidates) {
+        counts.set(candidate.supportState, (counts.get(candidate.supportState) ?? 0) + 1);
+    }
+
+    return formatCounts(counts);
+}
+
+function formatDescriptorSupportCounts(descriptors: readonly BatteryDeviceDescriptor[]): string {
+    const counts = new Map<BatteryDeviceSupportState, number>();
+    for (const descriptor of descriptors) {
+        counts.set(descriptor.supportState, (counts.get(descriptor.supportState) ?? 0) + 1);
+    }
+
+    return formatCounts(counts);
+}
+
+function formatCoalescingCounts(groups: readonly BatteryDeviceCandidateGroup[]): string {
+    const counts = new Map<BatteryDeviceCoalescingDiagnostic, number>();
+    for (const group of groups) {
+        counts.set(group.coalescing, (counts.get(group.coalescing) ?? 0) + 1);
+    }
+
+    return formatCounts(counts);
+}
+
+function formatCounts<TKey extends string>(counts: ReadonlyMap<TKey, number>): string {
+    return [...counts.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(",") || "none";
+}
+
+function formatDescriptorLabels(descriptors: readonly BatteryDeviceDescriptor[]): string {
+    return descriptors
+        .slice(0, 8)
+        .map(descriptor => [
+            descriptor.supportState,
+            descriptor.transport,
+            descriptor.receiverKind ?? "noReceiver",
+            descriptor.displayName,
+        ].join("/"))
+        .join("|") || "none";
 }

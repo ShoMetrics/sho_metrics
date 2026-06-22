@@ -195,9 +195,9 @@ export const systemMessages = {
         ja: "システム",
     },
     loadingBatteryDevicesOption: {
-        en: "Loading battery devices...",
-        zh_CN: "正在加载电池设备...",
-        ja: "バッテリーデバイスを読み込んでいます...",
+        en: "Searching...",
+        zh_CN: "查找中...",
+        ja: "検索中...",
     },
     noBatteryDevicesOption: {
         en: "No battery devices detected",
@@ -213,6 +213,37 @@ export const systemMessages = {
         en: "Unavailable: {label}",
         zh_CN: "不可用：{label}",
         ja: "利用不可: {label}",
+    },
+    searchingBatterySelectionOption: {
+        // Keep this prefix short; it appears inside a narrow select option before a device name.
+        en: "Searching... {label}",
+        zh_CN: "查找中... {label}",
+        ja: "検索中... {label}",
+    },
+    unavailableBatterySelectionNote: {
+        en: "The selected device is currently sleeping, or not currently connected.",
+        zh_CN: "所选设备当前处于睡眠状态，或未连接。",
+        ja: "選択したデバイスは現在スリープ中、または接続されていません。",
+    },
+    hiddenBatteryDevicesNote: {
+        en: "Some USB HID devices were detected but not shown in the Battery list.",
+        zh_CN: "检测到了一些 USB HID 设备，但未显示在电池列表中。",
+        ja: "一部の USB HID デバイスは検出されましたが、バッテリー一覧には表示されていません。",
+    },
+    hiddenBatteryDevicesDetailsButton: {
+        en: "Details...",
+        zh_CN: "详情...",
+        ja: "詳細...",
+    },
+    hiddenBatteryDevicesWindowTitle: {
+        en: "Battery device diagnostics",
+        zh_CN: "电池设备诊断",
+        ja: "バッテリーデバイス診断",
+    },
+    hiddenBatteryDevicesWindowIntro: {
+        en: "The following devices were detected but not shown.",
+        zh_CN: "检测到了以下设备，但它们没有被显示。",
+        ja: "次のデバイスは検出されましたが、表示されていません。",
     },
     experimentalVendorHidBatterySettingLabel: {
         en: "USB Device",

@@ -51,7 +51,13 @@ import {
     type LogitechReceiverSlot,
 } from "./hidpp-protocol";
 
-const DEFAULT_HIDPP_TRANSACTION_TIMEOUT_MILLISECONDS = 300;
+// Ordinary HID++ feature reads need more than the old 300ms budget on sleepy
+// receiver-backed devices. OpenLogi's inventory comments call out wakeups that
+// can take about 3s; using 1500ms keeps a single feature read tolerant enough
+// for real hardware without letting every fallback probe block for seconds.
+// Slot-discovery probes that intentionally walk empty receiver slots must use
+// a smaller explicit timeout via exchangeWithTimeout().
+const DEFAULT_HIDPP_TRANSACTION_TIMEOUT_MILLISECONDS = 1500;
 const READ_SLICE_TIMEOUT_MILLISECONDS = 20;
 // OpenLogi gives sleepy receiver-backed devices a larger arrival-event window.
 // Keep this separate from ordinary feature transactions: Unifying arrival
@@ -124,6 +130,12 @@ export type LogitechBatteryReadResult =
         readonly unrelatedReportCount: number;
     };
 
+type LogitechBatteryFeaturePath =
+    | "unifiedBattery"
+    | "batteryStatus"
+    | "batteryVoltage"
+    | "none";
+
 export type LogitechDeviceInformationReadResult =
     | {
         readonly state: "deviceInformation";
@@ -169,6 +181,20 @@ export class LogitechHidppSession {
     constructor(private readonly transport: LogitechHidppTransport) {}
 
     readBattery(receiverSlot: LogitechReceiverSlot): LogitechBatteryReadResult {
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const finish = (
+            featurePath: LogitechBatteryFeaturePath,
+            result: LogitechBatteryReadResult,
+        ): LogitechBatteryReadResult => {
+            logLogitechBatteryReadOutcome(
+                receiverSlot,
+                featurePath,
+                result,
+                monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+            );
+            return result;
+        };
+
         // HID++ battery support is feature-table driven. Fallback is absent-only:
         // a malformed/timeout response means the queue is not trustworthy for
         // this tick, so the source publishes no-data instead of probing another
@@ -180,58 +206,58 @@ export class LogitechHidppSession {
         const unifiedBatteryFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
         if (unifiedBatteryFeature.state === "supported") {
             const batteryResult = this.readUnifiedBattery(receiverSlot, unifiedBatteryFeature.feature.featureIndex);
-            return appendOptionalTelemetry(
+            return finish("unifiedBattery", appendOptionalTelemetry(
                 batteryResult,
                 this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
                 this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
-            );
+            ));
         }
 
         if (unifiedBatteryFeature.state === "noData") {
-            return {
+            return finish("unifiedBattery", {
                 state: "noData",
                 reason: unifiedBatteryFeature.reason,
                 unrelatedReportCount: 0,
-            };
+            });
         }
 
         const batteryStatusFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID);
         if (batteryStatusFeature.state === "supported") {
             const batteryResult = this.readBatteryStatus(receiverSlot, batteryStatusFeature.feature.featureIndex);
-            return appendOptionalTelemetry(
+            return finish("batteryStatus", appendOptionalTelemetry(
                 batteryResult,
                 this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
                 this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
-            );
+            ));
         }
 
         if (batteryStatusFeature.state === "noData") {
-            return {
+            return finish("batteryStatus", {
                 state: "noData",
                 reason: batteryStatusFeature.reason,
                 unrelatedReportCount: 0,
-            };
+            });
         }
 
         const batteryVoltageFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID);
         if (batteryVoltageFeature.state === "unsupported") {
-            return { state: "unsupported" };
+            return finish("none", { state: "unsupported" });
         }
 
         if (batteryVoltageFeature.state === "noData") {
-            return {
+            return finish("batteryVoltage", {
                 state: "noData",
                 reason: batteryVoltageFeature.reason,
                 unrelatedReportCount: 0,
-            };
+            });
         }
 
         const batteryResult = this.readBatteryVoltage(receiverSlot, batteryVoltageFeature.feature.featureIndex);
-        return appendOptionalTelemetry(
+        return finish("batteryVoltage", appendOptionalTelemetry(
             batteryResult,
             this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
             this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
-        );
+        ));
     }
 
     readDeviceInformation(receiverSlot: LogitechReceiverSlot): LogitechDeviceInformationReadResult {
@@ -552,11 +578,19 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
     ) {}
 
     exchange(request: LogitechHidppRequest): LogitechHidppExchangeResult {
+        return this.exchangeWithTimeout(request, this.transactionTimeoutMilliseconds);
+    }
+
+    exchangeWithTimeout(
+        request: LogitechHidppRequest,
+        timeoutMilliseconds: number,
+    ): LogitechHidppExchangeResult {
+        const startedAtMonotonicMilliseconds = this.monotonicNow();
         const unrelatedReports: Array<readonly number[]> = [];
 
         try {
             this.writeDevice.write([...request.bytes]);
-            const deadlineMilliseconds = this.monotonicNow() + this.transactionTimeoutMilliseconds;
+            const deadlineMilliseconds = this.monotonicNow() + timeoutMilliseconds;
 
             while (this.monotonicNow() < deadlineMilliseconds) {
                 for (const device of this.readDevices) {
@@ -567,7 +601,12 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                     }
 
                     if (matchesLogitechHidppExpectedResponse(report, request.expectedResponse)) {
-                        logUnrelatedReportsBeforeOutcome(request, unrelatedReports.length, "response");
+                        logHidppResponseOutcome(
+                            request,
+                            unrelatedReports.length,
+                            "response",
+                            this.monotonicNow() - startedAtMonotonicMilliseconds,
+                        );
                         return {
                             state: "response",
                             report,
@@ -577,7 +616,13 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
 
                     const errorCode = parseLogitechHidppErrorCode(report, request.expectedResponse);
                     if (errorCode !== undefined) {
-                        logHidppExchangeOutcome(request, "deviceError", unrelatedReports.length, `errorCode=${formatByte(errorCode)}`);
+                        logHidppExchangeOutcome(
+                            request,
+                            "deviceError",
+                            unrelatedReports.length,
+                            this.monotonicNow() - startedAtMonotonicMilliseconds,
+                            `errorCode=${formatByte(errorCode)}`,
+                        );
                         return {
                             state: "deviceError",
                             errorCode,
@@ -589,13 +634,23 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                 }
             }
 
-            logHidppExchangeOutcome(request, "timeout", unrelatedReports.length);
+            logHidppExchangeOutcome(
+                request,
+                "timeout",
+                unrelatedReports.length,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return {
                 state: "timeout",
                 unrelatedReports,
             };
         } catch (error) {
-            logHidppExchangeOutcome(request, "ioError", unrelatedReports.length);
+            logHidppExchangeOutcome(
+                request,
+                "ioError",
+                unrelatedReports.length,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return {
                 state: "ioError",
                 error,
@@ -612,6 +667,7 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
      * still uses pairing registers as the stable unit-id source.
      */
     drainReceiverConnectionEvents(receiverKind: OpenLogiReceiverKind): readonly OpenLogiReceiverDeviceConnection[] | undefined {
+        const startedAtMonotonicMilliseconds = this.monotonicNow();
         const request = buildOpenLogiTriggerDeviceArrivalRequest();
         const connections: OpenLogiReceiverDeviceConnection[] = [];
         let unrelatedReportCount = 0;
@@ -640,7 +696,12 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                 }
 
                 if (triggerResponse.state === "registerError" || triggerResponse.state === "malformed") {
-                    logHidppExchangeOutcome(request, "deviceError", unrelatedReportCount);
+                    logHidppExchangeOutcome(
+                        request,
+                        "deviceError",
+                        unrelatedReportCount,
+                        this.monotonicNow() - startedAtMonotonicMilliseconds,
+                    );
                     return undefined;
                 }
 
@@ -648,7 +709,12 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
             }
 
             if (!triggerAcknowledged) {
-                logHidppExchangeOutcome(request, "timeout", unrelatedReportCount);
+                logHidppExchangeOutcome(
+                    request,
+                    "timeout",
+                    unrelatedReportCount,
+                    this.monotonicNow() - startedAtMonotonicMilliseconds,
+                );
                 return undefined;
             }
 
@@ -668,10 +734,20 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                 unrelatedReportCount += 1;
             }
 
-            logHidppExchangeOutcome(request, "response", unrelatedReportCount);
+            logHidppExchangeOutcome(
+                request,
+                "response",
+                unrelatedReportCount,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return connections;
         } catch {
-            logHidppExchangeOutcome(request, "ioError", unrelatedReportCount);
+            logHidppExchangeOutcome(
+                request,
+                "ioError",
+                unrelatedReportCount,
+                this.monotonicNow() - startedAtMonotonicMilliseconds,
+            );
             return undefined;
         }
     }
@@ -772,25 +848,23 @@ function parseFeatureExchangeResult(
     }
 }
 
-function logUnrelatedReportsBeforeOutcome(
+function logHidppResponseOutcome(
     request: LogitechHidppRequest,
     unrelatedReportCount: number,
     outcome: "response" | "deviceError",
+    durationMilliseconds: number,
 ): void {
-    if (unrelatedReportCount === 0) {
-        return;
-    }
-
-    logHidppExchangeOutcome(request, outcome, unrelatedReportCount);
+    logHidppExchangeOutcome(request, outcome, unrelatedReportCount, durationMilliseconds);
 }
 
 function logHidppExchangeOutcome(
     request: LogitechHidppRequest,
     outcome: "response" | "deviceError" | "timeout" | "ioError",
     unrelatedReportCount: number,
+    durationMilliseconds: number,
     extra?: string,
 ): void {
-    log.atDebug()
+    log.atInfo()
         .everyMs(
             [
                 "hidpp-exchange",
@@ -807,9 +881,34 @@ function logHidppExchangeOutcome(
             `receiverSlot=${request.expectedResponse.receiverSlot}`,
             `featureIndex=${formatByte(request.expectedResponse.featureIndex)}`,
             `functionByte=${formatByte(request.expectedResponse.functionByte)}`,
+            `durationMs=${durationMilliseconds}`,
             `unrelatedReports=${unrelatedReportCount}`,
             extra,
         ].filter(part => part !== undefined).join(" "));
+}
+
+function logLogitechBatteryReadOutcome(
+    receiverSlot: LogitechReceiverSlot,
+    featurePath: LogitechBatteryFeaturePath,
+    result: LogitechBatteryReadResult,
+    durationMilliseconds: number,
+): void {
+    log.atInfo()
+        .everyMs(
+            `hidpp-battery-read:${receiverSlot}:${featurePath}:${result.state}`,
+            LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "Logitech HID++ battery read",
+            `receiverSlot=${receiverSlot}`,
+            `featurePath=${featurePath}`,
+            `state=${result.state}`,
+            `reason=${result.state === "noData" ? result.reason : ""}`,
+            `percent=${result.state === "battery" ? result.reading.percent : ""}`,
+            `percentSource=${result.state === "battery" ? result.reading.percentSource : ""}`,
+            `durationMs=${durationMilliseconds}`,
+            `unrelatedReports=${result.state === "unsupported" ? 0 : result.unrelatedReportCount}`,
+        ].join(" "));
 }
 
 function mapBatteryParseResult(

@@ -30,6 +30,12 @@ import type {
  * Original license for cited OpenLogi HID files: MIT OR Apache-2.0
  * ShoMetrics integration is distributed under the project license.
  */
+// Bolt slot discovery walks every possible pairing register. Empty slots are
+// expected, so this must stay short even though ordinary HID++ feature reads
+// use a longer timeout for sleepy devices. Otherwise one empty Bolt receiver
+// can stall the whole descriptor refresh for several seconds.
+const BOLT_PAIRING_REGISTER_PROBE_TIMEOUT_MILLISECONDS = 300;
+
 export const LOGITECH_OPENLOGI_RECEIVERS: readonly LogitechReceiverDescriptor[] = [
     {
         receiverKind: "bolt",
@@ -48,12 +54,17 @@ export const LOGITECH_OPENLOGI_RECEIVERS: readonly LogitechReceiverDescriptor[] 
     },
 ];
 
-/** Discovers online Bolt slots through pairing registers. */
+/**
+ * Discovers online Bolt slots through pairing registers.
+ *
+ * Uses the short pairing timeout above because this loop is a bounded probe
+ * over mostly-empty slots, not a user-selected device battery transaction.
+ */
 export function discoverOnlineBoltSlots(transport: NativeLogitechHidppTransport): readonly LogitechReceiverSlotRoute[] {
     const slots: LogitechReceiverSlotRoute[] = [];
     for (let receiverSlot = 1; receiverSlot <= OPENLOGI_BOLT_MAX_RECEIVER_SLOTS; receiverSlot += 1) {
         const request = buildOpenLogiBoltDevicePairingInformationRequest(receiverSlot);
-        const result = transport.exchange(request);
+        const result = transport.exchangeWithTimeout(request, BOLT_PAIRING_REGISTER_PROBE_TIMEOUT_MILLISECONDS);
         if (result.state !== "response") {
             continue;
         }

@@ -33,6 +33,16 @@ export interface AsusRogKeyboardRouteDescriptor {
     readonly supportState: "supported" | "experimental";
 }
 
+/** Describes an ASUS ROG Omni paired keyboard product id. */
+export interface AsusRogOmniKeyboardProductDescriptor {
+    /** ASUS product id reported by the Omni paired-device query. */
+    readonly productId: number;
+    /** User-facing model label shown for the receiver-backed keyboard route. */
+    readonly displayName: string;
+    /** ShoMetrics canonical model key for fallback identity. */
+    readonly modelId: string;
+}
+
 /**
  * Describes one ASUS mouse HID collection with a known direct battery report shape.
  *
