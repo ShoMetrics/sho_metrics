@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, test } from "vitest";
 import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { readStoredWidgetSettings } from "../../settings/storage/codec";

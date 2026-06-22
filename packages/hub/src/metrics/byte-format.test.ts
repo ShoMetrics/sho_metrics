@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { formatByteCount, formatBytesPerSecond } from "./byte-format";
 
 test("byte rate format clamps negative samples to a zero kilo-rate display", () => {

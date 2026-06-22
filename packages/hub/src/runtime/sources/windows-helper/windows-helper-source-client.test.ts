@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { status as grpcStatus } from "@grpc/grpc-js";
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import {
     MetricDescriptorSchema,
     MetricIdKind as ProtoMetricIdKind,

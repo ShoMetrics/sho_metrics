@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { MetricUnit, type MetricValue } from "../metric-source";
 import type { NativeHidDevice, NativeHidDeviceInfo, NativeHidModule } from "../battery-hid/native-hid-loader-internal";
 import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";

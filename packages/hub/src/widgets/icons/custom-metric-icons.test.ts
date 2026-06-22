@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES } from "../../generated/custom-metric-lucide-search-index.generated";
 import {
     CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT,

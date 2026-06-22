@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { StatusEdgeDetector, type StatusEdgeDetectorEvent } from "./status-edge-detector";
 
 test("status edge detector logs enter once for repeated no-data observations", () => {

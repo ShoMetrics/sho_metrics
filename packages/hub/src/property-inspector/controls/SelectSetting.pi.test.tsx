@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { test } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SelectSetting } from "./SelectSetting";

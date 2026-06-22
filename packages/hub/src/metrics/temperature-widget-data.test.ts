@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { buildTemperatureWidgetData } from "./temperature-widget-data";
 
 test("temperature widget data formats Fahrenheit display from Celsius samples", () => {

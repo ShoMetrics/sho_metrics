@@ -1,5 +1,5 @@
-﻿import assert from "node:assert/strict";
-import test from "node:test";
+import assert from "node:assert/strict";
+import { test } from "vitest";
 import type { Systeminformation } from "systeminformation";
 import { MetricUnit } from "../metric-source";
 import { getNetworkPingLatencyMetricKey } from "../../network-metric-keys";

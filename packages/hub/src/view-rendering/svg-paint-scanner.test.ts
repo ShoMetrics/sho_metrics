@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { resolveColorForThresholdValue } from "./color-resolver";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame } from "./metric-frame";

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { MetricStore } from "../metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } from "../sources/metric-source";
 import { normalizeMetricReadPlan, type MetricReadPlan } from "../source-routing/metric-read-plan";

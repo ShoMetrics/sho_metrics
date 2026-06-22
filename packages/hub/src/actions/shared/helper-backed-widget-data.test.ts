@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../../runtime/metric-store";
 import {
     CPU_TEMP_METRIC_KEY,

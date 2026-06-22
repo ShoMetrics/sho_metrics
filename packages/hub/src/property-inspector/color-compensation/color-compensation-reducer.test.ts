@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
 import {
     COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { readStoredWidgetSettings } from "../../settings/storage/codec";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";

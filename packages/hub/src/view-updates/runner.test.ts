@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../settings/default-appearance-settings";
@@ -468,9 +468,8 @@ async function recordMetricViewUpdateReasons(run: () => Promise<void>): Promise<
         originalRecordMetricViewPerformanceSample(options);
     };
 
-    // The unit-test build emits CommonJS, so runner calls this export through
-    // the module object. If tests move to native ESM, this hook should fail by
-    // leaving updateReasons empty.
+    // The runner observes this export through the module object, so replacing it here
+    // records the update reasons without exposing a test-only hook in production code.
     Object.defineProperty(observability, "recordMetricViewPerformanceSample", {
         configurable: true,
         value: replacement,

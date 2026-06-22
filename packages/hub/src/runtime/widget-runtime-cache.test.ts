@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { DiskVolumeOption } from "./disk-volumes";
 import type { NetworkInterfaceOption } from "./network-interfaces";
 import { WidgetRuntimeCacheStore } from "./widget-runtime-cache";

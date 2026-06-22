@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { formatCompactHardwareModelLabel } from "./hardware-model-format";
 
 test("hardware model format keeps recognizable CPU family and SKU", () => {

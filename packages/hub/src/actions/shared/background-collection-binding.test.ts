@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import type { MetricSubscription } from "../../runtime/metric-collection/metric-subscription-registry";
 import { listMetricReadPlanKeys, type MetricReadPlan } from "../../runtime/source-routing/metric-read-plan";
 import { BackgroundCollectionBinding, type BackgroundCollectionBindingTimer } from "./background-collection-binding";

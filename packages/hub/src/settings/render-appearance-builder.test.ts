@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS } from "../view-rendering/render-appearance";
 import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,

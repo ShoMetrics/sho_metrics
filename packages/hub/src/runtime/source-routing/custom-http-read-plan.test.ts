@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { CUSTOM_HTTP_SOURCE_ID } from "../sources/source-ids";
 import {
     buildCustomHttpRuntimeIdentity,

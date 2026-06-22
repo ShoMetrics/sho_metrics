@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { MetricViewUpdateQueue } from "./update-queue";
 
 test("settings changes are dequeued before ordinary metric ticks", () => {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { SourcePlanningMetadataRegistry } from "./source-planning-metadata-registry";
 
 test("accepts first planning fingerprint and ignores same fingerprint reconnect", () => {
