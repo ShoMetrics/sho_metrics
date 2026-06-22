@@ -1,4 +1,7 @@
-import type { AsusRogKeyboardRouteDescriptor } from "./asus-rog-route-types";
+import type {
+    AsusRogKeyboardRouteDescriptor,
+    AsusRogOmniKeyboardProductDescriptor,
+} from "./asus-rog-route-types";
 
 /**
  * Keyboard battery routes verified by local ShoMetrics HID probes.
@@ -243,4 +246,30 @@ export const ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES: readonly AsusRogKeyboard
     [
         ...ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES_FROM_LOCAL_PROBES,
         ...ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES_FROM_OPENRGB,
+    ];
+
+/**
+ * Known ROG Omni keyboard product ids reported by the paired-device query.
+ *
+ * These are not USB collection PIDs. Omni receivers use the shared receiver
+ * PID `0x1ace`; the paired PID comes from the receiver-side `01 a0 00 00`
+ * report and is used only to name and disambiguate different paired models.
+ *
+ * Keep this as a small audited table. Add entries only from a clearly
+ * reviewable source such as G-Helper facts or local hardware verification.
+ */
+export const ASUS_ROG_KNOWN_OMNI_KEYBOARD_PRODUCT_ROUTES: readonly AsusRogOmniKeyboardProductDescriptor[] =
+    [
+        {
+            // G-Helper lists this Omni paired PID as ROG Falchion RX Low Profile.
+            productId: 0x1b06,
+            displayName: "ROG Falchion RX Low Profile",
+            modelId: "asus-rog-keyboard:falchion-rx-low-profile",
+        },
+        {
+            // Locally verified with ROG Strix Scope II 96 RX Wireless hardware.
+            productId: 0x1b7a,
+            displayName: "ROG Strix Scope II 96 RX Wireless",
+            modelId: "asus-rog-keyboard:strix-scope-ii-96-rx-wireless",
+        },
     ];

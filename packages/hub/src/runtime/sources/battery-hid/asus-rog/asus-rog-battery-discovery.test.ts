@@ -9,7 +9,7 @@ import {
     ASUS_ROG_KEYBOARD_VENDOR_USAGE_PAGE,
     ASUS_ROG_VENDOR_ID,
 } from "./asus-rog-protocol";
-import { AsusRogBatteryDeviceDiscoverer } from "./asus-rog-battery-discovery";
+import { AsusRogBatteryReader } from "./asus-rog-battery-discovery";
 import { ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES } from "./asus-rog-keyboard-routes";
 import { ASUS_ROG_KNOWN_MOUSE_DIRECT_PID_ROUTES } from "./asus-rog-mouse-routes";
 
@@ -18,9 +18,9 @@ test("ASUS ROG discovery emits verified keyboard candidates", async () => {
         [buildKeyboardDeviceInfo()],
         () => [0x12, 0x01, 0x00, 0x00, 0x00, 0x5c, 0x02, 0x01, 0x01],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "ROG Strix Scope II 96 RX");
@@ -36,9 +36,9 @@ test("ASUS ROG discovery marks theory-backed mouse candidates experimental", asy
             0x00, 0x12, 0x07, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "ROG Keris Wireless");
@@ -56,9 +56,9 @@ test("ASUS ROG discovery marks OpenRGB-derived keyboard routes experimental", as
         [buildKeyboardDeviceInfo(0x190c, "ROG Strix Scope TKL")],
         () => [0x12, 0x01, 0x00, 0x00, 0x00, 0x51, 0x02, 0x01, 0x00],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "ROG Strix Scope TKL");
@@ -88,9 +88,9 @@ test("ASUS ROG discovery covers known direct mouse battery routes from G-Helper"
             0x00,
         ],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, KNOWN_DIRECT_MOUSE_ROUTE_CASES.length);
     assert.deepEqual(
@@ -120,9 +120,9 @@ test("ASUS ROG discovery covers known interface-1 keyboard routes from local pro
         ),
         () => [0x12, 0x01, 0x00, 0x00, 0x00, 0x51, 0x02, 0x01, 0x00],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(
         candidates.length,
@@ -153,9 +153,9 @@ test("ASUS ROG discovery does not open unmatched ASUS PIDs", async () => {
         ],
         () => [0x12, 0x01],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
     assert.equal(nativeModule.openCount, 0);
 });
 
@@ -163,9 +163,9 @@ test("ASUS ROG discovery treats allowlisted open failures as no-data", async () 
     const nativeModule = new ThrowingNativeHidModule([
         buildKeyboardDeviceInfo(),
     ]);
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
     assert.equal(nativeModule.openCount, 1);
 });
 
@@ -184,9 +184,9 @@ test("ASUS ROG discovery does not open known ASUS mouse models without battery s
         ],
         () => [0x00, 0x12, 0x07],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
     assert.equal(nativeModule.openCount, 0);
 });
 
@@ -195,9 +195,9 @@ test("ASUS ROG discovery does not open Omni mouse routes before paired-device lo
         [buildMouseDeviceInfo(0x1ace, "mi_02&col03")],
         () => [0x03, 0x12, 0x07],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
     assert.equal(nativeModule.openCount, 0);
 });
 
@@ -216,9 +216,9 @@ test("ASUS ROG discovery ignores standard input collections", async () => {
         ],
         () => [0x12, 0x01],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    assert.deepEqual(await discoverer.discoverBatteryDevices(), []);
+    assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
     assert.equal(nativeModule.openCount, 0);
 });
 
@@ -239,13 +239,37 @@ test("ASUS ROG discovery keeps Azoth device-PID wireless receiver kind generic",
         ],
         () => [0x12, 0x01, 0x00, 0x00, 0x00, 0x4b, 0x00, 0x01, 0x00],
     );
-    const discoverer = new AsusRogBatteryDeviceDiscoverer(nativeModule);
+    const discoverer = new AsusRogBatteryReader(nativeModule);
 
-    const candidates = await discoverer.discoverBatteryDevices();
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "unknownReceiver");
+});
+
+test("ASUS ROG discovery names Omni keyboard routes from paired product ids", async () => {
+    const nativeModule = new FakeNativeHidModule(
+        [
+            buildOmniDeviceInfo("col01"),
+            buildOmniDeviceInfo("col02"),
+        ],
+        (writtenBytes) => {
+            if (writtenBytes[0] === 0x01 && writtenBytes[1] === 0xa0) {
+                return [0x01, 0xa0, 0x00, 0x00, 0x00, 0x7a, 0x1b, 0x00, 0x00];
+            }
+
+            return [0x02, 0x12, 0x01, 0x00, 0x00, 0x00, 0x5c, 0x02, 0x01, 0x01];
+        },
+    );
+    const discoverer = new AsusRogBatteryReader(nativeModule);
+
+    const candidates = await discoverer.discoverBatteryDevices(nativeModule.devices());
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].displayName, "ROG Strix Scope II 96 RX Wireless");
+    assert.equal(candidates[0].identity.modelId, "asus-rog-keyboard:strix-scope-ii-96-rx-wireless");
+    assert.equal(candidates[0].receiverKind, "rogOmni");
 });
 
 const KNOWN_DIRECT_MOUSE_ROUTE_CASES: ReadonlyArray<{
@@ -307,6 +331,20 @@ function buildMouseDeviceInfo(
     };
 }
 
+function buildOmniDeviceInfo(collection: "col01" | "col02"): NativeHidDeviceInfo {
+    return {
+        path: `hid#vid_0b05&pid_1ace&mi_02&${collection}#7&2accaf8a&0&000${collection === "col01" ? "0" : "1"}`,
+        vendorId: ASUS_ROG_VENDOR_ID,
+        productId: 0x1ace,
+        manufacturer: "ASUSTeK",
+        product: "ASUS ROG Omni Receiver",
+        release: 0,
+        interface: 2,
+        usagePage: ASUS_ROG_KEYBOARD_VENDOR_USAGE_PAGE,
+        usage: 1,
+    };
+}
+
 class FakeNativeHidModule implements NativeHidModule {
     readonly HID: new (
         path: string,
@@ -338,7 +376,6 @@ class FakeNativeHidModule implements NativeHidModule {
         return [...this.deviceInfoList];
     }
 }
-
 class FakeNativeHidDevice implements NativeHidDevice {
     private queuedReport: readonly number[] | undefined;
 

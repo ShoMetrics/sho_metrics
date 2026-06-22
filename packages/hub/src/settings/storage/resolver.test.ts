@@ -1098,6 +1098,31 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.detectedPeripheralDisplayName, undefined);
     });
 
+    it("resolves System battery color thresholds in battery order", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {},
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+
+        const paint = settings.widget.slot.appearance.theme.flat.paint;
+        assert.equal(paint.multiColor.lowThresholdPercent, 10);
+        assert.equal(paint.multiColor.highThresholdPercent, 20);
+        assert.deepEqual(paint.multiColor.colors.usage, {
+            lowColor: "#ef4444",
+            mediumColor: "#f97316",
+            highColor: "#22c55e",
+        });
+    });
+
     it("resolves stored System peripheral battery identity as fallback matching evidence", () => {
         const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({

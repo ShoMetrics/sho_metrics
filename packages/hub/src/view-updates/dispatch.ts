@@ -7,6 +7,8 @@ export interface TouchStripMetricLayoutState {
     layoutPath: string | null;
 }
 
+export type MetricViewKeyImageTarget = "software-and-hardware" | "hardware-only";
+
 export type MetricViewDispatchResult =
     | {
         readonly status: "rendered";
@@ -34,6 +36,7 @@ export async function dispatchMetricViewImage(options: {
     readonly touchStripMetricLayout: TouchStripMetricLayout | null;
     readonly touchStripMetricLayoutState: TouchStripMetricLayoutState;
     readonly isActionActive: () => boolean;
+    readonly keyImageTarget?: MetricViewKeyImageTarget | undefined;
 }): Promise<MetricViewDispatchResult> {
     if (options.event.action.isDial()) {
         return dispatchTouchStripMetricImage(options);
@@ -98,10 +101,21 @@ async function dispatchKeyMetricImage(options: {
     readonly event: WillAppearEvent;
     readonly softwarePngDataUrl: string;
     readonly hardwarePngDataUrl: string;
+    readonly keyImageTarget?: MetricViewKeyImageTarget | undefined;
 }): Promise<MetricViewDispatchResult> {
     const updateStartTimestampMilliseconds = wallClockNowMilliseconds();
 
     try {
+        if (options.keyImageTarget === "hardware-only") {
+            await options.event.action.setImage(options.hardwarePngDataUrl, { target: Target.Hardware });
+            return {
+                status: "rendered",
+                donePhase: "setImageDone",
+                updateStartTimestampMilliseconds,
+                updateEndTimestampMilliseconds: wallClockNowMilliseconds(),
+            };
+        }
+
         if (options.softwarePngDataUrl === options.hardwarePngDataUrl) {
             await options.event.action.setImage(options.hardwarePngDataUrl);
         } else {

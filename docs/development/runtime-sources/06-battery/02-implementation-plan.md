@@ -161,6 +161,44 @@ silently merge them. Show separate candidates or keep the binding unresolved.
 If two coalesced paths repeatedly report large conflicting battery values, split
 them back into separate displayed devices for the current session.
 
+## Fixes After Manual Verification
+
+Manual testing with ROG Azoth, ROG Falchion RX Low Profile, ROG Strix Scope II
+96 RX Wireless, Logitech MX Master 4, and multiple ROG Omni receivers found
+several product behavior gaps. The following rules are part of the v1 behavior,
+not optional diagnostics:
+
+- Preserve the selected peripheral label while the device is sleeping, missing,
+  or still being searched. A configured ROG Azoth must continue to display as
+  `[Dongle] ROG Azoth`, not as `selected-peripheral`, a raw model id, or a raw
+  vendor/product id fallback.
+- Treat aggressive wireless sleep as normal no-data. ShoMetrics must not force
+  wake keyboards, mice, or receivers to read battery; sleeping devices may show
+  `N/A` until the user wakes or reconnects them. Local vendor software also
+  reports sleeping devices as unavailable, so this is a product limitation to
+  explain rather than a condition to fight with HID traffic.
+- Keep receiver-backed candidates distinguishable when multiple dongles are
+  present. Two ROG Omni receivers must not collapse into one ambiguous generic
+  candidate when route evidence can split them.
+- Use battery-specific color thresholds: green above `20%`, orange from
+  `10%` through `20%`, and red below `10%`. Do not reuse CPU/load semantics
+  where higher values are worse.
+- Show human-readable labels in the Battery selector even when experimental USB
+  support is disabled or a selected device is unavailable. Raw ids may appear in
+  debug details, but not as the primary selector label.
+- Keep generic receiver labels explicitly generic until a model mapping is
+  backed by source review or local hardware verification. For example, an
+  unknown ROG Omni keyboard route should say `Generic ROG Omni Keyboard`, not a
+  guessed product name.
+- Firmware-update stress testing on RX LP, RX 96, and ROG Azoth while forcing
+  battery refreshes did not brick devices or settings. USB reconnect sounds were
+  observed during the vendor firmware update flow, so the result is not absolute
+  proof of safety (and this can never be guaranteed); the product rule remains
+  low-frequency, read-only battery queries and no forced wake.
+- Manual reads can take several seconds, especially on Logitech receiver paths.
+  Keep timing diagnostics and separate startup/discovery/direct-read behavior so
+  slow reads can be attributed without adding blind retries.
+
 ## Step Granularity And Code Size
 
 This plan intentionally uses ten implementation steps. The split is based on

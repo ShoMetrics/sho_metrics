@@ -101,7 +101,7 @@ test("reconcile updates an existing runner with the same collector group key", a
         ["cpu.usage_percent"],
         ["cpu.model"],
     ]);
-    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000, 5000]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000, 0, 5000]);
 });
 
 test("reconcile stops runners whose collector groups disappear", async () => {
@@ -607,12 +607,13 @@ class FakeTimer {
     }
 
     async runNext(): Promise<void> {
-        const handle = this.handles.shift();
+        const handle = this.shiftNextActiveHandle();
 
-        if (!handle || !handle.active) {
+        if (!handle) {
             return;
         }
 
+        handle.active = false;
         handle.callback();
         await this.drainMicrotasks();
     }
@@ -641,6 +642,16 @@ class FakeTimer {
         for (let tick = 0; tick < ASYNC_TIMER_DRAIN_MICROTASK_TICKS; tick += 1) {
             await Promise.resolve();
         }
+    }
+
+    private shiftNextActiveHandle(): FakeTimerHandle | undefined {
+        const handleIndex = this.handles.findIndex(handle => handle.active);
+        if (handleIndex === -1) {
+            return undefined;
+        }
+
+        const [handle] = this.handles.splice(handleIndex, 1);
+        return handle;
     }
 }
 

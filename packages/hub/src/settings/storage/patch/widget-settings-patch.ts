@@ -581,6 +581,10 @@ function applySystemPatch(
             ? undefined
             : buildStoredSystemPeripheralIdentity(patch.peripheralIdentity);
     }
+
+    if ("detectedPeripheralDisplayName" in patch) {
+        target.detectedPeripheralDisplayName = patch.detectedPeripheralDisplayName;
+    }
 }
 
 function buildStoredSystemPeripheralIdentity(

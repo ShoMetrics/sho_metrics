@@ -8,4 +8,5 @@ Node dependencies, vendor-specific device probing, or safety policy for
 read-only peripheral telemetry.
 
 1. [HID Battery Experiment Report](01-hid-battery-experiment-report.md)
-
+2. [System & Battery Implementation Plan](02-implementation-plan.md)
+3. [Stream Deck Upload Failure Analysis](03-streamdeck-upload-failure-analysis.md)

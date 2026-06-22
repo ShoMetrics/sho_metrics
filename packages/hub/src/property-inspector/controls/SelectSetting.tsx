@@ -3,6 +3,7 @@ import {
     useRef,
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
+    type ReactNode,
 } from "react";
 import { InspectorItem } from "../components/InspectorItem";
 import type { SelectOption, SelectOptionValue } from "../inspector/types";
@@ -40,6 +41,7 @@ interface SelectSettingProps<TValue extends SelectOptionValue> extends SettingCo
     optionList: readonly SelectOption<TValue>[];
     buildOptionPreviewUri?: ((value: TValue) => string) | undefined;
     optionPreviewSizePixels?: number | undefined;
+    hint?: ReactNode | undefined;
     onValueChange: (value: TValue) => void;
 }
 
@@ -54,6 +56,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
     optionList,
     buildOptionPreviewUri,
     optionPreviewSizePixels,
+    hint,
     onValueChange,
     disabled = false,
 }: SelectSettingProps<TValue>): React.JSX.Element {
@@ -209,6 +212,7 @@ export function SelectSetting<TValue extends SelectOptionValue>({
                     </div>
                 )}
             </div>
+            {hint}
         </InspectorItem>
     );
 

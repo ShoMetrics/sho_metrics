@@ -216,7 +216,7 @@ test("stop prevents an in-flight refresh from writing stale generation results",
     );
 });
 
-test("updateCollectorGroup applies the new metric set and interval on the next timer tick", async () => {
+test("updateCollectorGroup refreshes immediately when the metric set changes", async () => {
     const fakeTimer = new FakeTimer();
     const sourceClient = new FakeSourceClient([
         buildSnapshot(1000, { "cpu.usage_percent": 40 }),
@@ -247,7 +247,7 @@ test("updateCollectorGroup applies the new metric set and interval on the next t
         ["cpu.usage_percent"],
         ["cpu.model"],
     ]);
-    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000, 5000]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000, 0, 5000]);
 });
 
 test("updateCollectorGroup prevents an in-flight old generation from writing", async () => {
@@ -269,6 +269,42 @@ test("updateCollectorGroup prevents an in-flight old generation from writing", a
         metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
         undefined,
     );
+});
+
+test("updateCollectorGroup queues an immediate refresh after a pending old generation", async () => {
+    const fakeTimer = new FakeTimer();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient([
+        deferredSnapshot.promise,
+        buildSnapshot(2000, { "cpu.model": 1 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+    runner.updateCollectorGroup(buildCollectorGroup({
+        metricKeys: ["cpu.model"],
+        intervalMilliseconds: 5000,
+    }));
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 99 }));
+    await fakeTimer.drainMicrotasks();
+
+    await fakeTimer.runNext();
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.model"],
+    ]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 0, 5000]);
 });
 
 test("start does not create a second timer while a running refresh is pending", async () => {
@@ -325,6 +361,44 @@ test("periodic refresh waits for pending refresh before scheduling the next poll
     assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000]);
 
     await fakeTimer.advanceBy(1000);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+});
+
+test("periodic refresh continues when refresh result callback throws", async () => {
+    const fakeTimer = new FakeTimer();
+    let callbackCallCount = 0;
+    const sourceClient = new FakeSourceClient([
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        buildSnapshot(2000, { "cpu.usage_percent": 55 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+        onRefreshResult: () => {
+            callbackCallCount += 1;
+            if (callbackCallCount === 1) {
+                throw new Error("callback failed");
+            }
+        },
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000]);
+
+    await fakeTimer.runNext();
 
     assert.deepEqual(sourceClient.requestedMetricKeys, [
         ["cpu.usage_percent"],

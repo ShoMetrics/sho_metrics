@@ -91,6 +91,41 @@ const DEFAULT_CATALOG_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
     },
 });
 
+const DEFAULT_BATTERY_APPEARANCE_SETTINGS = buildDefaultAppearanceSettings({
+    theme: {
+        flat: {
+            paint: {
+                multiColor: {
+                    lowThresholdPercent: 10,
+                    highThresholdPercent: 20,
+                    colors: {
+                        usage: {
+                            lowColor: "#ef4444",
+                            mediumColor: "#f97316",
+                            highColor: "#22c55e",
+                        },
+                    },
+                },
+            },
+        },
+        cupertinoGlass: {
+            paint: {
+                multiColor: {
+                    lowThresholdPercent: 10,
+                    highThresholdPercent: 20,
+                    colors: {
+                        usage: {
+                            lowColor: "#ef4444",
+                            mediumColor: "#f97316",
+                            highColor: "#22c55e",
+                        },
+                    },
+                },
+            },
+        },
+    },
+});
+
 const TEXT_VIEW_DEFAULT_METRIC_COLOR_MODE = "black-white" satisfies ColorMode;
 
 export function resolveDenseAppearanceSettings(
@@ -124,6 +159,9 @@ export function resolveDefaultAppearanceSettings(target: ResolvedMetricTarget): 
     }
     if (target.domain === "catalog" || target.domain === "customMetric") {
         return DEFAULT_CATALOG_APPEARANCE_SETTINGS;
+    }
+    if (target.domain === "system" && target.reading.kind === "batteryPercent") {
+        return DEFAULT_BATTERY_APPEARANCE_SETTINGS;
     }
 
     return DEFAULT_APPEARANCE_SETTINGS;

@@ -18,6 +18,7 @@ import {
     setMetricView,
     type MetricViewOptions,
 } from "./runner";
+import type { MetricImageDeliveryPolicyInput } from "./image-delivery/metric-image-delivery-policy";
 
 type RecordMetricViewPerformanceSample =
     typeof import("./view-update-observability")["recordMetricViewPerformanceSample"];
@@ -110,6 +111,184 @@ test("a pending settings-change update reason is not overwritten by a metric tic
         assert.deepEqual(updateReasons, ["settings-change"]);
     } finally {
         clearMetricViewState(action.id);
+    }
+});
+
+test("settings changes resend unchanged key images", async () => {
+    const action = new FakeKeyAction("settings-resend-action");
+
+    try {
+        setMetricView(buildMetricViewOptions(action));
+        await waitForImageCallCount(action, 1);
+        await waitForScheduledWork();
+
+        setMetricView(buildMetricViewOptions(action));
+        await waitForScheduledWork();
+        assert.equal(action.imageDataUrlList.length, 1);
+
+        setMetricView(buildMetricViewOptions(action, {
+            appearanceOverride: { line: { lineSmoothingPercent: 76 } },
+        }));
+        await waitForImageCallCount(action, 2);
+
+        assert.equal(action.imageDataUrlList.length, 2);
+    } finally {
+        clearMetricViewState(action.id);
+    }
+});
+
+test("image delivery policy schedules delayed key image resends", async () => {
+    const rasterizerRecorder = installRasterizerRecorder();
+    const runner = new MetricViewUpdateRunner({
+        imageDeliveryPolicyResolver: () => ({
+            resendDelaysMilliseconds: [1, 2],
+            forceSendUnchangedImage: true,
+            reason: { kind: "first-render" },
+        }),
+        imageResendJitterWindowMilliseconds: 0,
+    });
+    const action = new FakeKeyAction("resend-policy-action");
+
+    try {
+        runner.setMetricView(buildMetricViewOptions(action));
+
+        await waitForImageCallCount(action, 3);
+
+        assert.equal(action.imageDataUrlList.length, 3);
+        assert.deepEqual(action.imageTargetList, [undefined, Target.Hardware, Target.Hardware]);
+        assert.equal(new Set(action.imageDataUrlList).size, 3);
+        assert.equal(rasterizerRecorder.svgList.length, 3);
+        assert.match(rasterizerRecorder.svgList[1] ?? "", /<g opacity="0\.99">/u);
+        assert.match(rasterizerRecorder.svgList[2] ?? "", /<g opacity="0\.98">/u);
+    } finally {
+        runner.clearMetricViewState(action.id);
+        rasterizerRecorder.restore();
+    }
+});
+
+test("newer renders cancel pending image resends", async () => {
+    let policyCallCount = 0;
+    const runner = new MetricViewUpdateRunner({
+        imageDeliveryPolicyResolver: () => {
+            policyCallCount += 1;
+            return {
+                resendDelaysMilliseconds: policyCallCount === 1 ? [50] : [],
+                forceSendUnchangedImage: true,
+                reason: { kind: "first-render" },
+            };
+        },
+        imageResendJitterWindowMilliseconds: 0,
+    });
+    const action = new FakeKeyAction("cancel-newer-render-action");
+
+    try {
+        runner.setMetricView(buildMetricViewOptions(action, {
+            widgetData: buildWidgetData({ current: 1, displayValue: "1" }),
+        }));
+        await waitForImageCallCount(action, 1);
+
+        runner.setMetricView(buildMetricViewOptions(action, {
+            widgetData: buildWidgetData({ current: 2, displayValue: "2" }),
+        }));
+        await waitForImageCallCount(action, 2);
+        await waitForMilliseconds(80);
+
+        assert.equal(action.imageDataUrlList.length, 2);
+    } finally {
+        runner.clearMetricViewState(action.id);
+    }
+});
+
+test("clearing action state cancels pending image resends", async () => {
+    const runner = new MetricViewUpdateRunner({
+        imageDeliveryPolicyResolver: () => ({
+            resendDelaysMilliseconds: [50],
+            forceSendUnchangedImage: true,
+            reason: { kind: "first-render" },
+        }),
+        imageResendJitterWindowMilliseconds: 0,
+    });
+    const action = new FakeKeyAction("cancel-clear-action");
+
+    runner.setMetricView(buildMetricViewOptions(action));
+    await waitForImageCallCount(action, 1);
+
+    runner.clearMetricViewState(action.id);
+    await waitForMilliseconds(80);
+
+    assert.equal(action.imageDataUrlList.length, 1);
+});
+
+test("clearing action state before initial image dispatch settles prevents image resends", async () => {
+    const initialImageDispatch = createDeferred<void>();
+    const runner = new MetricViewUpdateRunner({
+        imageDeliveryPolicyResolver: () => ({
+            resendDelaysMilliseconds: [1],
+            forceSendUnchangedImage: true,
+            reason: { kind: "first-render" },
+        }),
+        imageResendJitterWindowMilliseconds: 0,
+    });
+    const action = new FakeKeyAction("cancel-before-initial-image-settles-action", initialImageDispatch.promise);
+
+    runner.setMetricView(buildMetricViewOptions(action));
+    await waitForImageCallCount(action, 1);
+
+    runner.clearMetricViewState(action.id);
+    initialImageDispatch.resolve();
+    await waitForMilliseconds(30);
+
+    assert.equal(action.imageDataUrlList.length, 1);
+});
+
+test("metric image policy receives first-render state and polling interval", async () => {
+    const policyInputs: MetricImageDeliveryPolicyInput[] = [];
+    const runner = new MetricViewUpdateRunner({
+        imageDeliveryPolicyResolver: (input) => {
+            policyInputs.push(input);
+            return {
+                resendDelaysMilliseconds: [],
+                forceSendUnchangedImage: true,
+                reason: { kind: "none" },
+            };
+        },
+        imageResendJitterWindowMilliseconds: 0,
+    });
+    const action = new FakeKeyAction("policy-input-action");
+
+    try {
+        runner.setMetricViewPollingInterval(action.id, 10_000);
+        runner.setMetricView(buildMetricViewOptions(action, {
+            widgetData: {
+                ...buildWidgetData(),
+                sampleTimestampMilliseconds: undefined,
+            },
+        }));
+        await waitForImageCallCount(action, 1);
+
+        runner.setMetricView(buildMetricViewOptions(action, {
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+        }));
+        await waitForImageCallCount(action, 2);
+
+        assert.deepEqual(policyInputs.map(input => ({
+            pollingIntervalMilliseconds: input.pollingIntervalMilliseconds,
+            isFirstRenderedImageForAction: input.isFirstRenderedImageForAction,
+            currentAvailability: input.currentAvailability,
+        })), [
+            {
+                pollingIntervalMilliseconds: 10_000,
+                isFirstRenderedImageForAction: true,
+                currentAvailability: "no-data",
+            },
+            {
+                pollingIntervalMilliseconds: 10_000,
+                isFirstRenderedImageForAction: false,
+                currentAvailability: "fresh",
+            },
+        ]);
+    } finally {
+        runner.clearMetricViewState(action.id);
     }
 });
 
@@ -349,6 +528,12 @@ async function waitForScheduledWork(): Promise<void> {
     });
     await new Promise<void>(resolve => {
         setImmediate(resolve);
+    });
+}
+
+async function waitForMilliseconds(milliseconds: number): Promise<void> {
+    await new Promise<void>(resolve => {
+        setTimeout(resolve, milliseconds);
     });
 }
 

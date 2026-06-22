@@ -84,6 +84,7 @@ export interface StoredWidgetSettingsPatch {
     }>;
     readonly system?: Partial<{
         readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
+        readonly detectedPeripheralDisplayName: string | undefined;
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;
     readonly stacked?: StackedWidgetSettingsPatch | undefined;

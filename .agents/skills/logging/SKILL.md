@@ -72,4 +72,8 @@ _logger
   file at once.
 - Hub plugin log candidates:
   - `packages/hub/com.ez.sho-metrics.sdPlugin/logs/com.ez.sho-metrics.0.log`
-  - `%appdata%\Elgato\StreamDeck\logs\com.ez.sho-metrics0.log`
+    - This is mirrored to `%appdata%\Elgato\StreamDeck\Plugins\com.ez.sho-metrics.sdPlugin\logs`. You do not need to search both locations.
+  - Logs under `%appdata%\Elgato\StreamDeck\logs\`
+    - `%appdata%\Elgato\StreamDeck\logs\com.ez.sho-metrics.0.log`
+    - `%appdata%\Elgato\StreamDeck\logs\StreamDeck.log`
+  - Logs are rotated after each restart, so check for `.1.log`, `.*.log` under same directory if applicable

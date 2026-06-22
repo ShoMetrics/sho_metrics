@@ -91,8 +91,11 @@ export class CollectorGroupRunner {
         result: CollectorGroupRefreshResult,
     ) => void;
     private timerHandle: unknown | null = null;
+    private scheduledRefreshFireAtMonotonicMilliseconds: number | null = null;
     private pendingRefreshPromise: Promise<CollectorGroupRefreshResult> | null = null;
+    private shouldRefreshAfterPendingUpdate = false;
     private generation = 0;
+    private isRunningLoop = false;
     private isStopped = false;
 
     constructor(options: CollectorGroupRunnerOptions) {
@@ -113,27 +116,32 @@ export class CollectorGroupRunner {
             return;
         }
 
+        this.isRunningLoop = true;
         this.isStopped = false;
         this.scheduleNextRefresh(0);
     }
 
     stop(): void {
+        this.isRunningLoop = false;
         this.isStopped = true;
         this.generation += 1;
+        this.shouldRefreshAfterPendingUpdate = false;
         this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
 
-        if (this.timerHandle !== null) {
-            this.timer.clear(this.timerHandle);
-            this.timerHandle = null;
-        }
+        this.clearScheduledRefresh();
     }
 
     updateCollectorGroup(collectorGroup: PlannedCollectorGroup): void {
+        const shouldRefreshImmediately = !areCollectorGroupsRefreshEquivalent(this.collectorGroup, collectorGroup);
         if (collectorGroup.collectorGroupKey !== this.collectorGroup.collectorGroupKey) {
             this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
         }
         this.collectorGroup = collectorGroup;
         this.generation += 1;
+
+        if (shouldRefreshImmediately) {
+            this.scheduleImmediateRefresh();
+        }
     }
 
     async refreshNow(): Promise<CollectorGroupRefreshResult> {
@@ -166,6 +174,10 @@ export class CollectorGroupRunner {
             .then(result => this.recordRefreshResult(result, refreshStartedAtMonotonicMilliseconds))
             .finally(() => {
                 this.pendingRefreshPromise = null;
+                if (this.shouldRefreshAfterPendingUpdate && !this.isStopped) {
+                    this.shouldRefreshAfterPendingUpdate = false;
+                    this.scheduleNextRefresh(0);
+                }
             });
 
         return this.pendingRefreshPromise;
@@ -272,15 +284,75 @@ export class CollectorGroupRunner {
     }
 
     private scheduleNextRefresh(delayMilliseconds: number): void {
-        this.timerHandle = this.timer.set(() => {
-            this.timerHandle = null;
+        const scheduledRefreshFireAtMonotonicMilliseconds = monotonicNowMilliseconds() + delayMilliseconds;
+        if (
+            this.timerHandle !== null
+            && this.scheduledRefreshFireAtMonotonicMilliseconds !== null
+            && this.scheduledRefreshFireAtMonotonicMilliseconds <= scheduledRefreshFireAtMonotonicMilliseconds
+        ) {
+            return;
+        }
+
+        this.clearScheduledRefresh();
+        const timerHandle = this.timer.set(() => {
+            if (this.timerHandle === timerHandle) {
+                this.timerHandle = null;
+                this.scheduledRefreshFireAtMonotonicMilliseconds = null;
+            }
             this.refreshNow()
-                .finally(() => {
+                .then(result => {
+                    if (!this.isStopped && result.status !== "skippedSuperseded") {
+                        this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
+                    }
+                })
+                .catch(error => {
+                    this.logRefreshLoopError(error);
                     if (!this.isStopped) {
                         this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
                     }
                 });
         }, delayMilliseconds);
+        this.timerHandle = timerHandle;
+        this.scheduledRefreshFireAtMonotonicMilliseconds = scheduledRefreshFireAtMonotonicMilliseconds;
+    }
+
+    private scheduleImmediateRefresh(): void {
+        if (this.isStopped || !this.isRunningLoop) {
+            return;
+        }
+
+        this.clearScheduledRefresh();
+
+        if (this.pendingRefreshPromise !== null) {
+            this.shouldRefreshAfterPendingUpdate = true;
+            return;
+        }
+
+        this.scheduleNextRefresh(0);
+    }
+
+    private clearScheduledRefresh(): void {
+        if (this.timerHandle === null) {
+            this.scheduledRefreshFireAtMonotonicMilliseconds = null;
+            return;
+        }
+
+        this.timer.clear(this.timerHandle);
+        this.timerHandle = null;
+        this.scheduledRefreshFireAtMonotonicMilliseconds = null;
+    }
+
+    private logRefreshLoopError(error: unknown): void {
+        log.atWarn()
+            .everyMs("collectorGroupRefreshLoopError", REFRESH_WARNING_LOG_INTERVAL_MILLISECONDS)
+            .log(() => [
+                "collectorGroupRefreshLoopError",
+                `sourceId=${this.collectorGroup.sourceId}`,
+                `sourceScopeId=${this.collectorGroup.sourceScopeId}`,
+                `groupKind=${this.collectorGroup.groupKind}`,
+                `groupId=${formatCollectorGroupId(this.collectorGroup)}`,
+                `error=${String(error)}`,
+            ].join(" "));
     }
 }
 
@@ -288,4 +360,22 @@ function formatCollectorGroupId(collectorGroup: PlannedCollectorGroup): string {
     return collectorGroup.groupKind === "sourceDeclared"
         ? collectorGroup.pollingGroupId
         : collectorGroup.isolatedMetricKey;
+}
+
+function areCollectorGroupsRefreshEquivalent(
+    left: PlannedCollectorGroup,
+    right: PlannedCollectorGroup,
+): boolean {
+    return left.intervalMilliseconds === right.intervalMilliseconds
+        && compareStringSets(left.metricKeys, right.metricKeys)
+        && compareStringSets(left.subscriberIds, right.subscriberIds);
+}
+
+function compareStringSets(left: readonly string[], right: readonly string[]): boolean {
+    if (left.length !== right.length) {
+        return false;
+    }
+
+    const rightValues = new Set(right);
+    return left.every(value => rightValues.has(value));
 }

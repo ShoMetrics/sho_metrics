@@ -18,12 +18,12 @@ export interface SolaarLogitechReceiverRoute {
 // ShoMetrics route still does not hard-filter interface because native HID
 // enumeration can omit interface metadata on some platforms.
 export const SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES = [
-    { productId: 0xC539, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC53A, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC53D, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC53F, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC541, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC545, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC547, displayPrefix: "Logitech LIGHTSPEED device" },
-    { productId: 0xC54D, displayPrefix: "Logitech LIGHTSPEED device" },
+    { productId: 0xC539, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC53A, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC53D, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC53F, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC541, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC545, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC547, displayPrefix: "Generic Logitech LIGHTSPEED device" },
+    { productId: 0xC54D, displayPrefix: "Generic Logitech LIGHTSPEED device" },
 ] as const satisfies readonly SolaarLogitechReceiverRoute[];
