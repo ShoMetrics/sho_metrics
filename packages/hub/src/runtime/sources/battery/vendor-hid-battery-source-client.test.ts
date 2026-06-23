@@ -11,6 +11,7 @@ import {
     readVendorHidBatteryDeviceDescriptorSnapshot,
     readVendorHidBatteryDeviceDescriptors,
 } from "./vendor-hid-battery-source-client";
+import { VendorHidBatteryRouteRegistry } from "./vendor-hid-battery-route-registry";
 
 test("vendor HID battery source does not load native HID during construction or planning", () => {
     let loadNativeHidCalls = 0;
@@ -116,12 +117,36 @@ test("vendor HID battery source maps discovered candidate battery percent to req
     assert.equal(client.getCachedStatus().state, "available");
 });
 
+test("vendor HID battery source defers full discovery when no selected route is registered", async () => {
+    let loadNativeHidCalls = 0;
+    const routeRegistry = new VendorHidBatteryRouteRegistry();
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => true,
+        loadNativeHid: () => {
+            loadNativeHidCalls += 1;
+            return { state: "loaded", module: fakeNativeHidModule };
+        },
+        routeRegistry,
+        deferredFullDiscoveryDelayMilliseconds: 60_000,
+        wallClockNow: () => 2345,
+    });
+
+    const result = await client.readSnapshot([buildTestMetricKey()]);
+
+    assert.equal(loadNativeHidCalls, 0);
+    assert.deepEqual(result.snapshot.metrics, {});
+    assert.equal(result.unavailableMetrics[0]?.metricId, buildTestMetricKey());
+    assert.equal(result.unavailableMetrics[0]?.reason, "noSourceReading");
+    client.dispose();
+});
+
 test("vendor HID battery source reads selected bindings without re-enumerating HID devices", async () => {
     const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
     const selectedCandidate = buildTestCandidate({ batteryPercent: 89 });
     let devicesCalls = 0;
     let discoverCalls = 0;
     let selectedReadCalls = 0;
+    let selectedRouteReadCalls = 0;
     const nativeHidModule = {
         ...fakeNativeHidModule,
         devices: () => {
@@ -139,12 +164,17 @@ test("vendor HID battery source reads selected bindings without re-enumerating H
                     discoverCalls += 1;
                     return Promise.resolve([firstCandidate]);
                 },
+                readBatteryDeviceFromIdentity: (metricKey) => {
+                    selectedRouteReadCalls += 1;
+                    return Promise.resolve(metricKey === buildTestMetricKey() ? firstCandidate : undefined);
+                },
                 readBatteryDevice: (metricKey) => {
                     selectedReadCalls += 1;
                     return Promise.resolve(metricKey === buildTestMetricKey() ? selectedCandidate : undefined);
                 },
             },
         }],
+        routeRegistry: buildTestRouteRegistry(),
         wallClockNow: () => 2345,
     });
 
@@ -152,23 +182,24 @@ test("vendor HID battery source reads selected bindings without re-enumerating H
     const selectedResult = await client.readSnapshot([buildTestMetricKey()]);
 
     assert.equal(devicesCalls, 1);
-    assert.equal(discoverCalls, 1);
+    assert.equal(discoverCalls, 0);
+    assert.equal(selectedRouteReadCalls, 1);
     assert.equal(selectedReadCalls, 1);
     assert.equal(readScalarMetricValue(selectedResult.snapshot.metrics[buildTestMetricKey()]), 89);
 });
 
-test("vendor HID battery source falls back to discovery when selected identity verification fails", async () => {
+test("vendor HID battery source keeps selected reads cheap when another requested device is offline", async () => {
     const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
-    const fallbackCandidate = buildTestCandidate({ batteryPercent: 91 });
-    const mismatchedCandidate = buildTestCandidate({
-        batteryPercent: 42,
-        identity: {
-            ...testIdentity,
-            vendorUnitId: "other-unit",
-        },
+    const selectedCandidate = buildTestCandidate({ batteryPercent: 89 });
+    const offlineMetricKey = buildBatteryMetricKeyFromIdentity({
+        ...testIdentity,
+        vendorUnitId: "offline-unit",
+        modelId: "offline-device",
     });
     let devicesCalls = 0;
     let discoverCalls = 0;
+    let selectedReadCalls = 0;
+    let selectedRouteReadCalls = 0;
     const nativeHidModule = {
         ...fakeNativeHidModule,
         devices: () => {
@@ -184,26 +215,90 @@ test("vendor HID battery source falls back to discovery when selected identity v
             reader: {
                 discoverBatteryDevices: () => {
                     discoverCalls += 1;
-                    return Promise.resolve(discoverCalls === 1 ? [firstCandidate] : [fallbackCandidate]);
+                    return Promise.resolve([firstCandidate]);
+                },
+                readBatteryDeviceFromIdentity: (metricKey) => {
+                    selectedRouteReadCalls += 1;
+                    return Promise.resolve(metricKey === buildTestMetricKey() ? firstCandidate : undefined);
+                },
+                readBatteryDevice: (metricKey) => {
+                    selectedReadCalls += 1;
+                    return Promise.resolve(metricKey === buildTestMetricKey() ? selectedCandidate : undefined);
+                },
+            },
+        }],
+        routeRegistry: buildTestRouteRegistry(),
+        wallClockNow: () => 2345,
+    });
+
+    await client.readSnapshot([buildTestMetricKey(), offlineMetricKey]);
+    const selectedResult = await client.readSnapshot([buildTestMetricKey(), offlineMetricKey]);
+
+    assert.equal(devicesCalls, 1);
+    assert.equal(discoverCalls, 0);
+    assert.equal(selectedRouteReadCalls, 1);
+    assert.equal(selectedReadCalls, 1);
+    assert.equal(readScalarMetricValue(selectedResult.snapshot.metrics[buildTestMetricKey()]), 89);
+    assert.equal(selectedResult.unavailableMetrics[0]?.metricId, offlineMetricKey);
+    assert.equal(selectedResult.unavailableMetrics[0]?.reason, "noSourceReading");
+});
+
+test("vendor HID battery source reports selected read failures without re-running full discovery", async () => {
+    const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
+    const mismatchedCandidate = buildTestCandidate({
+        batteryPercent: 42,
+        identity: {
+            ...testIdentity,
+            vendorUnitId: "other-unit",
+        },
+    });
+    let devicesCalls = 0;
+    let discoverCalls = 0;
+    let selectedRouteReadCalls = 0;
+    const nativeHidModule = {
+        ...fakeNativeHidModule,
+        devices: () => {
+            devicesCalls += 1;
+            return [buildNativeHidDeviceInfo({ path: "test-path" })];
+        },
+    } satisfies NativeHidModule;
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => true,
+        loadNativeHid: () => ({ state: "loaded", module: nativeHidModule }),
+        createReaders: () => [{
+            name: "testVendor",
+            reader: {
+                discoverBatteryDevices: () => {
+                    discoverCalls += 1;
+                    return Promise.resolve([firstCandidate]);
+                },
+                readBatteryDeviceFromIdentity: (metricKey) => {
+                    selectedRouteReadCalls += 1;
+                    return Promise.resolve(metricKey === buildTestMetricKey() ? firstCandidate : undefined);
                 },
                 readBatteryDevice: () => Promise.resolve(mismatchedCandidate),
             },
         }],
+        routeRegistry: buildTestRouteRegistry(),
         wallClockNow: () => 2345,
     });
 
     await client.readSnapshot([buildTestMetricKey()]);
-    const fallbackResult = await client.readSnapshot([buildTestMetricKey()]);
+    const selectedResult = await client.readSnapshot([buildTestMetricKey()]);
 
-    assert.equal(devicesCalls, 2);
-    assert.equal(discoverCalls, 2);
-    assert.equal(readScalarMetricValue(fallbackResult.snapshot.metrics[buildTestMetricKey()]), 91);
+    assert.equal(devicesCalls, 1);
+    assert.equal(discoverCalls, 0);
+    assert.equal(selectedRouteReadCalls, 1);
+    assert.equal(readScalarMetricValue(selectedResult.snapshot.metrics[buildTestMetricKey()]), undefined);
+    assert.equal(selectedResult.unavailableMetrics[0]?.metricId, buildTestMetricKey());
+    assert.equal(selectedResult.unavailableMetrics[0]?.reason, "noSourceReading");
 });
 
 test("vendor HID battery source omits scalar when native HID is unavailable", async () => {
     const client = new VendorHidBatterySourceClient({
         isExperimentalVendorHidEnabled: () => true,
         loadNativeHid: () => ({ state: "unavailable", error: new Error("missing addon") }),
+        routeRegistry: buildTestRouteRegistry(),
         wallClockNow: () => 3456,
     });
 
@@ -318,6 +413,16 @@ function buildTestCandidate(options: {
 
 function buildTestMetricKey(): string {
     return buildBatteryMetricKeyFromIdentity(testIdentity);
+}
+
+function buildTestRouteRegistry(): VendorHidBatteryRouteRegistry {
+    const routeRegistry = new VendorHidBatteryRouteRegistry();
+    routeRegistry.register({
+        metricKey: buildTestMetricKey(),
+        identity: testIdentity,
+        ownerId: "test-action",
+    });
+    return routeRegistry;
 }
 
 function readScalarMetricValue(metricValue: MetricValue | undefined): number | undefined {

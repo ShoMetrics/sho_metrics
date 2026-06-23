@@ -1,4 +1,4 @@
-import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgato/streamdeck";
+import { action, PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import {
     SYSTEM_BATTERY_DEVICE_DESCRIPTOR,
@@ -6,12 +6,14 @@ import {
 } from "../runtime/sources/battery/battery-device-descriptor";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { readVendorHidBatteryDeviceDescriptorSnapshot } from "../runtime/sources/battery/vendor-hid-battery-source-client";
+import { vendorHidBatteryRouteRegistry } from "../runtime/sources/battery/vendor-hid-battery-route-registry";
+import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
 import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { monotonicNowMilliseconds } from "../shared/clock";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
-import type { ResolvedSystemPeripheralIdentity } from "../settings/resolved-settings";
+import type { ResolvedSystemPeripheralIdentity, ResolvedWidgetSettings } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     buildSystemViewOptions,
@@ -25,6 +27,7 @@ const SYSTEM_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 5_000;
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.system })
 export class System extends MetricAction {
     protected readonly actionKind = "system";
+    private readonly registeredVendorHidMetricKeysByActionId = new Map<string, ReadonlySet<string>>();
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
@@ -43,6 +46,54 @@ export class System extends MetricAction {
             target,
             metrics: this.getMetricReader(event),
         }));
+    }
+
+    protected override onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
+        const target = readResolvedMetricTarget(settings, "system");
+        const selectedIdentity = target.reading.peripheralIdentity;
+        const previousMetricKeys = this.registeredVendorHidMetricKeysByActionId.get(event.action.id) ?? new Set<string>();
+        const nextMetricKeys = selectedIdentity === undefined
+            ? new Set<string>()
+            : new Set(resolveSystemMetricKeys(target));
+
+        // Project the persisted user-selected peripheral identity into the vendor HID
+        // source's in-memory route registry. This mirrors the custom HTTP definition
+        // registry pattern: the source receives per-metric settings-derived facts
+        // without reading settings or changing the generic source polling contract.
+        for (const metricKey of previousMetricKeys) {
+            if (!nextMetricKeys.has(metricKey)) {
+                vendorHidBatteryRouteRegistry.unregister(metricKey, event.action.id);
+            }
+        }
+
+        if (selectedIdentity !== undefined) {
+            for (const metricKey of nextMetricKeys) {
+                vendorHidBatteryRouteRegistry.register({
+                    metricKey,
+                    identity: selectedIdentity,
+                    ownerId: event.action.id,
+                });
+            }
+        }
+
+        if (nextMetricKeys.size === 0) {
+            this.registeredVendorHidMetricKeysByActionId.delete(event.action.id);
+            return;
+        }
+
+        this.registeredVendorHidMetricKeysByActionId.set(event.action.id, nextMetricKeys);
+    }
+
+    protected override onActionWillDisappear(event: WillDisappearEvent): void {
+        const metricKeys = this.registeredVendorHidMetricKeysByActionId.get(event.action.id);
+        if (metricKeys === undefined) {
+            return;
+        }
+
+        for (const metricKey of metricKeys) {
+            vendorHidBatteryRouteRegistry.unregister(metricKey, event.action.id);
+        }
+        this.registeredVendorHidMetricKeysByActionId.delete(event.action.id);
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
@@ -83,8 +134,10 @@ export class System extends MetricAction {
 
     protected async refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
         const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const isVendorHidBatterySupported = shouldEnableVendorHidBatterySupport(this.currentPlatform());
         const vendorBatteryDeviceSnapshot = await readVendorHidBatteryDeviceDescriptorSnapshot({
-            isExperimentalVendorHidEnabled: this.resolveGlobalVendorHidBatteryEnabled(),
+            isExperimentalVendorHidEnabled: isVendorHidBatterySupported
+                && this.resolveGlobalVendorHidBatteryEnabled(),
         });
         const vendorBatteryDevices = vendorBatteryDeviceSnapshot.descriptors;
         const target = readResolvedMetricTarget(this.resolveSettings(event), "system");

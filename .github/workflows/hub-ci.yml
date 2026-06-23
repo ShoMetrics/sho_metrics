@@ -68,7 +68,7 @@ jobs:
         run: npm run build
 
       - name: Pack Stream Deck plugin
-        run: npm run pack:streamdeck
+        run: npm run pack:streamdeck -- --native-addon-target win32-x64 --native-addon-target win32-arm64
 
       - name: Upload Stream Deck plugin package
         uses: actions/upload-artifact@v7

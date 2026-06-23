@@ -269,6 +269,8 @@ export class MetricViewUpdateRunner {
             return;
         }
 
+        // Keep the normal path to one `setImage()` payload. Only active color compensation
+        // needs a distinct hardware image and the software/hardware target split.
         const hardwarePngDataUrl = hardwareSvg === softwareSvg
             ? softwarePngDataUrl
             : rasterizeSvgToPngDataUrl(hardwareSvg, renderPlan.pngSize);

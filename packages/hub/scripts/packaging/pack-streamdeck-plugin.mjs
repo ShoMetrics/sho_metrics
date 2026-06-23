@@ -14,8 +14,10 @@ import {
     assertNodeHidDependencyPinned,
     assertStagedNodeHidNativeAddons,
     NODE_HID_PACKAGE_NAME,
+    resolveDefaultNodeHidNativeAddonTargets,
     resolveHostNodeHidNativeAddonTarget,
     resolveSupportedNodeHidNativeAddonTarget,
+    resolveSupportedNodeHidNativeAddonTargets,
     stageNodeHidRuntimeDependency,
 } from "./node-hid-native-addons.mjs";
 
@@ -65,10 +67,10 @@ async function packStreamDeckPlugin(argumentList) {
     });
     await copyNoticeFile(readHubNoticePath(), join(stagingPluginDirectory, "THIRD_PARTY_NOTICES.md"));
     await assertNodeHidDependencyPinned({ packageJsonPath, packageLockPath });
-    await stageRuntimeDependencies({ nativeAddonTarget: packOptions.nativeAddonTarget });
-    await assertRuntimeDependenciesComplete({ nativeAddonTarget: packOptions.nativeAddonTarget });
+    await stageRuntimeDependencies({ nativeAddonTargets: packOptions.nativeAddonTargets });
+    await assertRuntimeDependenciesComplete({ nativeAddonTargets: packOptions.nativeAddonTargets });
     assertHostRuntimeDependencyCanLoad();
-    assertHostNodeHidRuntimeDependencyCanLoad(packOptions.nativeAddonTarget);
+    assertHostNodeHidRuntimeDependencyCanLoad(packOptions.nativeAddonTargets);
 
     await runStreamDeckPack(packOptions.streamDeckPackArgumentList);
 }
@@ -78,7 +80,7 @@ async function stageRuntimeDependencies(options) {
     await stageNodeHidRuntimeDependency({
         packageDirectory,
         stagingPluginDirectory,
-        nativeAddonTarget: options.nativeAddonTarget,
+        nativeAddonTargets: options.nativeAddonTargets,
     });
 }
 
@@ -151,7 +153,7 @@ async function assertRuntimeDependenciesComplete(options) {
     await assertResvgRuntimeDependenciesComplete();
     await assertStagedNodeHidNativeAddons({
         stagingPluginDirectory,
-        nativeAddonTarget: options.nativeAddonTarget,
+        nativeAddonTargets: options.nativeAddonTargets,
     });
 }
 
@@ -208,8 +210,9 @@ function assertHostRuntimeDependencyCanLoad() {
     }
 }
 
-function assertHostNodeHidRuntimeDependencyCanLoad(nativeAddonTarget) {
-    if (nativeAddonTarget !== resolveHostNodeHidNativeAddonTarget()) {
+function assertHostNodeHidRuntimeDependencyCanLoad(nativeAddonTargets) {
+    const hostNativeAddonTarget = tryResolveHostNodeHidNativeAddonTarget();
+    if (hostNativeAddonTarget === undefined || !nativeAddonTargets.includes(hostNativeAddonTarget)) {
         return;
     }
 
@@ -217,6 +220,14 @@ function assertHostNodeHidRuntimeDependencyCanLoad(nativeAddonTarget) {
     const nativeHidModule = stagingPluginRequire(NODE_HID_PACKAGE_NAME);
     if (typeof nativeHidModule.HID !== "function" || typeof nativeHidModule.devices !== "function") {
         throw new Error(`Staged ${NODE_HID_PACKAGE_NAME} did not expose the expected module surface.`);
+    }
+}
+
+function tryResolveHostNodeHidNativeAddonTarget() {
+    try {
+        return resolveHostNodeHidNativeAddonTarget();
+    } catch {
+        return undefined;
     }
 }
 
@@ -242,7 +253,7 @@ function resolveHostNativeRuntimeDependencyPackageName() {
 
 function parsePackOptions(argumentList) {
     const streamDeckPackArgumentList = [];
-    let nativeAddonTarget = resolveHostNodeHidNativeAddonTarget();
+    const nativeAddonTargets = [];
 
     for (let argumentIndex = 0; argumentIndex < argumentList.length; argumentIndex += 1) {
         const argument = argumentList[argumentIndex];
@@ -252,14 +263,16 @@ function parsePackOptions(argumentList) {
                 throw new Error("--native-addon-target requires a target value.");
             }
 
-            nativeAddonTarget = resolveSupportedNodeHidNativeAddonTarget(value);
+            nativeAddonTargets.push(...resolveSupportedNodeHidNativeAddonTargets([value]));
             argumentIndex += 1;
             continue;
         }
 
         const nativeAddonTargetPrefix = "--native-addon-target=";
         if (argument.startsWith(nativeAddonTargetPrefix)) {
-            nativeAddonTarget = resolveSupportedNodeHidNativeAddonTarget(argument.slice(nativeAddonTargetPrefix.length));
+            nativeAddonTargets.push(...resolveSupportedNodeHidNativeAddonTargets([
+                argument.slice(nativeAddonTargetPrefix.length),
+            ]));
             continue;
         }
 
@@ -267,7 +280,9 @@ function parsePackOptions(argumentList) {
     }
 
     return {
-        nativeAddonTarget,
+        nativeAddonTargets: nativeAddonTargets.length > 0
+            ? [...new Set(nativeAddonTargets.map(resolveSupportedNodeHidNativeAddonTarget))]
+            : resolveDefaultNodeHidNativeAddonTargets(),
         streamDeckPackArgumentList,
     };
 }

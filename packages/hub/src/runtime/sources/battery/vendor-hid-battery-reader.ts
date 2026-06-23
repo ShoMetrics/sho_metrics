@@ -1,5 +1,6 @@
 import type { NativeHidDeviceInfo } from "../battery-hid/native-hid-loader-internal";
 import type { BatteryDeviceDiscoveryCandidate } from "./battery-device-discovery";
+import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
 
 /**
  * Reads vendor-specific HID battery candidates from one already-enumerated HID device list.
@@ -22,4 +23,16 @@ export interface VendorHidBatteryReader {
      * itself.
      */
     readBatteryDevice(metricKey: string): Promise<BatteryDeviceDiscoveryCandidate | undefined>;
+    /**
+     * Reads a user-selected route from the current HID device list before full discovery has run.
+     *
+     * This uses persisted user intent as a hint, not as proof that the device is still attached.
+     * Vendor readers must still target exact safe HID routes and verify live identity when the
+     * protocol exposes one.
+     */
+    readBatteryDeviceFromIdentity?(
+        metricKey: string,
+        identity: ResolvedSystemPeripheralIdentity,
+        deviceInfoList: readonly NativeHidDeviceInfo[],
+    ): Promise<BatteryDeviceDiscoveryCandidate | undefined>;
 }

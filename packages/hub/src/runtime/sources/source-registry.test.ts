@@ -27,10 +27,6 @@ test("default source registry registers the Windows helper before fallback on Wi
             sourceRegistry.resolveSourceClient(CUSTOM_HTTP_SOURCE_ID)?.sourceId,
             CUSTOM_HTTP_SOURCE_ID,
         );
-        assert.equal(
-            sourceRegistry.resolveSourceClient(VENDOR_HID_BATTERY_SOURCE_ID)?.sourceId,
-            VENDOR_HID_BATTERY_SOURCE_ID,
-        );
     } finally {
         sourceRegistry.dispose();
     }
@@ -49,10 +45,29 @@ test("default source registry excludes the Windows helper outside Windows", () =
             sourceRegistry.resolveSourceClient(CUSTOM_HTTP_SOURCE_ID)?.sourceId,
             CUSTOM_HTTP_SOURCE_ID,
         );
+    } finally {
+        sourceRegistry.dispose();
+    }
+});
+
+test("default source registry registers vendor HID battery support on Windows", () => {
+    const sourceRegistry = createDefaultSourceRegistry({ platform: "win32" });
+
+    try {
         assert.equal(
             sourceRegistry.resolveSourceClient(VENDOR_HID_BATTERY_SOURCE_ID)?.sourceId,
             VENDOR_HID_BATTERY_SOURCE_ID,
         );
+    } finally {
+        sourceRegistry.dispose();
+    }
+});
+
+test("default source registry excludes vendor HID battery support outside Windows", () => {
+    const sourceRegistry = createDefaultSourceRegistry({ platform: "darwin" });
+
+    try {
+        assert.equal(sourceRegistry.resolveSourceClient(VENDOR_HID_BATTERY_SOURCE_ID), undefined);
     } finally {
         sourceRegistry.dispose();
     }

@@ -75,7 +75,7 @@ export function resolveStoredGlobalSettings(
             .flatMap(resolveCustomHttpCredentialSummary),
         system: {
             experimentalVendorHidBatteryEnabled:
-                storedGlobalSettings?.system?.experimentalVendorHidBatteryEnabled ?? true,
+                storedGlobalSettings?.system?.experimentalVendorHidBatteryEnabled ?? false,
         },
     };
 }

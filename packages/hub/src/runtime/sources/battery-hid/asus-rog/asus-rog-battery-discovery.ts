@@ -1,4 +1,5 @@
 import type {
+    ResolvedSystemPeripheralIdentity,
     SystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind,
 } from "../../../../settings/resolved-settings";
@@ -126,8 +127,8 @@ export class AsusRogBatteryReader implements VendorHidBatteryReader {
         }
 
         try {
-            const battery = transport.exchange(binding.route.request, binding.route.parseReport);
-            if (battery.state !== "battery") {
+            const candidate = this.readBatteryCandidateFromTransport(binding.deviceInfo, binding.route, transport);
+            if (candidate === undefined) {
                 return Promise.resolve(undefined);
             }
 
@@ -135,14 +136,61 @@ export class AsusRogBatteryReader implements VendorHidBatteryReader {
             // exact cached HID path/VID/PID/interface route plus the ASUS battery report parser rejecting unrelated
             // responses, not a second identity read. Do not add a cached identity self-compare; it looks safer than
             // it is and cannot detect that the live device changed.
-            return Promise.resolve(buildAsusRogBatteryCandidate(
-                binding.deviceInfo,
-                binding.route,
-                battery.reading.percent,
-            ));
+            return Promise.resolve(candidate);
         } finally {
             transport.close();
         }
+    }
+
+    readBatteryDeviceFromIdentity(
+        metricKey: string,
+        identity: ResolvedSystemPeripheralIdentity,
+        deviceInfoList: readonly NativeHidDeviceInfo[],
+    ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        if (identity.vendorId !== ASUS_ROG_VENDOR_ID) {
+            return Promise.resolve(undefined);
+        }
+
+        for (const deviceInfo of deviceInfoList) {
+            const route = resolveAsusRogSelectedBatteryRoute(deviceInfo, identity);
+            if (route === undefined) {
+                continue;
+            }
+
+            const scanSummary = createAsusRogScanSummary();
+            const transport = this.openBatteryRoute(deviceInfo, route, scanSummary);
+            if (transport === undefined) {
+                continue;
+            }
+
+            try {
+                const candidate = this.readBatteryCandidateFromTransport(deviceInfo, route, transport);
+                if (candidate === undefined) {
+                    continue;
+                }
+                if (buildBatteryMetricKeyFromIdentity(candidate.identity) !== metricKey) {
+                    continue;
+                }
+
+                this.bindingByMetricKey.set(metricKey, { deviceInfo, route });
+                return Promise.resolve(candidate);
+            } finally {
+                transport.close();
+            }
+        }
+
+        return Promise.resolve(undefined);
+    }
+
+    private readBatteryCandidateFromTransport(
+        deviceInfo: NativeHidDeviceInfo,
+        route: AsusRogBatteryRoute,
+        transport: NativeAsusRogHidTransport,
+    ): BatteryDeviceDiscoveryCandidate | undefined {
+        const battery = transport.exchange(route.request, route.parseReport);
+        return battery.state === "battery"
+            ? buildAsusRogBatteryCandidate(deviceInfo, route, battery.reading.percent)
+            : undefined;
     }
 
     private openBatteryRoute(
@@ -334,6 +382,86 @@ function resolveAsusRogBatteryRoute(
     }
 
     return undefined;
+}
+
+function resolveAsusRogSelectedBatteryRoute(
+    deviceInfo: NativeHidDeviceInfo,
+    identity: ResolvedSystemPeripheralIdentity,
+): AsusRogBatteryRoute | undefined {
+    if (
+        identity.productId !== undefined &&
+        deviceInfo.productId !== identity.productId
+    ) {
+        return undefined;
+    }
+    if (
+        identity.interfaceNumber !== undefined &&
+        deviceInfo.interface !== identity.interfaceNumber
+    ) {
+        return undefined;
+    }
+    if (
+        identity.usagePage !== undefined &&
+        deviceInfo.usagePage !== identity.usagePage
+    ) {
+        return undefined;
+    }
+    if (
+        identity.usageId !== undefined &&
+        deviceInfo.usage !== identity.usageId
+    ) {
+        return undefined;
+    }
+    if (!isSafeAsusRogVendorCollection(deviceInfo)) {
+        return undefined;
+    }
+
+    const path = deviceInfo.path.toLowerCase();
+    if (
+        identity.bindingTransport === "usbReceiver" &&
+        identity.receiverKind === "rogOmni" &&
+        isAsusRogOmniKeyboardCollection(deviceInfo, path)
+    ) {
+        const formattedProductId = identity.productId === undefined
+            ? undefined
+            : formatProductId(identity.productId);
+        return {
+            routeId: `keyboard-omni-selected-${formattedProductId ?? "generic"}`,
+            displayName: identity.productName ?? "Generic ROG Omni Keyboard",
+            modelId: identity.modelId ?? `asus-rog-keyboard:omni-${formattedProductId ?? "generic"}`,
+            transport: "usbReceiver",
+            receiverKind: "rogOmni",
+            supportState: "supported",
+            request: buildAsusRogKeyboardOmniBatteryRequest(),
+            parseReport: parseAsusRogKeyboardOmniBatteryReport,
+        };
+    }
+
+    const route = resolveAsusRogBatteryRoute(deviceInfo, new Map());
+    if (route === undefined) {
+        return undefined;
+    }
+
+    if (
+        identity.bindingTransport !== undefined &&
+        route.transport !== identity.bindingTransport
+    ) {
+        return undefined;
+    }
+    if (
+        identity.receiverKind !== undefined &&
+        route.receiverKind !== identity.receiverKind
+    ) {
+        return undefined;
+    }
+    if (
+        identity.modelId !== undefined &&
+        route.modelId !== identity.modelId
+    ) {
+        return undefined;
+    }
+
+    return route;
 }
 
 function isAsusRogOmniKeyboardCollection(
