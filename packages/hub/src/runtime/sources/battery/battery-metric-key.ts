@@ -18,7 +18,7 @@ export function buildBatteryMetricKeyFromDescriptorId(descriptorId: string): str
 }
 
 /**
- * Builds the strong per-unit identity used by coalescing and runtime keys.
+ * Builds the strong per-unit identity used by runtime keys.
  *
  * Route-local fields such as receiver slot, transport, HID interface, usage,
  * and receiver kind must stay out of this key so a persisted binding survives
@@ -43,7 +43,7 @@ export function buildBatteryDeviceVendorUnitIdentityKey(
  *
  * Adapter-provided model ids are treated as opaque compatibility buckets. When
  * absent, exact vendor/product text is the last resort and duplicate matches
- * must remain ambiguous instead of being merged.
+ * must remain ambiguous.
  */
 export function buildBatteryDeviceFallbackIdentityKey(
     identity: ResolvedSystemPeripheralIdentity,

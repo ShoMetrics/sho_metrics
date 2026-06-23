@@ -12,7 +12,7 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
 
-test("battery discovery coalesces paths with the same vendor unit id", () => {
+test("battery discovery keeps one descriptor per candidate even with the same vendor unit id", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "bolt-slot-2",
@@ -30,12 +30,16 @@ test("battery discovery coalesces paths with the same vendor unit id", () => {
         }),
     ], enabledDiscoveryOptions());
 
-    assert.equal(descriptors.length, 1);
-    assert.equal(descriptors[0].diagnostics?.coalescing, "unitId");
-    assert.deepEqual(descriptors[0].diagnostics?.candidateIds, ["bolt-slot-2", "wired"]);
+    assert.equal(descriptors.length, 2);
+    assert.deepEqual(
+        descriptors.map(descriptor => descriptor.supportState),
+        ["ambiguous", "ambiguous"],
+    );
+    assert.notEqual(descriptors[0].descriptorId, descriptors[1].descriptorId);
+    assert.equal(descriptors[0].metricKey, descriptors[1].metricKey);
 });
 
-test("battery discovery uses unique candidate fallback only when one current candidate matches", () => {
+test("battery discovery keeps a unique candidate supported", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "only-mx-master",
@@ -46,10 +50,10 @@ test("battery discovery uses unique candidate fallback only when one current can
 
     assert.equal(descriptors.length, 1);
     assert.equal(descriptors[0].supportState, "supported");
-    assert.equal(descriptors[0].diagnostics?.coalescing, "uniqueCandidateFallback");
+    assert.deepEqual(descriptors[0].diagnostics?.candidateIds, ["only-mx-master"]);
 });
 
-test("battery discovery keeps duplicate candidate fallback matches separate and ambiguous", () => {
+test("battery discovery keeps duplicate fallback matches separate and ambiguous", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "slot-1",
@@ -70,10 +74,6 @@ test("battery discovery keeps duplicate candidate fallback matches separate and 
         descriptors.map(descriptor => descriptor.supportState),
         ["ambiguous", "ambiguous"],
     );
-    assert.deepEqual(
-        descriptors.map(descriptor => descriptor.diagnostics?.coalescing),
-        ["duplicateCandidateFallback", "duplicateCandidateFallback"],
-    );
     assert.notEqual(descriptors[0].descriptorId, descriptors[1].descriptorId);
     assert.equal(descriptors[0].metricKey, descriptors[1].metricKey);
     const firstDescriptorIdentity = descriptors[0].identity;
@@ -84,7 +84,29 @@ test("battery discovery keeps duplicate candidate fallback matches separate and 
     assert.equal(descriptors[0].metricKey, buildBatteryMetricKeyFromIdentity(firstDescriptorIdentity));
 });
 
-test("battery discovery does not coalesce untrusted shared serial numbers", () => {
+test("battery discovery keeps duplicate descriptor ids unique when sanitized candidate ids collide", () => {
+    const descriptors = resolveBatteryDeviceDescriptors([
+        buildCandidate({
+            candidateId: "slot 1",
+            vendorUnitId: "same-unit",
+        }),
+        buildCandidate({
+            candidateId: "slot+1",
+            vendorUnitId: "same-unit",
+        }),
+    ], enabledDiscoveryOptions());
+
+    assert.equal(descriptors.length, 2);
+    assert.deepEqual(
+        descriptors.map(descriptor => descriptor.supportState),
+        ["ambiguous", "ambiguous"],
+    );
+    assert.notEqual(descriptors[0].descriptorId, descriptors[1].descriptorId);
+    assert.match(descriptors[0].descriptorId, /\.candidate-slot-1-[0-9a-f]{8}$/u);
+    assert.match(descriptors[1].descriptorId, /\.candidate-slot-1-[0-9a-f]{8}$/u);
+});
+
+test("battery discovery does not treat shared serial numbers as unique candidates", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "first",
@@ -105,59 +127,27 @@ test("battery discovery does not coalesce untrusted shared serial numbers", () =
     );
 });
 
-test("battery discovery does not treat receiver slot as primary identity", () => {
+test("battery discovery keeps receiver slot as diagnostics only", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "receiver-slot-1",
             receiverSlot: 1,
-            vendorUnitId: "unit-2",
+            vendorUnitId: "unit-1",
         }),
         buildCandidate({
             candidateId: "receiver-slot-3",
             receiverSlot: 3,
-            vendorUnitId: "unit-2",
+            vendorUnitId: "unit-3",
         }),
     ], enabledDiscoveryOptions());
 
-    assert.equal(descriptors.length, 1);
-    assert.deepEqual(descriptors[0].diagnostics?.receiverSlots, [1, 3]);
-});
-
-test("battery discovery keeps descriptor keys stable across route-local field changes", () => {
-    const receiverCandidate = buildCandidate({
-        candidateId: "receiver",
-        transport: "usbReceiver",
-        receiverKind: "bolt",
-        receiverSlot: 2,
-        vendorUnitId: "unit-2",
-    });
-    const bluetoothCandidate: BatteryDeviceDiscoveryCandidate = {
-        ...buildCandidate({
-            candidateId: "bluetooth",
-            transport: "bluetooth",
-            receiverKind: undefined,
-            receiverSlot: undefined,
-            vendorUnitId: "unit-2",
-        }),
-        displayName: "MX Master 4 Bluetooth",
-        identity: {
-            ...receiverCandidate.identity,
-            productId: 0xBEEF,
-            productName: "MX Master 4 Bluetooth",
-            interfaceNumber: undefined,
-            usagePage: undefined,
-            usageId: undefined,
-            bindingTransport: "bluetooth",
-            receiverKind: undefined,
-            receiverSlot: undefined,
-        },
-    };
-
-    const receiverDescriptors = resolveBatteryDeviceDescriptors([receiverCandidate], enabledDiscoveryOptions());
-    const bluetoothDescriptors = resolveBatteryDeviceDescriptors([bluetoothCandidate], enabledDiscoveryOptions());
-
-    assert.equal(receiverDescriptors[0].descriptorId, bluetoothDescriptors[0].descriptorId);
-    assert.equal(receiverDescriptors[0].metricKey, bluetoothDescriptors[0].metricKey);
+    assert.equal(descriptors.length, 2);
+    assert.deepEqual(
+        descriptors
+            .map(descriptor => descriptor.diagnostics?.receiverSlots)
+            .sort(compareNumberArrays),
+        [[1], [3]],
+    );
 });
 
 test("battery discovery keeps Easy-Switch slot as diagnostics only", () => {
@@ -165,21 +155,31 @@ test("battery discovery keeps Easy-Switch slot as diagnostics only", () => {
         buildCandidate({
             candidateId: "host-1",
             easySwitchSlot: 1,
-            vendorUnitId: "unit-2",
+            vendorUnitId: "unit-1",
         }),
         buildCandidate({
             candidateId: "host-3",
             easySwitchSlot: 3,
-            vendorUnitId: "unit-2",
+            vendorUnitId: "unit-3",
         }),
     ], enabledDiscoveryOptions());
 
-    assert.equal(descriptors.length, 1);
-    assert.deepEqual(descriptors[0].diagnostics?.easySwitchSlots, [1, 3]);
-    assert.deepEqual(descriptors[0].diagnostics?.candidateIds, ["host-1", "host-3"]);
+    assert.equal(descriptors.length, 2);
+    assert.deepEqual(
+        descriptors
+            .map(descriptor => descriptor.diagnostics?.easySwitchSlots)
+            .sort(compareNumberArrays),
+        [[1], [3]],
+    );
+    assert.deepEqual(
+        descriptors
+            .map(descriptor => descriptor.diagnostics?.candidateIds)
+            .sort(compareStringArrays),
+        [["host-1"], ["host-3"]],
+    );
 });
 
-test("battery discovery prefers fresh Bluetooth telemetry over receiver telemetry for display route", () => {
+test("battery discovery does not prefer Bluetooth telemetry over receiver telemetry automatically", () => {
     const descriptors = resolveBatteryDeviceDescriptors([
         buildCandidate({
             candidateId: "bolt",
@@ -199,86 +199,14 @@ test("battery discovery prefers fresh Bluetooth telemetry over receiver telemetr
         }),
     ], enabledDiscoveryOptions());
 
-    assert.equal(descriptors.length, 1);
-    assert.equal(descriptors[0].transport, "bluetooth");
-    assert.equal(descriptors[0].isExperimental, false);
-    assert.equal(descriptors[0].descriptorId.includes("receiver"), false);
-});
-
-test("battery discovery keeps binding identity stable when display route changes freshness", () => {
-    const routeRule = {
-        ruleId: "same-device",
-        matches: (left: BatteryDeviceDiscoveryCandidate, right: BatteryDeviceDiscoveryCandidate) =>
-            [left.candidateId, right.candidateId].sort().join(":") === "bluetooth:receiver",
-    };
-    const receiverCandidate = buildCandidate({
-        candidateId: "receiver",
-        transport: "usbReceiver",
-        receiverKind: "bolt",
-        vendorUnitId: "unit-2",
-        batteryTelemetryFreshness: "fresh",
-    });
-    const freshBluetoothCandidate = buildCandidate({
-        candidateId: "bluetooth",
-        transport: "bluetooth",
-        receiverKind: undefined,
-        vendorUnitId: undefined,
-        serialNumber: "serial-2",
-        batteryTelemetryFreshness: "fresh",
-    });
-    const staleBluetoothCandidate = {
-        ...freshBluetoothCandidate,
-        batteryTelemetryFreshness: "stale" as const,
-    };
-
-    const freshDescriptors = resolveBatteryDeviceDescriptors([
-        receiverCandidate,
-        freshBluetoothCandidate,
-    ], {
-        ...enabledDiscoveryOptions(),
-        verifiedRouteRules: [routeRule],
-    });
-    const staleDescriptors = resolveBatteryDeviceDescriptors([
-        receiverCandidate,
-        staleBluetoothCandidate,
-    ], {
-        ...enabledDiscoveryOptions(),
-        verifiedRouteRules: [routeRule],
-    });
-
-    assert.equal(freshDescriptors[0].transport, "bluetooth");
-    assert.equal(staleDescriptors[0].transport, "usbReceiver");
-    assert.equal(freshDescriptors[0].descriptorId, staleDescriptors[0].descriptorId);
-    assert.equal(freshDescriptors[0].metricKey, staleDescriptors[0].metricKey);
-    assert.equal(freshDescriptors[0].identity?.vendorUnitId, "unit-2");
-});
-
-test("battery discovery splits coalesced paths after repeated large conflicts", () => {
-    const descriptors = resolveBatteryDeviceDescriptors([
-        buildCandidate({
-            candidateId: "bolt",
-            transport: "usbReceiver",
-            receiverKind: "bolt",
-            vendorUnitId: "unit-2",
-        }),
-        buildCandidate({
-            candidateId: "wired",
-            transport: "usbWired",
-            receiverKind: undefined,
-            vendorUnitId: "unit-2",
-        }),
-    ], {
-        ...enabledDiscoveryOptions(),
-        conflictEvidence: [{
-            candidateIds: ["bolt", "wired"],
-            repeatedLargeDisagreement: true,
-        }],
-    });
-
     assert.equal(descriptors.length, 2);
     assert.deepEqual(
-        descriptors.map(descriptor => descriptor.diagnostics?.coalescing),
-        ["conflictSplit", "conflictSplit"],
+        descriptors.map(descriptor => descriptor.transport),
+        ["bluetooth", "usbReceiver"],
+    );
+    assert.deepEqual(
+        descriptors.map(descriptor => descriptor.supportState),
+        ["ambiguous", "ambiguous"],
     );
 });
 
@@ -304,6 +232,7 @@ test("battery discovery hides experimental vendor HID descriptors when disabled"
             transport: "usbReceiver",
             receiverKind: "bolt",
             isExperimental: true,
+            vendorUnitId: "unit-bolt",
         }),
     ], {
         ...enabledDiscoveryOptions(),
@@ -396,4 +325,12 @@ function buildIdentity(overrides: Partial<ResolvedSystemPeripheralIdentity>): Re
         receiverSlot: 2,
         ...overrides,
     };
+}
+
+function compareNumberArrays(left: readonly number[] | undefined, right: readonly number[] | undefined): number {
+    return (left?.[0] ?? 0) - (right?.[0] ?? 0);
+}
+
+function compareStringArrays(left: readonly string[] | undefined, right: readonly string[] | undefined): number {
+    return (left?.[0] ?? "").localeCompare(right?.[0] ?? "");
 }

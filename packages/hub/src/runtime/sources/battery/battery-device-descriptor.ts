@@ -36,7 +36,6 @@ export interface BatteryDeviceDescriptorDiagnostics {
     readonly easySwitchSlots: readonly number[];
     readonly batteryPercentSources: readonly BatteryDeviceBatteryPercentSource[];
     readonly batteryVoltageMillivolts: readonly number[];
-    readonly coalescing: BatteryDeviceCoalescingDiagnostic;
 }
 
 export interface BatteryDeviceDiscoveryDiagnostics {
@@ -83,11 +82,3 @@ export const SYSTEM_BATTERY_DEVICE_DESCRIPTOR: BatteryDeviceDescriptor = {
     identity: undefined,
     supportState: "supported",
 };
-
-export type BatteryDeviceCoalescingDiagnostic =
-    | "system"
-    | "unitId"
-    | "uniqueCandidateFallback"
-    | "verifiedRouteRule"
-    | "duplicateCandidateFallback"
-    | "conflictSplit";

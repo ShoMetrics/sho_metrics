@@ -6,7 +6,7 @@
  * route logic is based on Windows HID paths.
  *
  * The check is platform-scoped, not architecture-scoped: Windows x64 and ARM64
- * are both supported when the package includes the matching node-hid native addon.
+ * are both supported when the package includes the matching native addon.
  */
 export function shouldEnableVendorHidBatterySupport(platform: string | undefined): boolean {
     return platform === "win32";

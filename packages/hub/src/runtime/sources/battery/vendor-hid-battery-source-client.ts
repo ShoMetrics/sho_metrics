@@ -287,10 +287,10 @@ export class VendorHidBatterySourceClient implements SourceClient {
 
         for (const metricKey of requestedMetricKeys) {
             const descriptor = descriptorByMetricKey.get(metricKey);
-            const candidate = descriptor === undefined
+            const candidate = !isReadableBatteryDescriptor(descriptor)
                 ? undefined
                 : selectDescriptorBatteryCandidate(descriptor, candidatesById);
-            if (descriptor === undefined || candidate?.batteryPercent === undefined) {
+            if (!isReadableBatteryDescriptor(descriptor) || candidate?.batteryPercent === undefined) {
                 // Do not emit 0 or a sentinel scalar; no-data must leave any retained battery value intact.
                 unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
                 continue;
@@ -391,8 +391,8 @@ export class VendorHidBatterySourceClient implements SourceClient {
             const unavailableMetrics: MetricUnavailableReport[] = [];
             for (const metricKey of requestedMetricKeys) {
                 const descriptor = this.descriptorByMetricKey.get(metricKey);
-                if (descriptor === undefined) {
-                    unavailableMetrics.push(...buildUnavailableReports([metricKey], undefined));
+                if (!isReadableBatteryDescriptor(descriptor)) {
+                    unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
                     continue;
                 }
 
@@ -495,7 +495,7 @@ export class VendorHidBatterySourceClient implements SourceClient {
         for (const candidate of options.candidates) {
             const metricKey = buildBatteryMetricKeyFromIdentity(candidate.identity);
             const descriptor = this.descriptorByMetricKey.get(metricKey);
-            if (descriptor === undefined || candidate.batteryPercent === undefined) {
+            if (!isReadableBatteryDescriptor(descriptor) || candidate.batteryPercent === undefined) {
                 unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
                 continue;
             }
@@ -816,10 +816,15 @@ function selectDescriptorBatteryCandidate(
     descriptor: BatteryDeviceDescriptor,
     candidatesById: ReadonlyMap<string, BatteryDeviceDiscoveryCandidate>,
 ): BatteryDeviceDiscoveryCandidate | undefined {
-    // A coalesced descriptor can point at several routes; use the first route that produced a battery reading.
-    return descriptor.diagnostics?.candidateIds
-        .map(candidateId => candidatesById.get(candidateId))
-        .find(candidate => candidate?.batteryPercent !== undefined);
+    const candidateId = descriptor.diagnostics?.candidateIds[0];
+    const candidate = candidateId === undefined ? undefined : candidatesById.get(candidateId);
+    return candidate?.batteryPercent === undefined ? undefined : candidate;
+}
+
+function isReadableBatteryDescriptor(
+    descriptor: BatteryDeviceDescriptor | undefined,
+): descriptor is BatteryDeviceDescriptor {
+    return descriptor !== undefined && descriptor.supportState !== "ambiguous";
 }
 
 function buildSourceSnapshotReadResult(

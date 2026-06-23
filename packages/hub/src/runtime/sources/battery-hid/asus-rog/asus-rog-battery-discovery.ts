@@ -278,7 +278,8 @@ interface AsusRogBatteryRoute {
      * ShoMetrics canonical model key.
      *
      * ASUS does not provide this value through the battery report. It is owned
-     * by our allowlist and is used only for fallback identity/coalescing.
+     * by our allowlist and is used only for fallback identity and duplicate
+     * detection.
      */
     readonly modelId: string;
     readonly transport: SystemPeripheralBindingTransport;
