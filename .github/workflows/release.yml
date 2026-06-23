@@ -96,7 +96,7 @@ jobs:
       - name: Pack Stream Deck plugin
         env:
           STREAMDECK_PLUGIN_VERSION: ${{ needs.validate.outputs.streamdeck_plugin_version }}
-        run: npm run pack:streamdeck -- --version "${STREAMDECK_PLUGIN_VERSION}"
+        run: npm run pack:streamdeck -- --native-addon-target win32-x64 --native-addon-target win32-arm64 --version "${STREAMDECK_PLUGIN_VERSION}"
 
       - name: Upload Stream Deck plugin package
         uses: actions/upload-artifact@v7

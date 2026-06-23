@@ -34,6 +34,10 @@ test("Logitech HID++ session reads UNIFIED_BATTERY with device identity", () => 
     }
 
     assert.equal(result.reading.featureId, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
+    assert.deepEqual(result.feature, {
+        featurePath: "unifiedBattery",
+        featureIndex: 0x09,
+    });
     assert.equal(result.reading.percent, 90);
     assert.equal(result.reading.statusByte, 0);
     assert.equal(result.deviceInformation?.unitId, "12345678");
@@ -42,6 +46,34 @@ test("Logitech HID++ session reads UNIFIED_BATTERY with device identity", () => 
         marketingName: "MX Master 3S",
         deviceType: "mouse",
     });
+});
+
+test("Logitech HID++ session reads known battery feature without feature lookup", () => {
+    const transport = new ScriptedLogitechTransport(request => responseForRequest(request, {
+        unifiedBatteryFeatureIndex: 0x09,
+        batteryStatusFeatureIndex: 0x00,
+        deviceInformationFeatureIndex: 0x03,
+    }));
+    const session = new LogitechHidppSession(transport);
+
+    const result = session.readBatteryFromKnownFeature(0x02, {
+        featurePath: "unifiedBattery",
+        featureIndex: 0x09,
+    });
+
+    assert.equal(result.state, "battery");
+    assert.equal(transport.requests.some(request => readFeatureLookupRequestFeatureId(request) !== undefined), false);
+    if (result.state !== "battery") {
+        throw new Error("Expected battery reading.");
+    }
+
+    assert.equal(result.reading.percent, 90);
+    assert.deepEqual(result.feature, {
+        featurePath: "unifiedBattery",
+        featureIndex: 0x09,
+    });
+    assert.equal(result.deviceInformation, undefined);
+    assert.equal(result.deviceTypeAndName, undefined);
 });
 
 test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS", () => {
@@ -62,6 +94,10 @@ test("Logitech HID++ session falls back from UNIFIED_BATTERY to BATTERY_STATUS",
             percentSource: "reported",
             nextPercent: 5,
             statusByte: 0,
+        },
+        feature: {
+            featurePath: "batteryStatus",
+            featureIndex: 0x08,
         },
         deviceInformation: undefined,
         unrelatedReportCount: 0,
@@ -87,6 +123,10 @@ test("Logitech HID++ session falls back from BATTERY_STATUS to BATTERY_VOLTAGE",
             percentSource: "voltageEstimated",
             statusByte: 0,
             voltageMillivolts: 4166,
+        },
+        feature: {
+            featurePath: "batteryVoltage",
+            featureIndex: 0x07,
         },
         deviceInformation: {
             entityCount: 2,

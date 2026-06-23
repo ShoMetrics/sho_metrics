@@ -1670,6 +1670,30 @@ test("system widget settings hide vendor HID battery options when the global tog
     assert.match(markup, /type="checkbox"\/>/);
 });
 
+test("system widget settings hide vendor HID battery support outside Windows", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        platform: "darwin",
+        isWindows: false,
+        globalSettings: buildGlobalSettings({
+            system: {
+                experimentalVendorHidBatteryEnabled: true,
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [buildBatteryDeviceDescriptor()],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /System/);
+    assert.doesNotMatch(markup, /MX Master 4/);
+    assert.doesNotMatch(markup, /USB Device/);
+    assert.doesNotMatch(markup, /Enable experimental support/);
+});
+
 function renderWidgetSettings(options: {
     actionKind: ActionKind;
     platform?: PropertyInspectorPlatform;

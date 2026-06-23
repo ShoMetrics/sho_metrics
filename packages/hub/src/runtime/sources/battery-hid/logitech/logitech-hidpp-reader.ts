@@ -68,6 +68,11 @@ const LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
 const MAX_LOGITECH_DEVICE_MARKETING_NAME_BYTE_COUNT = 64;
 const log = logger.for("Source:BatteryHID:Logitech");
 
+export interface LogitechHidppOpenContext {
+    readonly receiverKind?: string;
+    readonly groupId?: string;
+}
+
 /** Performs short write/read HID++ transactions for one opened Logitech route. */
 export interface LogitechHidppTransport {
     exchange(request: LogitechHidppRequest): LogitechHidppExchangeResult;
@@ -111,6 +116,7 @@ export type LogitechBatteryReadResult =
     | {
         readonly state: "battery";
         readonly reading: LogitechBatteryReading;
+        readonly feature?: LogitechKnownBatteryFeature;
         readonly deviceInformation?: LogitechDeviceInformation;
         readonly deviceTypeAndName?: LogitechDeviceTypeAndName;
         readonly unrelatedReportCount: number;
@@ -135,6 +141,11 @@ type LogitechBatteryFeaturePath =
     | "batteryStatus"
     | "batteryVoltage"
     | "none";
+
+export interface LogitechKnownBatteryFeature {
+    readonly featurePath: Exclude<LogitechBatteryFeaturePath, "none">;
+    readonly featureIndex: number;
+}
 
 export type LogitechDeviceInformationReadResult =
     | {
@@ -181,18 +192,31 @@ export class LogitechHidppSession {
     constructor(private readonly transport: LogitechHidppTransport) {}
 
     readBattery(receiverSlot: LogitechReceiverSlot): LogitechBatteryReadResult {
+        return this.readBatteryWithTelemetry(receiverSlot, true);
+    }
+
+    readBatteryWithDeviceInformation(receiverSlot: LogitechReceiverSlot): LogitechBatteryReadResult {
+        return this.readBatteryWithTelemetry(receiverSlot, false);
+    }
+
+    private readBatteryWithTelemetry(
+        receiverSlot: LogitechReceiverSlot,
+        includeDeviceTypeAndName: boolean,
+    ): LogitechBatteryReadResult {
         const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         const finish = (
             featurePath: LogitechBatteryFeaturePath,
+            featureIndex: number | undefined,
             result: LogitechBatteryReadResult,
         ): LogitechBatteryReadResult => {
+            const resultWithFeature = addKnownBatteryFeature(result, featurePath, featureIndex);
             logLogitechBatteryReadOutcome(
                 receiverSlot,
                 featurePath,
-                result,
+                resultWithFeature,
                 monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
             );
-            return result;
+            return resultWithFeature;
         };
 
         // HID++ battery support is feature-table driven. Fallback is absent-only:
@@ -206,15 +230,15 @@ export class LogitechHidppSession {
         const unifiedBatteryFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_UNIFIED_BATTERY_FEATURE_ID);
         if (unifiedBatteryFeature.state === "supported") {
             const batteryResult = this.readUnifiedBattery(receiverSlot, unifiedBatteryFeature.feature.featureIndex);
-            return finish("unifiedBattery", appendOptionalTelemetry(
+            return finish("unifiedBattery", unifiedBatteryFeature.feature.featureIndex, this.appendBatteryTelemetry(
                 batteryResult,
-                this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
-                this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
+                receiverSlot,
+                includeDeviceTypeAndName,
             ));
         }
 
         if (unifiedBatteryFeature.state === "noData") {
-            return finish("unifiedBattery", {
+            return finish("unifiedBattery", undefined, {
                 state: "noData",
                 reason: unifiedBatteryFeature.reason,
                 unrelatedReportCount: 0,
@@ -224,15 +248,15 @@ export class LogitechHidppSession {
         const batteryStatusFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_STATUS_FEATURE_ID);
         if (batteryStatusFeature.state === "supported") {
             const batteryResult = this.readBatteryStatus(receiverSlot, batteryStatusFeature.feature.featureIndex);
-            return finish("batteryStatus", appendOptionalTelemetry(
+            return finish("batteryStatus", batteryStatusFeature.feature.featureIndex, this.appendBatteryTelemetry(
                 batteryResult,
-                this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
-                this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
+                receiverSlot,
+                includeDeviceTypeAndName,
             ));
         }
 
         if (batteryStatusFeature.state === "noData") {
-            return finish("batteryStatus", {
+            return finish("batteryStatus", undefined, {
                 state: "noData",
                 reason: batteryStatusFeature.reason,
                 unrelatedReportCount: 0,
@@ -241,11 +265,11 @@ export class LogitechHidppSession {
 
         const batteryVoltageFeature = this.readFeature(receiverSlot, LOGITECH_HIDPP_BATTERY_VOLTAGE_FEATURE_ID);
         if (batteryVoltageFeature.state === "unsupported") {
-            return finish("none", { state: "unsupported" });
+            return finish("none", undefined, { state: "unsupported" });
         }
 
         if (batteryVoltageFeature.state === "noData") {
-            return finish("batteryVoltage", {
+            return finish("batteryVoltage", undefined, {
                 state: "noData",
                 reason: batteryVoltageFeature.reason,
                 unrelatedReportCount: 0,
@@ -253,14 +277,53 @@ export class LogitechHidppSession {
         }
 
         const batteryResult = this.readBatteryVoltage(receiverSlot, batteryVoltageFeature.feature.featureIndex);
-        return finish("batteryVoltage", appendOptionalTelemetry(
+        return finish("batteryVoltage", batteryVoltageFeature.feature.featureIndex, this.appendBatteryTelemetry(
             batteryResult,
-            this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
-            this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult),
+            receiverSlot,
+            includeDeviceTypeAndName,
         ));
     }
 
+    readBatteryFromKnownFeature(
+        receiverSlot: LogitechReceiverSlot,
+        feature: LogitechKnownBatteryFeature,
+    ): LogitechBatteryReadResult {
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const batteryResult = (() => {
+            switch (feature.featurePath) {
+                case "unifiedBattery":
+                    return this.readUnifiedBattery(receiverSlot, feature.featureIndex);
+                case "batteryStatus":
+                    return this.readBatteryStatus(receiverSlot, feature.featureIndex);
+                case "batteryVoltage":
+                    return this.readBatteryVoltage(receiverSlot, feature.featureIndex);
+                default:
+                    return assertNever(feature.featurePath);
+            }
+        })();
+        const resultWithFeature = addKnownBatteryFeature(batteryResult, feature.featurePath, feature.featureIndex);
+        logLogitechBatteryReadOutcome(
+            receiverSlot,
+            feature.featurePath,
+            resultWithFeature,
+            monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+        );
+        return resultWithFeature;
+    }
+
     readDeviceInformation(receiverSlot: LogitechReceiverSlot): LogitechDeviceInformationReadResult {
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const finish = (result: LogitechDeviceInformationReadResult): LogitechDeviceInformationReadResult => {
+            logLogitechOptionalTelemetryReadOutcome(
+                receiverSlot,
+                "deviceInformation",
+                result.state,
+                result.state === "noData" ? result.reason : undefined,
+                monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+            );
+            return result;
+        };
+
         const cached = this.deviceInformationBySlot.get(receiverSlot);
         if (cached !== undefined) {
             return cached;
@@ -270,7 +333,7 @@ export class LogitechHidppSession {
         if (feature.state === "unsupported") {
             const result = { state: "unsupported" } satisfies LogitechDeviceInformationReadResult;
             this.deviceInformationBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         if (feature.state === "noData") {
@@ -279,7 +342,7 @@ export class LogitechHidppSession {
                 reason: feature.reason,
             } satisfies LogitechDeviceInformationReadResult;
             this.deviceInformationBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         const request = buildLogitechDeviceInformationRequest(receiverSlot, feature.feature.featureIndex);
@@ -287,7 +350,7 @@ export class LogitechHidppSession {
         if (exchangeResult.state !== "response") {
             const result = mapExchangeFailure(exchangeResult);
             this.deviceInformationBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         const parsed = parseLogitechDeviceInformationReport(exchangeResult.report, request.expectedResponse);
@@ -297,7 +360,7 @@ export class LogitechHidppSession {
                 reason: parsed.state === "malformed" ? "malformed" : "timeout",
             } satisfies LogitechDeviceInformationReadResult;
             this.deviceInformationBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         const result = {
@@ -305,10 +368,22 @@ export class LogitechHidppSession {
             deviceInformation: parsed.deviceInformation,
         } satisfies LogitechDeviceInformationReadResult;
         this.deviceInformationBySlot.set(receiverSlot, result);
-        return result;
+        return finish(result);
     }
 
     readDeviceTypeAndName(receiverSlot: LogitechReceiverSlot): LogitechDeviceTypeAndNameReadResult {
+        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const finish = (result: LogitechDeviceTypeAndNameReadResult): LogitechDeviceTypeAndNameReadResult => {
+            logLogitechOptionalTelemetryReadOutcome(
+                receiverSlot,
+                "deviceTypeAndName",
+                result.state,
+                result.state === "noData" ? result.reason : undefined,
+                monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+            );
+            return result;
+        };
+
         const cached = this.deviceTypeAndNameBySlot.get(receiverSlot);
         if (cached !== undefined) {
             return cached;
@@ -318,7 +393,7 @@ export class LogitechHidppSession {
         if (feature.state === "unsupported") {
             const result = { state: "unsupported" } satisfies LogitechDeviceTypeAndNameReadResult;
             this.deviceTypeAndNameBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         if (feature.state === "noData") {
@@ -327,7 +402,7 @@ export class LogitechHidppSession {
                 reason: feature.reason,
             } satisfies LogitechDeviceTypeAndNameReadResult;
             this.deviceTypeAndNameBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         const marketingName = this.readDeviceMarketingName(receiverSlot, feature.feature.featureIndex);
@@ -342,7 +417,7 @@ export class LogitechHidppSession {
                 deviceTypeAndName,
             } satisfies LogitechDeviceTypeAndNameReadResult;
             this.deviceTypeAndNameBySlot.set(receiverSlot, result);
-            return result;
+            return finish(result);
         }
 
         const reason = marketingName.state === "noData"
@@ -355,7 +430,7 @@ export class LogitechHidppSession {
             reason,
         } satisfies LogitechDeviceTypeAndNameReadResult;
         this.deviceTypeAndNameBySlot.set(receiverSlot, result);
-        return result;
+        return finish(result);
     }
 
     readFeature(receiverSlot: LogitechReceiverSlot, featureId: number): LogitechFeatureReadResult {
@@ -462,6 +537,20 @@ export class LogitechHidppSession {
         return batteryResult.state === "battery"
             ? this.readDeviceInformation(receiverSlot)
             : { state: "unsupported" };
+    }
+
+    private appendBatteryTelemetry(
+        batteryResult: LogitechBatteryReadResult,
+        receiverSlot: LogitechReceiverSlot,
+        includeDeviceTypeAndName: boolean,
+    ): LogitechBatteryReadResult {
+        return appendOptionalTelemetry(
+            batteryResult,
+            this.readDeviceInformationForBatteryResult(receiverSlot, batteryResult),
+            includeDeviceTypeAndName
+                ? this.readDeviceTypeAndNameForBatteryResult(receiverSlot, batteryResult)
+                : { state: "unsupported" },
+        );
     }
 
     private readDeviceTypeAndNameForBatteryResult(
@@ -601,10 +690,10 @@ export class NativeLogitechHidppTransport implements LogitechHidppTransport {
                     }
 
                     if (matchesLogitechHidppExpectedResponse(report, request.expectedResponse)) {
-                        logHidppResponseOutcome(
+                        logHidppExchangeOutcome(
                             request,
-                            unrelatedReports.length,
                             "response",
+                            unrelatedReports.length,
                             this.monotonicNow() - startedAtMonotonicMilliseconds,
                         );
                         return {
@@ -789,21 +878,47 @@ function assertNever(value: never): never {
     throw new Error(`Unexpected Logitech receiver kind: ${value}`);
 }
 
+function addKnownBatteryFeature(
+    result: LogitechBatteryReadResult,
+    featurePath: LogitechBatteryFeaturePath,
+    featureIndex: number | undefined,
+): LogitechBatteryReadResult {
+    if (result.state !== "battery" || featurePath === "none" || featureIndex === undefined) {
+        return result;
+    }
+
+    return {
+        ...result,
+        feature: {
+            featurePath,
+            featureIndex,
+        },
+    };
+}
+
 export function openNativeLogitechHidppTransport(
     nativeDeviceInfoList: readonly NativeHidDeviceInfo[],
     openDevice: (path: string) => NativeHidDevice,
+    context: LogitechHidppOpenContext = {},
 ): NativeLogitechHidppTransport | undefined {
-    const devicePathList = [...nativeDeviceInfoList]
-        .sort(compareLogitechWriteHandlePreference)
-        .flatMap(deviceInfo =>
-            deviceInfo.path === undefined ? [] : [deviceInfo.path],
-        );
-    if (devicePathList.length === 0) {
+    const sortedDeviceInfoList = [...nativeDeviceInfoList]
+        .sort(compareLogitechWriteHandlePreference);
+    const openDeviceInfoList = sortedDeviceInfoList.filter(hasNativeHidPath);
+    if (openDeviceInfoList.length === 0) {
+        logLogitechHidppOpenPlan(context, sortedDeviceInfoList, "noPath");
         return undefined;
     }
 
-    const openedDevices = devicePathList.map(path => openDevice(path));
+    logLogitechHidppOpenPlan(context, openDeviceInfoList, "open");
+    const openedDevices: NativeHidDevice[] = [];
+    for (const deviceInfo of openDeviceInfoList) {
+        openedDevices.push(openDevice(deviceInfo.path));
+    }
     return new NativeLogitechHidppTransport(openedDevices[0], openedDevices);
+}
+
+function hasNativeHidPath(deviceInfo: NativeHidDeviceInfo): deviceInfo is NativeHidDeviceInfo & { readonly path: string } {
+    return deviceInfo.path !== undefined;
 }
 
 function compareLogitechWriteHandlePreference(
@@ -819,6 +934,59 @@ function scoreLogitechWriteHandle(deviceInfo: NativeHidDeviceInfo): number {
         deviceInfo.usage === LOGITECH_HIDPP_SHORT_USAGE
         ? 1
         : 0;
+}
+
+function logLogitechHidppOpenPlan(
+    context: LogitechHidppOpenContext,
+    deviceInfoList: readonly NativeHidDeviceInfo[],
+    outcome: "open" | "noPath",
+): void {
+    log.atInfo()
+        .everyMs(
+            `hidpp-open-plan:${context.groupId ?? "unknown"}:${outcome}`,
+            LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "Logitech HID++ open plan",
+            `outcome=${outcome}`,
+            `receiverKind=${context.receiverKind ?? "unknown"}`,
+            `groupId=${context.groupId ?? "unknown"}`,
+            `collections=${deviceInfoList.length}`,
+            `order=${formatLogitechHidppOpenOrder(deviceInfoList)}`,
+        ].join(" "));
+}
+
+function formatLogitechHidppOpenOrder(deviceInfoList: readonly NativeHidDeviceInfo[]): string {
+    return deviceInfoList
+        .map((deviceInfo, index) => [
+            `${index}`,
+            `usagePage=${formatOptionalHex(deviceInfo.usagePage)}`,
+            `usage=${formatOptionalHex(deviceInfo.usage)}`,
+            `interface=${deviceInfo.interface}`,
+            `pathKey=${formatLogitechHidppPathKey(deviceInfo.path)}`,
+        ].join("/"))
+        .join(",");
+}
+
+function formatLogitechHidppPathKey(path: string | undefined): string {
+    if (path === undefined) {
+        return "none";
+    }
+
+    const normalizedPath = path.toLowerCase();
+    const match = /#([^#]+)#/u.exec(normalizedPath);
+    return sanitizeLogField(match?.[1] ?? normalizedPath).slice(0, 96) || "unknown";
+}
+
+function formatOptionalHex(value: number | undefined): string {
+    return value === undefined ? "unknown" : `0x${value.toString(16).padStart(4, "0")}`;
+}
+
+function sanitizeLogField(value: string): string {
+    return value
+        .replace(/\s+/gu, "_")
+        .replace(/[^a-zA-Z0-9._:&-]+/gu, "-")
+        .slice(0, 160) || "empty";
 }
 
 function parseFeatureExchangeResult(
@@ -846,15 +1014,6 @@ function parseFeatureExchangeResult(
                 reason: parsed.state === "malformed" ? "malformed" : "timeout",
             };
     }
-}
-
-function logHidppResponseOutcome(
-    request: LogitechHidppRequest,
-    unrelatedReportCount: number,
-    outcome: "response" | "deviceError",
-    durationMilliseconds: number,
-): void {
-    logHidppExchangeOutcome(request, outcome, unrelatedReportCount, durationMilliseconds);
 }
 
 function logHidppExchangeOutcome(
@@ -908,6 +1067,28 @@ function logLogitechBatteryReadOutcome(
             `percentSource=${result.state === "battery" ? result.reading.percentSource : ""}`,
             `durationMs=${durationMilliseconds}`,
             `unrelatedReports=${result.state === "unsupported" ? 0 : result.unrelatedReportCount}`,
+        ].join(" "));
+}
+
+function logLogitechOptionalTelemetryReadOutcome(
+    receiverSlot: LogitechReceiverSlot,
+    telemetryKind: "deviceInformation" | "deviceTypeAndName",
+    state: LogitechDeviceInformationReadResult["state"] | LogitechDeviceTypeAndNameReadResult["state"],
+    reason: string | undefined,
+    durationMilliseconds: number,
+): void {
+    log.atInfo()
+        .everyMs(
+            `hidpp-optional-telemetry:${receiverSlot}:${telemetryKind}:${state}:${reason ?? "none"}`,
+            LOGITECH_HIDPP_DEBUG_LOG_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "Logitech HID++ optional telemetry read",
+            `receiverSlot=${receiverSlot}`,
+            `telemetry=${telemetryKind}`,
+            `state=${state}`,
+            `reason=${reason ?? ""}`,
+            `durationMs=${durationMilliseconds}`,
         ].join(" "));
 }
 

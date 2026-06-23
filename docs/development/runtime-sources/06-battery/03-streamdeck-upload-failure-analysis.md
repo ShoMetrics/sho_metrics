@@ -81,13 +81,59 @@ delayMs=500
 ```
 
 This is not a retry delay. It intentionally shifts broad vendor-HID discovery
-out of the Stream Deck host's first image-upload burst after plugin reload.
-Manual reload testing showed that `0ms` could still reproduce host upload
-failures, while dozens of reloads at `500ms` did not reproduce the failure in
-the same test loop. Higher values were avoided because they make the first
-vendor-HID readings and Battery selector refresh feel unnecessarily late. The
-remaining risk is handled by the bounded image resend fallback rather than by
-making startup HID discovery visibly slower.
+out of the Stream Deck host's first image-upload burst after plugin reload. It
+is a UX tradeoff, not a proof that one specific delay value is uniquely safe.
+Higher values make first vendor-HID readings and Battery selector refresh feel
+late, while lower values overlap more with startup image upload.
+
+The delay experiments were run against the packaged plugin by repeatedly
+restarting the plugin and counting host-side `Upload Image Ignore error: FAILED`
+entries. The first `10s` restart-spacing run was useful to prove the failure was
+easy to trigger, but it was too aggressive and likely carried state from one
+reload into the next:
+
+| Delay | Restart spacing | Restarts | Upload failures |
+| --- | ---: | ---: | ---: |
+| `0ms` | `10s` | `50` | `19` |
+| `100ms` | `10s` | `50` | `7` |
+| `200ms` | `10s` | `50` | `0` |
+| `300ms` | `10s` | `50` | `12` |
+| `400ms` | `10s` | `50` | `11` |
+| `500ms` | `10s` | `50` | `29` |
+
+The follow-up `30s` restart-spacing runs were more representative, but still
+do not identify a safe delay value:
+
+| Delay | Restart spacing | Restarts | Upload failures | Sessions with failures | Failure p95 after reload | Failure p99 after reload | Failures within 10s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `0ms` | `30s` | `50` | `12` | `4` | `4.913s` | `4.913s` | `12/12` |
+| `100ms` | `30s` | `50` | `10` | `2` | `4.835s` | `4.835s` | `10/10` |
+| `300ms` | `30s` | `50` | `0` | `0` | n/a | n/a | `0/0` |
+| `500ms` | `30s` | `50` | `12` | `2` | `5.394s` | `5.394s` | `12/12` |
+| `600ms` | `30s` | `50` | `7` | `1` | `5.588s` | `5.588s` | `7/7` |
+| `700ms` | `30s` | `50` | `5` | `1` | `4.840s` | `4.840s` | `5/5` |
+| `800ms` | `30s` | `50` | `5` | `1` | `4.876s` | `4.876s` | `5/5` |
+| `900ms` | `30s` | `50` | `6` | `1` | `5.682s` | `5.682s` | `6/6` |
+| `1000ms` | `30s` | `50` | `0` | `0` | n/a | n/a | `0/0` |
+| `1500ms` | `30s` | `50` | `12` | `2` | `7.385s` | `7.385s` | `12/12` |
+
+The non-monotonic results are important. `300ms` and `1000ms` happened to be
+clean in these samples, while `1500ms` was one of the highest-failure groups.
+That means the delay matrix mostly proves what it does not prove: delay alone
+is not the root fix. The useful signal is that representative failures still
+cluster in the first few seconds after reload. The number and shape of image
+uploads also matter.
+
+This experiment has an important limitation: it measures host log failure
+counts under scripted plugin restarts, not the user-visible "key stuck on the
+plugin logo" outcome. Manual testing previously saw `0ms` reproduce stuck-logo
+behavior while `500ms` subjectively stopped reproducing it, even before resend
+was enabled. The scripted matrix does not line up cleanly with that observation.
+Likely differences include restart cadence, Stream Deck host state carried
+between restarts, the exact key layout, whether the physical key missed the
+failed upload, and whether a later image repaired it before it was noticed.
+Therefore this table should be treated as failure-window evidence, not as a
+complete UX reproduction test.
 
 The cache POC writes one real `HID.devices()` result to:
 
@@ -111,6 +157,32 @@ totalMs≈40
 
 That timing change is large enough to explain why the upload failure rate fell.
 
+## Main-Thread HID I/O Constraint
+
+`node-hid` read/write calls used by the vendor HID readers are synchronous. Even
+though ShoMetrics now serializes vendor HID work with an async mutex, the active
+HID transaction still runs on the Hub plugin's main JavaScript thread. A sleepy
+device, missing response, or broad discovery pass can therefore block the event
+loop until the HID timeout expires.
+
+The mutex solves a different problem: it prevents overlapping HID transactions
+from stealing each other's HID++ responses. It does not move native HID I/O off
+the main thread and does not prevent event-loop stalls.
+
+This is a real risk, but it is not being fixed with worker threads before this
+release. The current release mitigation is deliberately conservative:
+
+- vendor HID support is Windows-only and experimental opt-in;
+- selected-device reads avoid broad discovery when a stored route is available;
+- full discovery is deferred out of the Stream Deck first-image upload window;
+- HID operations log `eventLoopBlockedMs` and `eventLoopLagMaxMs` so the stall
+  can be measured instead of guessed.
+
+If vendor HID USB battery support becomes default, or if the event-loop lag logs
+show multi-second selected reads in normal use, the next architecture step
+should be moving native HID I/O behind a worker thread with a narrow command
+surface such as selected-route read and full descriptor discovery.
+
 ## Image Delivery Evidence
 
 Image resend alone is not the root fix.
@@ -129,6 +201,17 @@ implementation detail.
 
 The useful product conclusion is narrower: when a resend is needed to repair a
 stuck physical key, resending byte-identical image data may be insufficient.
+
+A later bandwidth experiment isolated image delivery from the startup delay. At
+`500ms` startup delay with normal image delivery, the `30s` restart-spacing run
+produced `12` upload failures in `50` reloads. With a temporary diagnostic build
+that forced both primary and resend delivery to use a single image payload for
+software and hardware, the same `500ms` / `30s` / `50 reloads` test produced
+`1` upload failure.
+
+That does not mean the temporary diagnostic build is the production design. It
+does mean target splitting and extra image payloads are part of the failure
+surface, not just HID discovery timing.
 
 ## Rejected Primary Fix: Error-Driven Retry
 
@@ -194,8 +277,8 @@ The route B owner is the image delivery boundary:
 The fallback should be bounded and should not grow into a general retry
 framework.
 
-Because Route A reduces the startup HID conflict, Route B uses fewer resend
-attempts than the earlier design:
+Because Route A reduces the startup HID conflict and image bandwidth is now
+known to matter, Route B uses fewer resend attempts than the earlier design:
 
 ```text
 first render:              3s, 5s
@@ -212,6 +295,15 @@ resend-only and isolated near final image dispatch, not mixed into metric
 rendering or `composeMetricViewFrame()`. The current mutation wraps only
 hardware resend SVGs in a subtle opacity group cycling between `0.99`, `0.98`,
 and `0.97`. Primary images stay visually exact.
+
+Primary key images already avoid target splitting when color compensation has no
+visible effect: the software and hardware PNGs are the same object, so delivery
+uses one un-targeted `setImage()` call. The hot-path check uses the already
+resolved committed or preview color-compensation profile; it does not query
+settings history or ask whether color compensation was ever enabled. Targeted
+software/hardware uploads are only required when that active profile actually
+changes the hardware image. This keeps the color-compensation boundary from
+adding work to normal PNG delivery.
 
 ## Product Trade-Off
 

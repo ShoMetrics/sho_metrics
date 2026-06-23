@@ -1,11 +1,14 @@
 import { logger } from "../../../../../logging/logger";
 import { monotonicNowMilliseconds } from "../../../../../shared/clock";
+import type { ResolvedSystemPeripheralIdentity } from "../../../../../settings/resolved-settings";
 import { buildBatteryMetricKeyFromIdentity } from "../../../battery/battery-metric-key";
 import type { NativeHidDeviceInfo, NativeHidModule } from "../../native-hid-loader-internal";
 import type { BatteryDeviceDiscoveryCandidate } from "../../../battery/battery-device-discovery";
 import type { VendorHidBatteryReader } from "../../../battery/vendor-hid-battery-reader";
+import { LOGITECH_HIDPP_VENDOR_ID } from "../hidpp-protocol";
 import {
     LogitechHidppSession,
+    type LogitechKnownBatteryFeature,
     openNativeLogitechHidppTransport,
     type LogitechBatteryReadResult,
     type NativeLogitechHidppTransport,
@@ -57,11 +60,21 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
         const receiverDeviceGroups = groupLogitechReceiverDevices(deviceInfoList, LOGITECH_RECEIVERS);
         const candidates: BatteryDeviceDiscoveryCandidate[] = [];
 
+        // Scan receiver groups serially on purpose. Most users have one Logitech
+        // receiver, and serial HID++ traffic avoids multiplying USB/HID contention
+        // when Bolt, Unifying, and LIGHTSPEED receivers are connected together.
         for (const receiverDeviceGroup of receiverDeviceGroups) {
             const receiverStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
             const transport = openNativeLogitechHidppTransport(
                 receiverDeviceGroup.deviceInfoList,
-                path => new this.nativeHidModule.HID(path),
+                // Keep Logitech aligned with ASUS and the hardware probe scripts:
+                // Windows Bolt/Unifying HID++ collections can fail to open while
+                // the Stream Deck host and other software have handles alive. The
+                // battery query is read-only, so non-exclusive opens are the least
+                // invasive way to avoid dropping the whole Logitech reader before
+                // any HID++ transaction is attempted.
+                path => new this.nativeHidModule.HID(path, { nonExclusive: true }),
+                openContextForReceiverDeviceGroup(receiverDeviceGroup),
             );
             if (transport === undefined) {
                 logLogitechReceiverOpenFailure(receiverDeviceGroup);
@@ -76,7 +89,7 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 for (const slotRoute of slotRoutes) {
                     const battery = session.readBattery(slotRoute.receiverSlot);
                     recordLogitechBatteryRead(scanSummary, battery);
-                    if (battery.state !== "battery") {
+                    if (battery.state !== "battery" || battery.feature === undefined) {
                         continue;
                     }
 
@@ -86,10 +99,13 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                         battery,
                     });
                     candidates.push(candidate);
-                    this.bindingByMetricKey.set(buildBatteryMetricKeyFromIdentity(candidate.identity), {
+                    this.storeBinding(
+                        buildBatteryMetricKeyFromIdentity(candidate.identity),
                         receiverDeviceGroup,
                         slotRoute,
-                    });
+                        battery,
+                        battery.feature,
+                    );
                 }
 
                 logLogitechReceiverScanSummary(
@@ -120,36 +136,53 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
             return Promise.resolve(undefined);
         }
 
-        let transport: NativeLogitechHidppTransport | undefined;
-        try {
-            transport = openNativeLogitechHidppTransport(
-                binding.receiverDeviceGroup.deviceInfoList,
-                path => new this.nativeHidModule.HID(path),
-            );
-        } catch {
-            return Promise.resolve(undefined);
-        }
-
+        const transport = this.openReceiverDeviceGroup(binding.receiverDeviceGroup);
         if (transport === undefined) {
             return Promise.resolve(undefined);
         }
 
         try {
             const session = new LogitechHidppSession(transport);
-            const battery = session.readBattery(binding.slotRoute.receiverSlot);
+            const battery = session.readBatteryFromKnownFeature(
+                binding.slotRoute.receiverSlot,
+                binding.batteryFeature,
+            );
             if (battery.state !== "battery") {
                 return Promise.resolve(undefined);
             }
+            const liveDeviceInformation = binding.deviceInformation === undefined
+                ? undefined
+                : session.readDeviceInformation(binding.slotRoute.receiverSlot);
+            if (binding.deviceInformation !== undefined && liveDeviceInformation?.state !== "deviceInformation") {
+                return Promise.resolve(undefined);
+            }
+            if (
+                binding.deviceInformation !== undefined &&
+                liveDeviceInformation?.state === "deviceInformation" &&
+                !matchesBoundLogitechDeviceInformation(liveDeviceInformation.deviceInformation, binding.deviceInformation)
+            ) {
+                return Promise.resolve(undefined);
+            }
 
+            // Selected refreshes intentionally skip DeviceTypeAndName because it is display-only and may require
+            // several HID++ chunks. DeviceInformation is different: Logitech exposes stable unit/model fields there,
+            // so keep this one cheap live read as the identity proof before trusting a cached route.
             const candidate = buildLogitechBatteryCandidate({
                 receiverDeviceGroup: binding.receiverDeviceGroup,
                 slotRoute: binding.slotRoute,
-                battery,
+                battery: {
+                    ...battery,
+                    deviceInformation: liveDeviceInformation?.state === "deviceInformation"
+                        ? liveDeviceInformation.deviceInformation
+                        : battery.deviceInformation,
+                    deviceTypeAndName: binding.deviceTypeAndName ?? battery.deviceTypeAndName,
+                },
             });
-            if (hasLiveLogitechDeviceIdentity(battery)) {
-                return Promise.resolve(buildBatteryMetricKeyFromIdentity(candidate.identity) === metricKey
-                    ? candidate
-                    : undefined);
+            if (
+                liveDeviceInformation?.state === "deviceInformation" &&
+                hasLogitechDeviceIdentity(liveDeviceInformation.deviceInformation)
+            ) {
+                return Promise.resolve(buildBatteryMetricKeyFromIdentity(candidate.identity) === metricKey ? candidate : undefined);
             }
 
             // Some Logitech paths can read battery without exposing live DeviceInformation. In that case the direct
@@ -161,19 +194,171 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
             transport.close();
         }
     }
+
+    readBatteryDeviceFromIdentity(
+        metricKey: string,
+        identity: ResolvedSystemPeripheralIdentity,
+        deviceInfoList: readonly NativeHidDeviceInfo[],
+    ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        if (
+            identity.vendorId !== LOGITECH_HIDPP_VENDOR_ID ||
+            !hasSelectedLogitechReceiverSlot(identity) ||
+            !isSupportedLogitechReceiverKind(identity.receiverKind)
+        ) {
+            return Promise.resolve(undefined);
+        }
+
+        const receiverDeviceGroups = groupLogitechReceiverDevices(deviceInfoList, LOGITECH_RECEIVERS)
+            .filter(receiverDeviceGroup =>
+                receiverDeviceGroup.receiver.receiverKind === identity.receiverKind &&
+                (identity.productId === undefined || receiverDeviceGroup.receiver.productId === identity.productId),
+            );
+        for (const receiverDeviceGroup of receiverDeviceGroups) {
+            const candidate = this.readBatteryDeviceFromReceiverGroup(metricKey, identity, receiverDeviceGroup);
+            if (candidate !== undefined) {
+                return Promise.resolve(candidate);
+            }
+        }
+
+        return Promise.resolve(undefined);
+    }
+
+    private readBatteryDeviceFromReceiverGroup(
+        metricKey: string,
+        identity: ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number },
+        receiverDeviceGroup: LogitechReceiverDeviceGroup,
+    ): BatteryDeviceDiscoveryCandidate | undefined {
+        const transport = this.openReceiverDeviceGroup(receiverDeviceGroup);
+        if (transport === undefined) {
+            return undefined;
+        }
+
+        try {
+            const slotRoute = buildSelectedLogitechSlotRoute(identity);
+            const session = new LogitechHidppSession(transport);
+            const battery = session.readBatteryWithDeviceInformation(slotRoute.receiverSlot);
+            if (battery.state !== "battery" || battery.feature === undefined) {
+                return undefined;
+            }
+
+            if (!matchesSelectedLogitechDeviceInformation(identity, battery.deviceInformation)) {
+                return undefined;
+            }
+
+            const candidate = buildLogitechBatteryCandidate({
+                receiverDeviceGroup,
+                slotRoute,
+                battery,
+            });
+            if (buildBatteryMetricKeyFromIdentity(candidate.identity) !== metricKey) {
+                return undefined;
+            }
+
+            this.storeBinding(metricKey, receiverDeviceGroup, slotRoute, battery, battery.feature);
+            return candidate;
+        } finally {
+            transport.close();
+        }
+    }
+
+    private openReceiverDeviceGroup(
+        receiverDeviceGroup: LogitechReceiverDeviceGroup,
+    ): NativeLogitechHidppTransport | undefined {
+        try {
+            return openNativeLogitechHidppTransport(
+                receiverDeviceGroup.deviceInfoList,
+                // See the discovery open path above: selected-device refreshes
+                // should use the same non-exclusive handle mode as full scans.
+                path => new this.nativeHidModule.HID(path, { nonExclusive: true }),
+                openContextForReceiverDeviceGroup(receiverDeviceGroup),
+            );
+        } catch {
+            return undefined;
+        }
+    }
+
+    private storeBinding(
+        metricKey: string,
+        receiverDeviceGroup: LogitechReceiverDeviceGroup,
+        slotRoute: LogitechReceiverSlotRoute,
+        battery: LogitechBatteryResult,
+        batteryFeature: LogitechKnownBatteryFeature,
+    ): void {
+        this.bindingByMetricKey.set(metricKey, {
+            receiverDeviceGroup,
+            slotRoute,
+            batteryFeature,
+            deviceInformation: battery.deviceInformation,
+            deviceTypeAndName: battery.deviceTypeAndName,
+        });
+    }
 }
 
 interface LogitechBatteryRouteBinding {
     readonly receiverDeviceGroup: LogitechReceiverDeviceGroup;
     readonly slotRoute: LogitechReceiverSlotRoute;
+    readonly batteryFeature: LogitechKnownBatteryFeature;
+    readonly deviceInformation?: LogitechBatteryResult["deviceInformation"];
+    readonly deviceTypeAndName?: LogitechBatteryResult["deviceTypeAndName"];
 }
 
 type LogitechBatteryNoDataReason = Extract<LogitechBatteryReadResult, { readonly state: "noData" }>["reason"];
 type LogitechBatteryResult = Extract<LogitechBatteryReadResult, { readonly state: "battery" }>;
 
-function hasLiveLogitechDeviceIdentity(battery: LogitechBatteryResult): boolean {
-    return battery.deviceInformation?.unitId !== undefined
-        || battery.deviceInformation?.modelId !== undefined;
+function isSupportedLogitechReceiverKind(
+    receiverKind: ResolvedSystemPeripheralIdentity["receiverKind"],
+): receiverKind is LogitechReceiverDescriptor["receiverKind"] {
+    return receiverKind === "bolt" || receiverKind === "unifying" || receiverKind === "lightspeed";
+}
+
+function hasSelectedLogitechReceiverSlot(
+    identity: ResolvedSystemPeripheralIdentity,
+): identity is ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number } {
+    return identity.receiverSlot !== undefined;
+}
+
+function buildSelectedLogitechSlotRoute(
+    identity: ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number },
+): LogitechReceiverSlotRoute {
+    return {
+        receiverSlot: identity.receiverSlot,
+        vendorUnitId: identity.vendorUnitId,
+        deviceKind: undefined,
+        wirelessProductId: undefined,
+    };
+}
+
+function matchesSelectedLogitechDeviceInformation(
+    identity: ResolvedSystemPeripheralIdentity,
+    liveDeviceInformation: LogitechBatteryResult["deviceInformation"],
+): boolean {
+    if (identity.vendorUnitId === undefined && identity.modelId === undefined) {
+        // Some Logitech routes cannot expose a live unit/model identity. In that case
+        // selected reads deliberately fall back to route-only trust
+        // (receiver kind + product id + receiver slot); reusing the same slot for a
+        // different paired device can therefore report the new device's battery.
+        return true;
+    }
+
+    if (liveDeviceInformation === undefined) {
+        return false;
+    }
+
+    return (identity.vendorUnitId === undefined || liveDeviceInformation.unitId === identity.vendorUnitId)
+        && (identity.modelId === undefined || liveDeviceInformation.modelId === identity.modelId);
+}
+
+function hasLogitechDeviceIdentity(deviceInformation: NonNullable<LogitechBatteryResult["deviceInformation"]>): boolean {
+    return deviceInformation.unitId !== undefined
+        || deviceInformation.modelId !== undefined;
+}
+
+function matchesBoundLogitechDeviceInformation(
+    liveDeviceInformation: NonNullable<LogitechBatteryResult["deviceInformation"]>,
+    boundDeviceInformation: NonNullable<LogitechBatteryResult["deviceInformation"]>,
+): boolean {
+    return (boundDeviceInformation.unitId === undefined || liveDeviceInformation.unitId === boundDeviceInformation.unitId)
+        && (boundDeviceInformation.modelId === undefined || liveDeviceInformation.modelId === boundDeviceInformation.modelId);
 }
 
 interface LogitechReceiverScanSummary {
@@ -255,6 +440,16 @@ function logLogitechReceiverOpenFailure(receiverDeviceGroup: LogitechReceiverDev
             `groupId=${receiverDeviceGroup.groupId}`,
             `hidCollections=${receiverDeviceGroup.deviceInfoList.length}`,
         ].join(" "));
+}
+
+function openContextForReceiverDeviceGroup(receiverDeviceGroup: LogitechReceiverDeviceGroup): {
+    readonly receiverKind: string;
+    readonly groupId: string;
+} {
+    return {
+        receiverKind: receiverDeviceGroup.receiver.receiverKind,
+        groupId: receiverDeviceGroup.groupId,
+    };
 }
 
 function formatNoDataCounts(counts: Record<LogitechBatteryNoDataReason, number>): string {

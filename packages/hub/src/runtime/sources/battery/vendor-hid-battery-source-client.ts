@@ -32,6 +32,15 @@ import {
 } from "./battery-device-discovery";
 import { buildBatteryMetricKeyFromIdentity } from "./battery-metric-key";
 import type { VendorHidBatteryReader } from "./vendor-hid-battery-reader";
+import {
+    vendorHidBatteryRouteRegistry,
+    type VendorHidBatteryRouteDefinition,
+    type VendorHidBatteryRouteRegistry,
+} from "./vendor-hid-battery-route-registry";
+import {
+    vendorHidOperationMutex,
+    type VendorHidOperationMutex,
+} from "./vendor-hid-operation-mutex";
 
 const log = logger.for("Source:BatteryHID");
 const VENDOR_HID_BATTERY_POLLING_GROUP_ID = "vendor-hid-battery";
@@ -41,12 +50,13 @@ const VENDOR_HID_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 30_000;
 // Local Stream Deck XL testing showed host-side "Upload Image Ignore error: FAILED" events
 // concentrated in that startup window when native HID enumeration/open/query ran at the same time.
 // This delay is not a correctness delay for battery data; it is a USB contention mitigation that
-// lets first-render key images leave before vendor HID discovery starts. `0ms` still reproduced
-// upload failures; dozens of reloads at `500ms` did not, and higher values start to make the
-// battery selector and first vendor-HID readings feel unnecessarily late.
+// lets first-render key images leave before vendor HID discovery starts. The measured failure rate
+// is non-monotonic, so this value is a UX tradeoff, not a proof that 500ms is uniquely safe.
+// Image-delivery bandwidth reduction remains the other half of the mitigation.
 const VENDOR_HID_DISCOVERY_STARTUP_DELAY_MILLISECONDS = 500;
+const VENDOR_HID_DEFERRED_FULL_DISCOVERY_DELAY_MILLISECONDS = 10_000;
 
-type VendorHidBatteryDiscoveryOrigin = "poll" | "descriptor";
+type VendorHidBatteryDiscoveryOrigin = "poll" | "descriptor" | "deferred" | "selectedRoute";
 
 interface VendorHidBatteryDiscoveryResult {
     readonly descriptors: readonly BatteryDeviceDescriptor[];
@@ -64,6 +74,9 @@ interface VendorHidBatterySourceClientOptions {
     readonly isExperimentalVendorHidEnabled?: () => boolean;
     readonly wallClockNow?: () => number;
     readonly createReaders?: (nativeHidModule: NativeHidModule) => readonly VendorHidBatteryReaderEntry[];
+    readonly routeRegistry?: VendorHidBatteryRouteRegistry;
+    readonly operationMutex?: VendorHidOperationMutex;
+    readonly deferredFullDiscoveryDelayMilliseconds?: number;
     readonly discoverCandidates?: (
         nativeHidModule: NativeHidModule,
         deviceInfoList: readonly NativeHidDeviceInfo[],
@@ -104,10 +117,15 @@ export class VendorHidBatterySourceClient implements SourceClient {
         deviceInfoList: readonly NativeHidDeviceInfo[],
     ) => Promise<readonly BatteryDeviceDiscoveryCandidate[]>;
     private readonly createReaders: (nativeHidModule: NativeHidModule) => readonly VendorHidBatteryReaderEntry[];
+    private readonly routeRegistry: VendorHidBatteryRouteRegistry;
+    private readonly operationMutex: VendorHidOperationMutex;
+    private readonly deferredFullDiscoveryDelayMilliseconds: number;
     private readonly usesInjectedCandidateDiscovery: boolean;
     private readerEntries: readonly VendorHidBatteryReaderEntry[] | undefined;
     private descriptorByMetricKey = new Map<string, BatteryDeviceDescriptor>();
     private status: SourceClientStatus = { state: "unknown" };
+    private deferredFullDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
+    private deferredFullDiscoveryPromise: Promise<void> | undefined;
 
     constructor(options: VendorHidBatterySourceClientOptions = {}) {
         this.loadNativeHid = options.loadNativeHid ?? loadNativeHidModule;
@@ -115,6 +133,10 @@ export class VendorHidBatterySourceClient implements SourceClient {
             ?? (() => pluginGlobalSettingsStore.getResolved().system.experimentalVendorHidBatteryEnabled);
         this.wallClockNow = options.wallClockNow ?? wallClockNowMilliseconds;
         this.createReaders = options.createReaders ?? createVendorHidBatteryReaders;
+        this.routeRegistry = options.routeRegistry ?? vendorHidBatteryRouteRegistry;
+        this.operationMutex = options.operationMutex ?? vendorHidOperationMutex;
+        this.deferredFullDiscoveryDelayMilliseconds = options.deferredFullDiscoveryDelayMilliseconds
+            ?? VENDOR_HID_DEFERRED_FULL_DISCOVERY_DELAY_MILLISECONDS;
         this.usesInjectedCandidateDiscovery = options.discoverCandidates !== undefined;
         this.discoverCandidates = options.discoverCandidates ?? ((nativeHidModule, deviceInfoList) =>
             discoverVendorHidBatteryCandidatesFromReaders(
@@ -152,6 +174,40 @@ export class VendorHidBatterySourceClient implements SourceClient {
             );
         }
 
+        const selectedReadResult = this.usesInjectedCandidateDiscovery
+            ? undefined
+            : await this.readSelectedBatteryDevices(
+                requestedMetricKeys,
+                snapshotTimestampMilliseconds,
+                0,
+                startedAtMonotonicMilliseconds,
+            );
+        if (selectedReadResult !== undefined) {
+            return selectedReadResult;
+        }
+
+        const routeDefinitions = this.readRouteDefinitions(requestedMetricKeys);
+        if (!this.usesInjectedCandidateDiscovery && routeDefinitions.length === 0) {
+            this.scheduleDeferredFullDiscovery();
+            logVendorHidPollDiagnostic({
+                outcome: "deferredDiscovery",
+                requestedMetricCount: requestedMetricKeys.length,
+                candidateCount: 0,
+                descriptorCount: 0,
+                emittedMetricCount: 0,
+                unavailableMetricCount: requestedMetricKeys.length,
+                nativeLoadDurationMilliseconds: 0,
+                discoveryDurationMilliseconds: 0,
+                totalDurationMilliseconds: monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+            });
+            return buildSourceSnapshotReadResult(
+                snapshotTimestampMilliseconds,
+                {},
+                [],
+                buildUnavailableReports(requestedMetricKeys, undefined),
+            );
+        }
+
         // The native HID addon is optional. Loading failures belong to this source, not the whole plugin runtime.
         const nativeLoadStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         const nativeHidLoadResult = await this.loadNativeHid();
@@ -177,29 +233,28 @@ export class VendorHidBatterySourceClient implements SourceClient {
             );
         }
 
-        const selectedReadResult = this.usesInjectedCandidateDiscovery
-            ? undefined
-            : await this.readSelectedBatteryDevices(
+        if (!this.usesInjectedCandidateDiscovery) {
+            const routeReadResult = await this.readRouteRegistryBatteryDevices(
                 requestedMetricKeys,
+                routeDefinitions,
                 snapshotTimestampMilliseconds,
+                nativeHidLoadResult.module,
                 nativeLoadDurationMilliseconds,
                 startedAtMonotonicMilliseconds,
             );
-        if (selectedReadResult !== undefined) {
-            return selectedReadResult;
+            this.scheduleDeferredFullDiscovery();
+            return routeReadResult;
         }
 
         let discoveryResult: VendorHidBatteryDiscoveryResult;
         const discoveryStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         try {
-            // Battery polling is low frequency, so each poll does a fresh HID discovery/read pass instead of holding
-            // device handles or sharing mutable route state with the Property Inspector descriptor picker.
-            discoveryResult = await discoverVendorHidBatteryDevices({
+            discoveryResult = await this.operationMutex.run("poll-discovery", () => discoverVendorHidBatteryDevices({
                 nativeHidModule: nativeHidLoadResult.module,
                 discoverCandidates: this.discoverCandidates,
                 isExperimentalVendorHidEnabled: true,
                 origin: "poll",
-            });
+            }));
         } catch (error) {
             this.recordUnavailableStatus("sourceError", snapshotTimestampMilliseconds, error);
             logVendorHidPollDiagnostic({
@@ -278,6 +333,13 @@ export class VendorHidBatterySourceClient implements SourceClient {
         return { ...this.status };
     }
 
+    dispose(): void {
+        if (this.deferredFullDiscoveryTimer !== undefined) {
+            clearTimeout(this.deferredFullDiscoveryTimer);
+            this.deferredFullDiscoveryTimer = undefined;
+        }
+    }
+
     private recordUnavailableStatus(
         reason: NonNullable<SourceClientStatus["reason"]>,
         timestampMilliseconds: number,
@@ -303,6 +365,15 @@ export class VendorHidBatterySourceClient implements SourceClient {
         return this.readerEntries;
     }
 
+    private readRouteDefinitions(
+        requestedMetricKeys: readonly string[],
+    ): readonly VendorHidBatteryRouteDefinition[] {
+        return requestedMetricKeys.flatMap(metricKey => {
+            const definition = this.routeRegistry.read(metricKey);
+            return definition === undefined ? [] : [definition];
+        });
+    }
+
     private async readSelectedBatteryDevices(
         requestedMetricKeys: readonly string[],
         snapshotTimestampMilliseconds: number,
@@ -314,35 +385,119 @@ export class VendorHidBatterySourceClient implements SourceClient {
             return undefined;
         }
 
-        const startedAtSelectedReadMilliseconds = monotonicNowMilliseconds();
-        const candidates: BatteryDeviceDiscoveryCandidate[] = [];
-        for (const metricKey of requestedMetricKeys) {
-            const candidate = await this.readSelectedBatteryDevice(metricKey, readerEntries);
-            if (candidate === undefined) {
-                logVendorHidPollDiagnostic({
-                    outcome: "selectedFallback",
-                    requestedMetricCount: requestedMetricKeys.length,
-                    candidateCount: candidates.length,
-                    descriptorCount: this.descriptorByMetricKey.size,
-                    emittedMetricCount: 0,
-                    unavailableMetricCount: 0,
-                    nativeLoadDurationMilliseconds,
-                    discoveryDurationMilliseconds: monotonicNowMilliseconds() - startedAtSelectedReadMilliseconds,
-                    totalDurationMilliseconds: monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
-                });
-                return undefined;
+        return this.operationMutex.run("selected-binding", async () => {
+            const startedAtSelectedReadMilliseconds = monotonicNowMilliseconds();
+            const candidates: BatteryDeviceDiscoveryCandidate[] = [];
+            const unavailableMetrics: MetricUnavailableReport[] = [];
+            for (const metricKey of requestedMetricKeys) {
+                const descriptor = this.descriptorByMetricKey.get(metricKey);
+                if (descriptor === undefined) {
+                    unavailableMetrics.push(...buildUnavailableReports([metricKey], undefined));
+                    continue;
+                }
+
+                const candidate = await this.readSelectedBatteryDevice(metricKey, readerEntries);
+                if (candidate === undefined) {
+                    unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
+                    continue;
+                }
+
+                candidates.push(candidate);
             }
 
-            candidates.push(candidate);
-        }
+            return this.buildSelectedReadResult({
+                requestedMetricKeys,
+                candidates,
+                snapshotTimestampMilliseconds,
+                nativeLoadDurationMilliseconds,
+                selectedReadDurationMilliseconds: monotonicNowMilliseconds() - startedAtSelectedReadMilliseconds,
+                startedAtMonotonicMilliseconds,
+                outcome: "selectedComplete",
+                initialUnavailableMetrics: unavailableMetrics,
+            });
+        });
+    }
 
+    private async readRouteRegistryBatteryDevices(
+        requestedMetricKeys: readonly string[],
+        routeDefinitions: readonly VendorHidBatteryRouteDefinition[],
+        snapshotTimestampMilliseconds: number,
+        nativeHidModule: NativeHidModule,
+        nativeLoadDurationMilliseconds: number,
+        startedAtMonotonicMilliseconds: number,
+    ): Promise<SourceSnapshotReadResult> {
+        return this.operationMutex.run("selected-route", async () => {
+            const startedAtSelectedReadMilliseconds = monotonicNowMilliseconds();
+            const nativeDiagnostics = createVendorHidBatteryDiscoveryNativeDiagnostics();
+            const diagnosticNativeHidModule = createDiagnosticNativeHidModule(nativeHidModule, nativeDiagnostics);
+            const deviceInfoList = diagnosticNativeHidModule.devices();
+            const readerEntries = this.resolveReaderEntries(diagnosticNativeHidModule);
+            const candidates: BatteryDeviceDiscoveryCandidate[] = [];
+
+            for (const definition of routeDefinitions) {
+                const candidate = await this.readBatteryDeviceFromIdentity(definition, readerEntries, deviceInfoList);
+                if (candidate !== undefined) {
+                    candidates.push(candidate);
+                }
+            }
+
+            const descriptors = resolveBatteryDeviceDescriptors(candidates, {
+                isExperimentalVendorHidEnabled: true,
+            });
+            for (const descriptor of descriptors) {
+                this.descriptorByMetricKey.set(descriptor.metricKey, descriptor);
+            }
+            logVendorHidDiscoveryPassDiagnostic({
+                phase: "complete",
+                origin: "selectedRoute",
+                nativeDiagnostics,
+                durationMilliseconds: monotonicNowMilliseconds() - startedAtSelectedReadMilliseconds,
+            });
+
+            return this.buildSelectedReadResult({
+                requestedMetricKeys,
+                candidates,
+                snapshotTimestampMilliseconds,
+                nativeLoadDurationMilliseconds,
+                selectedReadDurationMilliseconds: monotonicNowMilliseconds() - startedAtSelectedReadMilliseconds,
+                startedAtMonotonicMilliseconds,
+                outcome: "selectedRouteComplete",
+            });
+        });
+    }
+
+    private async readBatteryDeviceFromIdentity(
+        definition: VendorHidBatteryRouteDefinition,
+        readerEntries: readonly VendorHidBatteryReaderEntry[],
+        deviceInfoList: readonly NativeHidDeviceInfo[],
+    ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        return this.readBatteryDeviceFromReaders(definition.metricKey, readerEntries, reader =>
+            reader.readBatteryDeviceFromIdentity?.(
+                definition.metricKey,
+                definition.identity,
+                deviceInfoList,
+            ) ?? Promise.resolve(undefined));
+    }
+
+    private buildSelectedReadResult(options: {
+        readonly requestedMetricKeys: readonly string[];
+        readonly candidates: readonly BatteryDeviceDiscoveryCandidate[];
+        readonly snapshotTimestampMilliseconds: number;
+        readonly nativeLoadDurationMilliseconds: number;
+        readonly selectedReadDurationMilliseconds: number;
+        readonly startedAtMonotonicMilliseconds: number;
+        readonly outcome: string;
+        readonly initialUnavailableMetrics?: readonly MetricUnavailableReport[];
+    }): SourceSnapshotReadResult {
+        const unavailableMetrics: MetricUnavailableReport[] = [...(options.initialUnavailableMetrics ?? [])];
         const metrics: Record<string, MetricValue> = {};
         const valueMetadata: SourceMetricValueMetadata[] = [];
-        for (const candidate of candidates) {
+        for (const candidate of options.candidates) {
             const metricKey = buildBatteryMetricKeyFromIdentity(candidate.identity);
             const descriptor = this.descriptorByMetricKey.get(metricKey);
             if (descriptor === undefined || candidate.batteryPercent === undefined) {
-                return undefined;
+                unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
+                continue;
             }
 
             metrics[metricKey] = buildScalarMetricValue(candidate.batteryPercent, {
@@ -360,30 +515,47 @@ export class VendorHidBatterySourceClient implements SourceClient {
             });
         }
 
+        for (const metricKey of options.requestedMetricKeys) {
+            if (metricKey in metrics || unavailableMetrics.some(report => report.metricId === metricKey)) {
+                continue;
+            }
+
+            unavailableMetrics.push(...buildUnavailableReports([metricKey], this.descriptorByMetricKey.get(metricKey)));
+        }
+
         this.status = {
             state: "available",
-            lastSuccessAtTimestampMilliseconds: snapshotTimestampMilliseconds,
+            lastSuccessAtTimestampMilliseconds: options.snapshotTimestampMilliseconds,
         };
         logVendorHidPollDiagnostic({
-            outcome: "selectedComplete",
-            requestedMetricCount: requestedMetricKeys.length,
-            candidateCount: candidates.length,
+            outcome: options.outcome,
+            requestedMetricCount: options.requestedMetricKeys.length,
+            candidateCount: options.candidates.length,
             descriptorCount: this.descriptorByMetricKey.size,
             emittedMetricCount: Object.keys(metrics).length,
-            unavailableMetricCount: 0,
-            nativeLoadDurationMilliseconds,
-            discoveryDurationMilliseconds: monotonicNowMilliseconds() - startedAtSelectedReadMilliseconds,
-            totalDurationMilliseconds: monotonicNowMilliseconds() - startedAtMonotonicMilliseconds,
+            unavailableMetricCount: unavailableMetrics.length,
+            nativeLoadDurationMilliseconds: options.nativeLoadDurationMilliseconds,
+            discoveryDurationMilliseconds: options.selectedReadDurationMilliseconds,
+            totalDurationMilliseconds: monotonicNowMilliseconds() - options.startedAtMonotonicMilliseconds,
         });
-        return buildSourceSnapshotReadResult(snapshotTimestampMilliseconds, metrics, valueMetadata, []);
+        return buildSourceSnapshotReadResult(options.snapshotTimestampMilliseconds, metrics, valueMetadata, unavailableMetrics);
     }
 
     private async readSelectedBatteryDevice(
         metricKey: string,
         readerEntries: readonly VendorHidBatteryReaderEntry[],
     ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        return this.readBatteryDeviceFromReaders(metricKey, readerEntries, reader =>
+            reader.readBatteryDevice(metricKey));
+    }
+
+    private async readBatteryDeviceFromReaders(
+        expectedMetricKey: string,
+        readerEntries: readonly VendorHidBatteryReaderEntry[],
+        readCandidate: (reader: VendorHidBatteryReader) => Promise<BatteryDeviceDiscoveryCandidate | undefined>,
+    ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
         for (const { reader } of readerEntries) {
-            const candidate = await reader.readBatteryDevice(metricKey);
+            const candidate = await readCandidate(reader);
             if (candidate === undefined) {
                 continue;
             }
@@ -391,12 +563,59 @@ export class VendorHidBatterySourceClient implements SourceClient {
             // This is a reader-contract sanity check, not a live hardware identity proof. Vendor readers that can
             // read live unit identity must validate it before returning; readers that cannot must rely on exact HID
             // path/route targeting plus protocol parsers rejecting unrelated responses.
-            if (buildBatteryMetricKeyFromIdentity(candidate.identity) === metricKey) {
+            if (buildBatteryMetricKeyFromIdentity(candidate.identity) === expectedMetricKey) {
                 return candidate;
             }
         }
 
         return undefined;
+    }
+
+    private scheduleDeferredFullDiscovery(): void {
+        if (
+            this.usesInjectedCandidateDiscovery ||
+            this.deferredFullDiscoveryTimer !== undefined ||
+            this.deferredFullDiscoveryPromise !== undefined
+        ) {
+            return;
+        }
+
+        // Startup selected-route reads intentionally avoid a full receiver sweep.
+        // Schedule one later full discovery to refresh the descriptor catalog after
+        // the Stream Deck image-upload burst; the operation gate serializes it with
+        // PI refreshes and steady-state selected polls if they overlap.
+        this.deferredFullDiscoveryTimer = setTimeout(() => {
+            this.deferredFullDiscoveryTimer = undefined;
+            this.deferredFullDiscoveryPromise = this.runDeferredFullDiscovery()
+                .finally(() => {
+                    this.deferredFullDiscoveryPromise = undefined;
+                });
+        }, this.deferredFullDiscoveryDelayMilliseconds);
+        unrefTimerIfAvailable(this.deferredFullDiscoveryTimer);
+    }
+
+    private async runDeferredFullDiscovery(): Promise<void> {
+        if (!this.isExperimentalVendorHidEnabled()) {
+            return;
+        }
+
+        const nativeHidLoadResult = await this.loadNativeHid();
+        if (nativeHidLoadResult.state === "unavailable") {
+            this.recordUnavailableStatus("driverUnavailable", this.wallClockNow(), nativeHidLoadResult.error);
+            return;
+        }
+
+        try {
+            const discoveryResult = await this.operationMutex.run("deferred-discovery", () => discoverVendorHidBatteryDevices({
+                nativeHidModule: nativeHidLoadResult.module,
+                discoverCandidates: this.discoverCandidates,
+                isExperimentalVendorHidEnabled: true,
+                origin: "deferred",
+            }));
+            this.descriptorByMetricKey = new Map(discoveryResult.descriptors.map(descriptor => [descriptor.metricKey, descriptor]));
+        } catch (error) {
+            this.recordUnavailableStatus("sourceError", this.wallClockNow(), error);
+        }
     }
 }
 
@@ -459,12 +678,12 @@ export async function readVendorHidBatteryDeviceDescriptorSnapshot(options: {
         return emptyVendorHidBatteryDeviceDescriptorSnapshot;
     }
 
-    const discoveryResult = await discoverVendorHidBatteryDevices({
+    const discoveryResult = await vendorHidOperationMutex.run("descriptor-discovery", () => discoverVendorHidBatteryDevices({
         nativeHidModule: nativeHidLoadResult.module,
         discoverCandidates: options.discoverCandidates ?? discoverVendorHidBatteryCandidates,
         isExperimentalVendorHidEnabled: options.isExperimentalVendorHidEnabled,
         origin: "descriptor",
-    });
+    }));
     logVendorHidDescriptorDiagnostic({
         outcome: "complete",
         candidateCount: discoveryResult.candidates.length,
@@ -723,6 +942,12 @@ const emptyVendorHidBatteryDeviceDescriptorSnapshot = {
         hiddenCandidates: [],
     },
 } satisfies VendorHidBatteryDeviceDescriptorSnapshot;
+
+function unrefTimerIfAvailable(timer: ReturnType<typeof setTimeout>): void {
+    if (typeof timer === "object" && timer !== null && "unref" in timer && typeof timer.unref === "function") {
+        timer.unref();
+    }
+}
 
 function logVendorHidPollDiagnostic(options: {
     readonly outcome: string;

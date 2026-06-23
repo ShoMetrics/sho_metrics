@@ -260,6 +260,11 @@ export const systemMessages = {
         zh_CN: "读取通过 USB 接收器/接收器适配器连接的 Logitech/ROG 设备电池电量。如果发现外设卡顿、厂商软件冲突或设备行为不稳定，请关闭此选项。",
         ja: "USB レシーバー/ドングル経由で接続された Logitech/ROG デバイスからバッテリー残量を読み取ります。周辺機器のカクつき、メーカーソフトウェアとの競合、デバイス動作が不安定な場合はオフにしてください。",
     },
+    experimentalVendorHidBatteryReopenPanelNote: {
+        en: "Reopen this panel to refresh the USB device list.",
+        zh_CN: "请重新打开此面板以刷新 USB 设备列表。",
+        ja: "USB デバイス一覧を更新するには、このパネルを開き直してください。",
+    },
     infrequentPollingNote: {
         en: "This device is checked infrequently since the support is experimental.",
         zh_CN: "由于支持仍为实验性，此设备会以较低频率检查。",

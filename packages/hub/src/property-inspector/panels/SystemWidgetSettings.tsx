@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import {
     SYSTEM_BATTERY_DEVICE_DESCRIPTOR,
     type BatteryDeviceDescriptor,
@@ -19,6 +21,7 @@ import { LineSettings } from "./LineSettings";
 import { PollingSettings } from "./PollingSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
+import { shouldEnableVendorHidBatterySupport } from "../../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
 
 // Vendor-HID peripheral battery reads are intentionally low-frequency because
 // experimental devices can share queues with manufacturer software.
@@ -43,6 +46,13 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
     readonly target: ResolvedSystemMetricTarget;
 }): React.JSX.Element {
     const { t } = useI18n();
+    const [
+        didEnableVendorHidBatteryInThisInspectorSession,
+        setDidEnableVendorHidBatteryInThisInspectorSession,
+    ] = useState(false);
+    const isVendorHidBatterySupported = shouldEnableVendorHidBatterySupport(props.context.platform);
+    const isVendorHidBatteryEnabled = isVendorHidBatterySupported
+        && props.context.globalSettings.system.experimentalVendorHidBatteryEnabled;
     const batteryDevices = withSystemBatteryDevice(props.context.runtimeCache.availableBatteryDevices);
     const selectedDescriptorId = resolveSelectedBatteryDescriptorId(
         batteryDevices,
@@ -54,7 +64,7 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
         descriptors: batteryDevices,
         selectedDescriptorId,
         selectedUnavailableLabel: resolveSelectedBatteryUnavailableLabel(props.target),
-        isVendorHidEnabled: props.context.globalSettings.system.experimentalVendorHidBatteryEnabled,
+        isVendorHidEnabled: isVendorHidBatteryEnabled,
         loadStatus: props.context.runtimeCacheStatus.batteryDeviceOptionsStatus,
         t,
     });
@@ -118,25 +128,42 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                         </p>
                     </InspectorItem>
                 )}
-                <InspectorItem label={t(systemMessages.experimentalVendorHidBatterySettingLabel)}>
-                    <div className="override-toggle-control">
-                        <label className="native-checkbox-row">
-                            <input
-                                type="checkbox"
-                                checked={props.context.globalSettings.system.experimentalVendorHidBatteryEnabled}
-                                onChange={(event) => props.onGlobalSettingsPatch?.({
-                                    system: {
-                                        experimentalVendorHidBatteryEnabled: event.currentTarget.checked,
-                                    },
-                                })}
-                            />
-                            <span>{t(systemMessages.experimentalVendorHidBatteryCheckboxLabel)}</span>
-                        </label>
-                        <p className="section-note">
-                            {t(systemMessages.experimentalVendorHidBatteryNote)}
-                        </p>
-                    </div>
-                </InspectorItem>
+                {isVendorHidBatterySupported && (
+                    <InspectorItem label={t(systemMessages.experimentalVendorHidBatterySettingLabel)}>
+                        <div className="override-toggle-control">
+                            <label className="native-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    checked={props.context.globalSettings.system.experimentalVendorHidBatteryEnabled}
+                                    onChange={(event) => {
+                                        const shouldEnableExperimentalVendorHidBattery = event.currentTarget.checked;
+                                        if (
+                                            shouldEnableExperimentalVendorHidBattery
+                                            && !props.context.globalSettings.system.experimentalVendorHidBatteryEnabled
+                                        ) {
+                                            setDidEnableVendorHidBatteryInThisInspectorSession(true);
+                                        }
+                                        props.onGlobalSettingsPatch?.({
+                                            system: {
+                                                experimentalVendorHidBatteryEnabled: shouldEnableExperimentalVendorHidBattery,
+                                            },
+                                        });
+                                    }}
+                                />
+                                <span>{t(systemMessages.experimentalVendorHidBatteryCheckboxLabel)}</span>
+                            </label>
+                            <p className="section-note">
+                                {t(systemMessages.experimentalVendorHidBatteryNote)}
+                            </p>
+                            {didEnableVendorHidBatteryInThisInspectorSession
+                                && props.context.globalSettings.system.experimentalVendorHidBatteryEnabled && (
+                                <p className="section-note">
+                                    {t(systemMessages.experimentalVendorHidBatteryReopenPanelNote)}
+                                </p>
+                            )}
+                        </div>
+                    </InspectorItem>
+                )}
             </SettingsSection>
             <AppearanceSettings {...props} />
             <LineSettings {...props} />
@@ -325,81 +352,113 @@ function openBatteryDeviceDiscoveryDiagnosticsWindow(input: {
         return;
     }
 
-    diagnosticsWindow.document.open();
-    diagnosticsWindow.document.write(buildBatteryDeviceDiscoveryDiagnosticsHtml(input));
-    diagnosticsWindow.document.close();
+    renderBatteryDeviceDiscoveryDiagnosticsDocument(diagnosticsWindow.document, input);
 }
 
-function buildBatteryDeviceDiscoveryDiagnosticsHtml(input: {
+function renderBatteryDeviceDiscoveryDiagnosticsDocument(targetDocument: Document, input: {
     readonly diagnostics: BatteryDeviceDiscoveryDiagnostics;
     readonly title: string;
     readonly intro: string;
-}): string {
+}): void {
     const hiddenCandidates = input.diagnostics.hiddenCandidates;
+    const meta = targetDocument.createElement("meta");
+    meta.setAttribute("charset", "utf-8");
+    const style = targetDocument.createElement("style");
+    style.textContent = [
+        "body { background: #1f1f1f; color: #f3f3f3; font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; margin: 24px; }",
+        "h1 { font-size: 20px; margin: 0 0 8px; }",
+        "p { color: #cfcfcf; margin: 0 0 16px; }",
+        ".summary { color: #aeb8c2; margin-bottom: 18px; }",
+        "details { border: 1px solid #555; border-radius: 6px; margin: 10px 0; padding: 10px 12px; background: #262626; }",
+        "summary { cursor: pointer; font-weight: 600; }",
+        "dl { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 6px 14px; margin: 12px 0 0; }",
+        "dt { color: #aeb8c2; }",
+        "dd { margin: 0; overflow-wrap: anywhere; }",
+        "code { color: #f1d18a; }",
+    ].join("\n");
 
-    return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(input.title)}</title>
-<style>
-body { background: #1f1f1f; color: #f3f3f3; font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; }
-h1 { font-size: 20px; margin: 0 0 8px; }
-p { color: #cfcfcf; margin: 0 0 16px; }
-.summary { color: #aeb8c2; margin-bottom: 18px; }
-details { border: 1px solid #555; border-radius: 6px; margin: 10px 0; padding: 10px 12px; background: #262626; }
-summary { cursor: pointer; font-weight: 600; }
-dl { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 6px 14px; margin: 12px 0 0; }
-dt { color: #aeb8c2; }
-dd { margin: 0; overflow-wrap: anywhere; }
-code { color: #f1d18a; }
-</style>
-</head>
-<body>
-<h1>${escapeHtml(input.title)}</h1>
-<p>${escapeHtml(input.intro)}</p>
-<div class="summary">Detected candidates: ${input.diagnostics.detectedCandidateCount}. Displayed devices: ${input.diagnostics.displayedDescriptorCount}. Hidden devices: ${hiddenCandidates.length}.</div>
-${hiddenCandidates.map(buildHiddenBatteryCandidateHtml).join("") || "<p>No hidden devices in this snapshot.</p>"}
-</body>
-</html>`;
+    targetDocument.title = input.title;
+    targetDocument.head.replaceChildren(meta, style);
+
+    const title = targetDocument.createElement("h1");
+    title.textContent = input.title;
+
+    const intro = targetDocument.createElement("p");
+    intro.textContent = input.intro;
+
+    const summary = targetDocument.createElement("div");
+    summary.className = "summary";
+    summary.textContent = `Detected candidates: ${input.diagnostics.detectedCandidateCount}. `
+        + `Displayed devices: ${input.diagnostics.displayedDescriptorCount}. `
+        + `Hidden devices: ${hiddenCandidates.length}.`;
+
+    const candidateElements = hiddenCandidates.length === 0
+        ? [createParagraph(targetDocument, "No hidden devices in this snapshot.")]
+        : hiddenCandidates.map(candidate => buildHiddenBatteryCandidateElement(targetDocument, candidate));
+
+    targetDocument.body.replaceChildren(title, intro, summary, ...candidateElements);
 }
 
-function buildHiddenBatteryCandidateHtml(candidate: BatteryDeviceHiddenCandidateDiagnostic): string {
-    return `<details>
-<summary>${escapeHtml(candidate.displayName)} <code>${escapeHtml(candidate.reason)}</code></summary>
-<dl>
-${buildDiagnosticFieldHtml("Candidate id", candidate.candidateId)}
-${buildDiagnosticFieldHtml("Reason", candidate.reason)}
-${buildDiagnosticFieldHtml("Support state", candidate.supportState)}
-${buildDiagnosticFieldHtml("Transport", candidate.transport)}
-${buildDiagnosticFieldHtml("Receiver kind", candidate.receiverKind)}
-${buildDiagnosticFieldHtml("Vendor id", formatOptionalHex(candidate.vendorId))}
-${buildDiagnosticFieldHtml("Product id", formatOptionalHex(candidate.productId))}
-${buildDiagnosticFieldHtml("Model id", candidate.modelId)}
-${buildDiagnosticFieldHtml("Manufacturer", candidate.manufacturer)}
-${buildDiagnosticFieldHtml("Product name", candidate.productName)}
-${buildDiagnosticFieldHtml("Interface", candidate.interfaceNumber)}
-${buildDiagnosticFieldHtml("Usage page", formatOptionalHex(candidate.usagePage))}
-${buildDiagnosticFieldHtml("Usage id", formatOptionalHex(candidate.usageId))}
-${buildDiagnosticFieldHtml("Receiver slot", candidate.receiverSlot)}
-${buildDiagnosticFieldHtml("Source path id", candidate.sourcePathId)}
-</dl>
-</details>`;
+function buildHiddenBatteryCandidateElement(
+    targetDocument: Document,
+    candidate: BatteryDeviceHiddenCandidateDiagnostic,
+): HTMLElement {
+    const details = targetDocument.createElement("details");
+    const summary = targetDocument.createElement("summary");
+    summary.append(
+        candidate.displayName,
+        " ",
+        createCode(targetDocument, candidate.reason),
+    );
+    details.append(summary, buildDiagnosticFieldListElement(targetDocument, [
+        ["Candidate id", candidate.candidateId],
+        ["Reason", candidate.reason],
+        ["Support state", candidate.supportState],
+        ["Transport", candidate.transport],
+        ["Receiver kind", candidate.receiverKind],
+        ["Vendor id", formatOptionalHex(candidate.vendorId)],
+        ["Product id", formatOptionalHex(candidate.productId)],
+        ["Model id", candidate.modelId],
+        ["Manufacturer", candidate.manufacturer],
+        ["Product name", candidate.productName],
+        ["Interface", candidate.interfaceNumber],
+        ["Usage page", formatOptionalHex(candidate.usagePage)],
+        ["Usage id", formatOptionalHex(candidate.usageId)],
+        ["Receiver slot", candidate.receiverSlot],
+        ["Source path id", candidate.sourcePathId],
+    ]));
+
+    return details;
 }
 
-function buildDiagnosticFieldHtml(label: string, value: string | number | undefined): string {
-    return `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value === undefined ? "n/a" : String(value))}</dd>`;
+function buildDiagnosticFieldListElement(
+    targetDocument: Document,
+    fields: readonly (readonly [string, string | number | undefined])[],
+): HTMLElement {
+    const descriptionList = targetDocument.createElement("dl");
+    for (const [label, value] of fields) {
+        const term = targetDocument.createElement("dt");
+        term.textContent = label;
+        const description = targetDocument.createElement("dd");
+        description.textContent = value === undefined ? "n/a" : String(value);
+        descriptionList.append(term, description);
+    }
+
+    return descriptionList;
+}
+
+function createParagraph(targetDocument: Document, text: string): HTMLParagraphElement {
+    const paragraph = targetDocument.createElement("p");
+    paragraph.textContent = text;
+    return paragraph;
+}
+
+function createCode(targetDocument: Document, text: string): HTMLElement {
+    const code = targetDocument.createElement("code");
+    code.textContent = text;
+    return code;
 }
 
 function formatOptionalHex(value: number | undefined): string | undefined {
     return value === undefined ? undefined : `0x${value.toString(16).padStart(4, "0")}`;
-}
-
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/gu, "&amp;")
-        .replace(/</gu, "&lt;")
-        .replace(/>/gu, "&gt;")
-        .replace(/"/gu, "&quot;")
-        .replace(/'/gu, "&#39;");
 }

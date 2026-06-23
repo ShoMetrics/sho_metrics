@@ -1271,16 +1271,16 @@ describe("stored settings proto resolver", () => {
         assert.equal(
             resolveStoredGlobalSettings(readStoredGlobalSettings(undefined).settings)
                 .system.experimentalVendorHidBatteryEnabled,
-            true,
+            false,
         );
 
         const globalSettings = resolveStoredGlobalSettings(readStoredGlobalSettings({
             system: {
-                experimentalVendorHidBatteryEnabled: false,
+                experimentalVendorHidBatteryEnabled: true,
             },
         }).settings);
 
-        assert.equal(globalSettings.system.experimentalVendorHidBatteryEnabled, false);
+        assert.equal(globalSettings.system.experimentalVendorHidBatteryEnabled, true);
     });
 
     it("resolves Custom HTTP credential summaries without exposing secrets", () => {
@@ -1921,4 +1921,3 @@ function resolveSingleMetricWidgetSettings(
         widget: settings.widget,
     };
 }
-
