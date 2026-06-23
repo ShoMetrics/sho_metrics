@@ -1,5 +1,6 @@
 * text=auto
 
+.gitattributes text eol=lf
 *.js text eol=lf
 *.mjs text eol=lf
 *.ts text eol=lf
@@ -7,3 +8,6 @@
 *.ps1 text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+
+packages/hub/THIRD_PARTY_NOTICES.md text eol=lf
+packages/source-windows/THIRD_PARTY_NOTICES.md text eol=lf

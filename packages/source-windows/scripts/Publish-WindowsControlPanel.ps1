@@ -84,6 +84,19 @@ if ([string]::IsNullOrWhiteSpace($assemblyName)) {
     $assemblyName = $projectName
 }
 
+$depsJsonCandidates = @(
+    (Join-Path $outputFullPath "$assemblyName.deps.json"),
+    (Join-Path $outputFullPath "$projectName.deps.json")
+) | Select-Object -Unique
+
+$depsJsonPath = $depsJsonCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($depsJsonPath)) {
+    throw "Published dependency manifest was not found. Checked: $($depsJsonCandidates -join ', ')"
+}
+
 $targetFramework = $projectXml.Project.PropertyGroup |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_.TargetFramework) } |
     Select-Object -First 1 -ExpandProperty TargetFramework
@@ -121,6 +134,18 @@ if ($xamlResourceFiles.Count -eq 0) {
 foreach ($xamlResourceFile in $xamlResourceFiles) {
     Copy-Item -LiteralPath $xamlResourceFile.FullName -Destination (Join-Path $outputFullPath $xamlResourceFile.Name) -Force
 }
+
+$thirdPartyNoticeScriptPath = Join-Path $repoRoot "scripts\generate-third-party-notices.mjs"
+& node $thirdPartyNoticeScriptPath --target source-windows --source-windows-deps-json $depsJsonPath
+
+if ($LASTEXITCODE -ne 0) {
+    throw "third-party notices generation failed with exit code $LASTEXITCODE."
+}
+
+Copy-Item `
+    -LiteralPath (Join-Path $sourceRoot "THIRD_PARTY_NOTICES.md") `
+    -Destination (Join-Path $outputFullPath "THIRD_PARTY_NOTICES.md") `
+    -Force
 
 $publishedFiles = @(Get-ChildItem -LiteralPath $outputFullPath -Recurse -File)
 

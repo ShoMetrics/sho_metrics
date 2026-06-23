@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check third-party notices
+        run: node ../../scripts/generate-third-party-notices.mjs --check --target hub
+
       - name: Lint proto
         run: npm run proto:lint
 

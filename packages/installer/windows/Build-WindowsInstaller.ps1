@@ -220,6 +220,38 @@ $publishControlPanelScript = Join-Path $repoRoot "packages\source-windows\script
     -SelfContained:(-not $isFrameworkDependentDistribution) `
     -WindowsAppSDKSelfContained:(-not $isFrameworkDependentDistribution)
 
+$serviceDepsJsonPath = @(
+    (Join-Path $servicePayloadDirectory "ShoMetricsHelperService.deps.json"),
+    (Join-Path $servicePayloadDirectory "ShoMetrics.Source.Windows.Service.deps.json")
+) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($serviceDepsJsonPath)) {
+    throw "Service dependency manifest was not found in '$servicePayloadDirectory'."
+}
+
+$controlPanelDepsJsonPath = @(
+    (Join-Path $controlPanelPayloadDirectory "ShoMetricsHelper.deps.json"),
+    (Join-Path $controlPanelPayloadDirectory "ShoMetrics.Source.Windows.ControlPanel.deps.json")
+) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($controlPanelDepsJsonPath)) {
+    throw "Control Panel dependency manifest was not found in '$controlPanelPayloadDirectory'."
+}
+
+$thirdPartyNoticeScriptPath = Join-Path $repoRoot "scripts\generate-third-party-notices.mjs"
+& node $thirdPartyNoticeScriptPath `
+    --target source-windows `
+    --source-windows-deps-json $serviceDepsJsonPath `
+    --source-windows-deps-json $controlPanelDepsJsonPath
+
+if ($LASTEXITCODE -ne 0) {
+    throw "third-party notices generation failed with exit code $LASTEXITCODE."
+}
+
+$sourceWindowsNoticePath = Join-Path $repoRoot "packages\source-windows\THIRD_PARTY_NOTICES.md"
+Copy-Item -LiteralPath $sourceWindowsNoticePath -Destination (Join-Path $servicePayloadDirectory "THIRD_PARTY_NOTICES.md") -Force
+Copy-Item -LiteralPath $sourceWindowsNoticePath -Destination (Join-Path $controlPanelPayloadDirectory "THIRD_PARTY_NOTICES.md") -Force
+
 $serviceBaseRuntimeRequirement = ""
 if ($isFrameworkDependentDistribution) {
     $serviceBaseRuntimeRequirement = Read-ServiceRuntimeFrameworkRequirement `
