@@ -19,7 +19,7 @@ interface QueuedMutexOperation<T> {
  * Serializes vendor HID operations through one async mutex.
  *
  * This prevents overlapping receiver transactions from stealing each other's
- * HID++ responses. It does not move node-hid off the main thread; the debug
+ * HID++ responses. It does not move native HID I/O off the main thread; the debug
  * lag fields below exist to measure that separate event-loop blocking cost.
  *
  * The mutex owns release through `finally`; callers provide an operation and cannot forget

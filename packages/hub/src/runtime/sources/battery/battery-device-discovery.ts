@@ -5,14 +5,12 @@ import type {
 } from "../../../settings/resolved-settings";
 import { logger } from "../../../logging/logger";
 import {
-    buildBatteryDeviceFallbackIdentityKey,
     buildBatteryDeviceDescriptorIdFromIdentity,
     buildBatteryMetricKeyFromDescriptorId,
-    buildBatteryDeviceVendorUnitIdentityKey,
+    buildBatteryMetricKeyFromIdentity,
 } from "./battery-metric-key";
 import type {
     BatteryDeviceTransport,
-    BatteryDeviceCoalescingDiagnostic,
     BatteryDeviceDescriptor,
     BatteryDeviceBatteryPercentSource,
     BatteryDeviceSupportState,
@@ -39,13 +37,10 @@ export type BatteryDeviceTelemetryFreshness =
 /**
  * Describes one route that may expose battery data for one physical device.
  *
- * Protocol readers create candidates from OS, receiver, wired, or vendor HID
- * observations. This layer may coalesce multiple candidates into one
- * descriptor, so candidate identity must contain stable device facts and not a
- * raw HID path.
+ * Protocol readers create candidates from OS, receiver, wired, or vendor HID observations.
  */
 export interface BatteryDeviceDiscoveryCandidate {
-    /** Runtime-only id for diagnostics and session conflict evidence. */
+    /** Runtime-only id for diagnostics and duplicate descriptor suffixes. */
     readonly candidateId: string;
     readonly displayName: string;
     readonly transport: SystemPeripheralBindingTransport;
@@ -67,28 +62,9 @@ export interface BatteryDeviceDiscoveryCandidateDiagnostics {
     readonly batteryVoltageMillivolts?: number;
 }
 
-/** Records session evidence that a previously coalesced group should be split. */
-export interface BatteryDeviceConflictEvidence {
-    readonly candidateIds: readonly string[];
-    readonly repeatedLargeDisagreement: boolean;
-}
-
-/**
- * Links mutually exclusive routes for known device families.
- *
- * Examples include a verified ROG wired PID and Omni receiver PID pair. These
- * rules are compatibility evidence, not a replacement for per-unit identity.
- */
-export interface VerifiedBatteryDeviceRouteRule {
-    readonly ruleId: string;
-    matches(left: BatteryDeviceDiscoveryCandidate, right: BatteryDeviceDiscoveryCandidate): boolean;
-}
-
 /** Defines discovery-time gates that are owned by runtime state, not settings. */
 export interface BatteryDeviceDiscoveryOptions {
     readonly isExperimentalVendorHidEnabled: boolean;
-    readonly conflictEvidence?: readonly BatteryDeviceConflictEvidence[];
-    readonly verifiedRouteRules?: readonly VerifiedBatteryDeviceRouteRule[];
 }
 
 /** Produces protocol-specific battery candidates without deciding UI identity. */
@@ -122,16 +98,14 @@ export function resolveBatteryDeviceDescriptors(
     options: BatteryDeviceDiscoveryOptions,
 ): readonly BatteryDeviceDescriptor[] {
     const visibleCandidates = candidates.filter(candidate => isVisibleCandidate(candidate, options));
-    const conflictPairSet = buildConflictPairSet(options.conflictEvidence ?? []);
-    const groups = groupPhysicalBatteryDevices(
-        visibleCandidates,
-        conflictPairSet,
-        options.verifiedRouteRules ?? [],
-    );
-    const descriptors = groups
-        .map(group => buildBatteryDeviceDescriptor(group))
+    const duplicateMetricKeys = buildDuplicateMetricKeySet(visibleCandidates);
+    const descriptors = visibleCandidates
+        .map(candidate => buildBatteryDeviceDescriptor(
+            candidate,
+            duplicateMetricKeys.has(buildBatteryMetricKeyFromIdentity(candidate.identity)),
+        ))
         .sort(compareBatteryDeviceDescriptors);
-    logBatteryDescriptorResolveSummary(candidates, visibleCandidates, groups, descriptors);
+    logBatteryDescriptorResolveSummary(candidates, visibleCandidates, duplicateMetricKeys.size, descriptors);
     return descriptors;
 }
 
@@ -229,273 +203,58 @@ function compareHiddenCandidateDiagnostics(
         || left.candidateId.localeCompare(right.candidateId);
 }
 
-interface BatteryDeviceCandidateGroup {
-    readonly candidates: readonly BatteryDeviceDiscoveryCandidate[];
-    readonly coalescing: BatteryDeviceCoalescingDiagnostic;
-}
-
 /**
- * Groups candidates by physical-device evidence without averaging values.
+ * Finds persisted metric keys that are shared by multiple visible candidates.
  *
- * The order mirrors the product policy: strong unit identity or verified route
- * rules can merge routes, duplicate weak fallback buckets without a unit id
- * stay separate and ambiguous, and conflict evidence can split a previously
- * merged device for the current session.
+ * Duplicate keys become separate ambiguous descriptors instead of an automatic
+ * merge. This prevents route-local or same-model evidence from silently choosing
+ * which physical device a stored binding should mean.
+ *
+ * This intentionally makes a rare same-unit, multi-route device go dark until
+ * the routes can be proven equivalent. A false merge would publish a plausible
+ * but wrong battery value, while no-data is the safe failure mode.
  */
-function groupPhysicalBatteryDevices(
+function buildDuplicateMetricKeySet(
     candidates: readonly BatteryDeviceDiscoveryCandidate[],
-    conflictPairSet: ReadonlySet<string>,
-    verifiedRouteRules: readonly VerifiedBatteryDeviceRouteRule[],
-): readonly BatteryDeviceCandidateGroup[] {
-    const groups: BatteryDeviceCandidateGroup[] = [];
-    const assignedCandidateIds = new Set<string>();
-    const conflictCandidateIds = buildConflictCandidateIdSet(conflictPairSet);
-
+): ReadonlySet<string> {
+    const metricKeyCounts = new Map<string, number>();
     for (const candidate of candidates) {
-        if (assignedCandidateIds.has(candidate.candidateId)) {
-            continue;
-        }
-
-        const exactUnitGroup = candidates.filter(otherCandidate =>
-            !assignedCandidateIds.has(otherCandidate.candidateId)
-            && shouldCoalesceCandidates(candidate, otherCandidate, conflictPairSet, verifiedRouteRules),
-        );
-        if (exactUnitGroup.length > 1) {
-            addGroup(groups, assignedCandidateIds, exactUnitGroup, resolveCoalescingReason(exactUnitGroup, verifiedRouteRules));
-            continue;
-        }
-
-        const duplicateCandidateFallbackGroup = findDuplicateCandidateFallbackGroup(candidate, candidates, assignedCandidateIds);
-        if (duplicateCandidateFallbackGroup.length > 1) {
-            for (const duplicateCandidate of duplicateCandidateFallbackGroup) {
-                addGroup(groups, assignedCandidateIds, [duplicateCandidate], "duplicateCandidateFallback");
-            }
-            continue;
-        }
-
-        addGroup(groups, assignedCandidateIds, [candidate], resolveSingleCandidateReason(candidate, conflictCandidateIds));
+        const metricKey = buildBatteryMetricKeyFromIdentity(candidate.identity);
+        metricKeyCounts.set(metricKey, (metricKeyCounts.get(metricKey) ?? 0) + 1);
     }
 
-    return groups;
+    return new Set([...metricKeyCounts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([metricKey]) => metricKey));
 }
 
-function shouldCoalesceCandidates(
-    left: BatteryDeviceDiscoveryCandidate,
-    right: BatteryDeviceDiscoveryCandidate,
-    conflictPairSet: ReadonlySet<string>,
-    verifiedRouteRules: readonly VerifiedBatteryDeviceRouteRule[],
-): boolean {
-    if (left.candidateId === right.candidateId) {
-        return true;
-    }
-
-    if (conflictPairSet.has(buildCandidatePairKey(left.candidateId, right.candidateId))) {
-        return false;
-    }
-
-    return hasMatchingUnitIdentity(left, right)
-        || verifiedRouteRules.some(rule => rule.matches(left, right));
-}
-
-/**
- * Finds candidates that share the same weak fallback bucket.
- *
- * These candidates become separate ambiguous descriptors instead of one false
- * merge. A later protocol reader can remove the ambiguity by providing a
- * trusted unit id.
- *
- * The fallback bucket can come from adapter-owned `identity.modelId` or exact
- * text identity. `modelId` is not interpreted here: it can mean an exact vendor
- * model, a tested family, or another adapter-defined compatibility bucket. For
- * example, G502 and G502 Limited compare as the same fallback only if the
- * Logitech adapter intentionally emits the same `modelId` for both. The core
- * layer never interprets product names or vendor marketing names as a model
- * taxonomy.
- */
-function findDuplicateCandidateFallbackGroup(
+function buildBatteryDeviceDescriptor(
     candidate: BatteryDeviceDiscoveryCandidate,
-    candidates: readonly BatteryDeviceDiscoveryCandidate[],
-    assignedCandidateIds: ReadonlySet<string>,
-): readonly BatteryDeviceDiscoveryCandidate[] {
-    const candidateFallbackKey = buildBatteryDeviceFallbackIdentityKey(candidate.identity);
-    if (candidateFallbackKey === undefined || hasStrongUnitIdentity(candidate)) {
-        return [candidate];
-    }
-
-    return candidates.filter(otherCandidate =>
-        !assignedCandidateIds.has(otherCandidate.candidateId)
-        && !hasStrongUnitIdentity(otherCandidate)
-        && buildBatteryDeviceFallbackIdentityKey(otherCandidate.identity) === candidateFallbackKey,
-    );
-}
-
-function addGroup(
-    groups: BatteryDeviceCandidateGroup[],
-    assignedCandidateIds: Set<string>,
-    candidates: readonly BatteryDeviceDiscoveryCandidate[],
-    coalescing: BatteryDeviceCoalescingDiagnostic,
-): void {
-    for (const candidate of candidates) {
-        assignedCandidateIds.add(candidate.candidateId);
-    }
-
-    groups.push({ candidates, coalescing });
-}
-
-function resolveCoalescingReason(
-    candidates: readonly BatteryDeviceDiscoveryCandidate[],
-    verifiedRouteRules: readonly VerifiedBatteryDeviceRouteRule[],
-): BatteryDeviceCoalescingDiagnostic {
-    const [firstCandidate, ...remainingCandidates] = candidates;
-    if (firstCandidate !== undefined
-        && remainingCandidates.every(candidate => hasMatchingUnitIdentity(firstCandidate, candidate))) {
-        return "unitId";
-    }
-
-    if (firstCandidate !== undefined
-        && remainingCandidates.some(candidate => verifiedRouteRules.some(rule => rule.matches(firstCandidate, candidate)))) {
-        return "verifiedRouteRule";
-    }
-
-    return "uniqueCandidateFallback";
-}
-
-function resolveSingleCandidateReason(
-    candidate: BatteryDeviceDiscoveryCandidate,
-    conflictCandidateIds: ReadonlySet<string>,
-): BatteryDeviceCoalescingDiagnostic {
-    if (conflictCandidateIds.has(candidate.candidateId)) {
-        return "conflictSplit";
-    }
-
-    return hasStrongUnitIdentity(candidate) ? "unitId" : "uniqueCandidateFallback";
-}
-
-function buildBatteryDeviceDescriptor(group: BatteryDeviceCandidateGroup): BatteryDeviceDescriptor {
-    const selectedCandidate = selectDisplayCandidate(group.candidates);
-    const bindingCandidate = selectBindingCandidate(group.candidates);
-    const bindingDescriptorId = buildBatteryDeviceDescriptorIdFromIdentity(bindingCandidate.identity);
-    const descriptorId = buildDescriptorId(group, bindingDescriptorId, bindingCandidate);
+    isDuplicateMetricKey: boolean,
+): BatteryDeviceDescriptor {
+    const bindingDescriptorId = buildBatteryDeviceDescriptorIdFromIdentity(candidate.identity);
+    const descriptorId = isDuplicateMetricKey
+        ? `${bindingDescriptorId}.candidate-${formatDuplicateCandidateDescriptorIdPart(candidate.candidateId)}`
+        : bindingDescriptorId;
 
     return {
         descriptorId,
-        displayName: selectedCandidate.displayName,
+        displayName: candidate.displayName,
         metricKey: buildBatteryMetricKeyFromDescriptorId(bindingDescriptorId),
-        transport: selectedCandidate.transport,
-        receiverKind: selectedCandidate.receiverKind,
-        isExperimental: selectedCandidate.isExperimental,
-        identity: bindingCandidate.identity,
-        supportState: resolveDescriptorSupportState(selectedCandidate, group.coalescing),
-        diagnostics: buildBatteryDeviceDescriptorDiagnostics(group),
+        transport: candidate.transport,
+        receiverKind: candidate.receiverKind,
+        isExperimental: candidate.isExperimental,
+        identity: candidate.identity,
+        supportState: resolveDescriptorSupportState(candidate, isDuplicateMetricKey),
+        diagnostics: buildBatteryDeviceDescriptorDiagnostics(candidate),
     };
-}
-
-/**
- * Builds the runtime descriptor id from binding identity, not display route.
- *
- * Ambiguous duplicate fallback descriptors include candidate identity only to
- * keep UI/runtime descriptor ids distinct. Their metric keys still use the
- * persisted binding identity because the session candidate suffix cannot be
- * reconstructed from stored settings.
- */
-function buildDescriptorId(
-    group: BatteryDeviceCandidateGroup,
-    baseDescriptorId: string,
-    bindingCandidate: BatteryDeviceDiscoveryCandidate,
-): string {
-    if (group.coalescing !== "duplicateCandidateFallback") {
-        return baseDescriptorId;
-    }
-
-    return `${baseDescriptorId}.candidate-${sanitizeDescriptorIdPart(bindingCandidate.candidateId)}`;
-}
-
-/**
- * Chooses the route that should supply user-facing display fields.
- *
- * Fresh Bluetooth OS telemetry wins because it avoids vendor HID contention,
- * but this choice must not drive the stored binding identity.
- */
-function selectDisplayCandidate(
-    candidates: readonly BatteryDeviceDiscoveryCandidate[],
-): BatteryDeviceDiscoveryCandidate {
-    return [...candidates].sort(compareDisplayCandidates)[0];
-}
-
-function compareDisplayCandidates(
-    left: BatteryDeviceDiscoveryCandidate,
-    right: BatteryDeviceDiscoveryCandidate,
-): number {
-    return scoreDisplayCandidate(right) - scoreDisplayCandidate(left)
-        || left.displayName.localeCompare(right.displayName)
-        || left.candidateId.localeCompare(right.candidateId);
-}
-
-function scoreDisplayCandidate(candidate: BatteryDeviceDiscoveryCandidate): number {
-    let score = 0;
-    if (candidate.transport === "bluetooth" && candidate.batteryTelemetryFreshness === "fresh") {
-        score += 100;
-    }
-
-    if (candidate.batteryTelemetryFreshness === "fresh") {
-        score += 20;
-    }
-
-    if (!candidate.isExperimental) {
-        score += 10;
-    }
-
-    if (candidate.supportState === "supported") {
-        score += 5;
-    }
-
-    return score;
-}
-
-/**
- * Chooses the identity basis for descriptor ids and metric keys.
- *
- * This is intentionally independent from display freshness so the same
- * physical device keeps a stable runtime key when the preferred display route
- * changes from Bluetooth to receiver or wired.
- */
-function selectBindingCandidate(
-    candidates: readonly BatteryDeviceDiscoveryCandidate[],
-): BatteryDeviceDiscoveryCandidate {
-    return [...candidates].sort(compareBindingCandidates)[0];
-}
-
-function compareBindingCandidates(
-    left: BatteryDeviceDiscoveryCandidate,
-    right: BatteryDeviceDiscoveryCandidate,
-): number {
-    return scoreBindingCandidate(right) - scoreBindingCandidate(left)
-        || compareTransportOrder(left.transport, right.transport)
-        || left.displayName.localeCompare(right.displayName)
-        || left.candidateId.localeCompare(right.candidateId);
-}
-
-/** Scores stable identity evidence, not display quality. */
-function scoreBindingCandidate(candidate: BatteryDeviceDiscoveryCandidate): number {
-    let score = 0;
-    if (candidate.identity.vendorUnitId !== undefined) {
-        score += 300;
-    }
-
-    // Adapter model/family ids are useful for stable descriptor ids, but they
-    // are still weaker than per-unit evidence and cannot merge duplicates.
-    if (candidate.identity.modelId !== undefined) {
-        score += 100;
-    }
-
-    return score;
 }
 
 function resolveDescriptorSupportState(
     candidate: BatteryDeviceDiscoveryCandidate,
-    coalescing: BatteryDeviceCoalescingDiagnostic,
+    isDuplicateMetricKey: boolean,
 ): BatteryDeviceSupportState {
-    if (coalescing === "duplicateCandidateFallback") {
+    if (isDuplicateMetricKey) {
         return "ambiguous";
     }
 
@@ -513,89 +272,20 @@ function resolveDescriptorSupportState(
 }
 
 function buildBatteryDeviceDescriptorDiagnostics(
-    group: BatteryDeviceCandidateGroup,
+    candidate: BatteryDeviceDiscoveryCandidate,
 ): NonNullable<BatteryDeviceDescriptor["diagnostics"]> {
     return {
-        candidateIds: uniqueSorted(group.candidates.map(candidate => candidate.candidateId)),
-        sourcePathIds: uniqueSorted(group.candidates.flatMap(candidate =>
-            candidate.diagnostics?.sourcePathId === undefined ? [] : [candidate.diagnostics.sourcePathId],
-        )),
-        receiverSlots: uniqueSortedNumbers(group.candidates.flatMap(candidate =>
-            candidate.diagnostics?.receiverSlot === undefined ? [] : [candidate.diagnostics.receiverSlot],
-        )),
-        easySwitchSlots: uniqueSortedNumbers(group.candidates.flatMap(candidate =>
-            candidate.diagnostics?.easySwitchSlot === undefined ? [] : [candidate.diagnostics.easySwitchSlot],
-        )),
-        batteryPercentSources: uniqueSorted(group.candidates.flatMap(candidate =>
-            candidate.diagnostics?.batteryPercentSource === undefined ? [] : [candidate.diagnostics.batteryPercentSource],
-        )),
-        batteryVoltageMillivolts: uniqueSortedNumbers(group.candidates.flatMap(candidate =>
-            candidate.diagnostics?.batteryVoltageMillivolts === undefined ? [] : [candidate.diagnostics.batteryVoltageMillivolts],
-        )),
-        coalescing: group.coalescing,
+        candidateIds: [candidate.candidateId],
+        sourcePathIds: candidate.diagnostics?.sourcePathId === undefined ? [] : [candidate.diagnostics.sourcePathId],
+        receiverSlots: candidate.diagnostics?.receiverSlot === undefined ? [] : [candidate.diagnostics.receiverSlot],
+        easySwitchSlots: candidate.diagnostics?.easySwitchSlot === undefined ? [] : [candidate.diagnostics.easySwitchSlot],
+        batteryPercentSources: candidate.diagnostics?.batteryPercentSource === undefined
+            ? []
+            : [candidate.diagnostics.batteryPercentSource],
+        batteryVoltageMillivolts: candidate.diagnostics?.batteryVoltageMillivolts === undefined
+            ? []
+            : [candidate.diagnostics.batteryVoltageMillivolts],
     };
-}
-
-function hasMatchingUnitIdentity(
-    left: BatteryDeviceDiscoveryCandidate,
-    right: BatteryDeviceDiscoveryCandidate,
-): boolean {
-    const leftVendorUnitKey = buildBatteryDeviceVendorUnitIdentityKey(left.identity);
-    if (leftVendorUnitKey !== undefined && leftVendorUnitKey === buildBatteryDeviceVendorUnitIdentityKey(right.identity)) {
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * Returns whether a candidate has identity evidence strong enough to merge on.
- *
- * Trusted vendor protocol unit ids count. HID serials are intentionally not a
- * strong identity source until the persisted identity contract can also carry
- * the vendor-specific evidence that makes a serial trustworthy.
- */
-function hasStrongUnitIdentity(candidate: BatteryDeviceDiscoveryCandidate): boolean {
-    return buildBatteryDeviceVendorUnitIdentityKey(candidate.identity) !== undefined;
-}
-
-function buildConflictPairSet(
-    conflictEvidenceList: readonly BatteryDeviceConflictEvidence[],
-): ReadonlySet<string> {
-    const pairSet = new Set<string>();
-
-    for (const conflictEvidence of conflictEvidenceList) {
-        if (!conflictEvidence.repeatedLargeDisagreement) {
-            continue;
-        }
-
-        for (let leftIndex = 0; leftIndex < conflictEvidence.candidateIds.length; leftIndex += 1) {
-            for (let rightIndex = leftIndex + 1; rightIndex < conflictEvidence.candidateIds.length; rightIndex += 1) {
-                pairSet.add(buildCandidatePairKey(
-                    conflictEvidence.candidateIds[leftIndex],
-                    conflictEvidence.candidateIds[rightIndex],
-                ));
-            }
-        }
-    }
-
-    return pairSet;
-}
-
-function buildConflictCandidateIdSet(conflictPairSet: ReadonlySet<string>): ReadonlySet<string> {
-    const candidateIdSet = new Set<string>();
-
-    for (const pairKey of conflictPairSet) {
-        for (const candidateId of pairKey.split("\n")) {
-            candidateIdSet.add(candidateId);
-        }
-    }
-
-    return candidateIdSet;
-}
-
-function buildCandidatePairKey(leftCandidateId: string, rightCandidateId: string): string {
-    return [leftCandidateId, rightCandidateId].sort().join("\n");
 }
 
 function sanitizeDescriptorIdPart(value: string): string {
@@ -606,6 +296,20 @@ function sanitizeDescriptorIdPart(value: string): string {
         .replace(/-+/gu, "-")
         .replace(/^[-._]+|[-._]+$/gu, "")
         || "unknown";
+}
+
+function formatDuplicateCandidateDescriptorIdPart(candidateId: string): string {
+    return `${sanitizeDescriptorIdPart(candidateId)}-${hashDescriptorIdPart(candidateId)}`;
+}
+
+function hashDescriptorIdPart(value: string): string {
+    let hash = 0x811C9DC5;
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+
+    return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function compareBatteryDeviceDescriptors(
@@ -637,18 +341,10 @@ function transportOrder(transport: BatteryDeviceTransport): number {
     }
 }
 
-function uniqueSorted<TValue extends string>(values: readonly TValue[]): readonly TValue[] {
-    return [...new Set(values)].sort();
-}
-
-function uniqueSortedNumbers(values: readonly number[]): readonly number[] {
-    return [...new Set(values)].sort((left, right) => left - right);
-}
-
 function logBatteryDescriptorResolveSummary(
     candidates: readonly BatteryDeviceDiscoveryCandidate[],
     visibleCandidates: readonly BatteryDeviceDiscoveryCandidate[],
-    groups: readonly BatteryDeviceCandidateGroup[],
+    duplicateMetricKeyCount: number,
     descriptors: readonly BatteryDeviceDescriptor[],
 ): void {
     log.atInfo()
@@ -659,8 +355,7 @@ function logBatteryDescriptorResolveSummary(
             `visibleCandidates=${visibleCandidates.length}`,
             `hiddenCandidates=${candidates.length - visibleCandidates.length}`,
             `candidateStates=${formatCandidateSupportCounts(candidates)}`,
-            `groups=${groups.length}`,
-            `coalescing=${formatCoalescingCounts(groups)}`,
+            `duplicateMetricKeys=${duplicateMetricKeyCount}`,
             `descriptors=${descriptors.length}`,
             `descriptorStates=${formatDescriptorSupportCounts(descriptors)}`,
             `descriptorLabels=${formatDescriptorLabels(descriptors)}`,
@@ -680,15 +375,6 @@ function formatDescriptorSupportCounts(descriptors: readonly BatteryDeviceDescri
     const counts = new Map<BatteryDeviceSupportState, number>();
     for (const descriptor of descriptors) {
         counts.set(descriptor.supportState, (counts.get(descriptor.supportState) ?? 0) + 1);
-    }
-
-    return formatCounts(counts);
-}
-
-function formatCoalescingCounts(groups: readonly BatteryDeviceCandidateGroup[]): string {
-    const counts = new Map<BatteryDeviceCoalescingDiagnostic, number>();
-    for (const group of groups) {
-        counts.set(group.coalescing, (counts.get(group.coalescing) ?? 0) + 1);
     }
 
     return formatCounts(counts);

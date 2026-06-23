@@ -117,6 +117,31 @@ test("vendor HID battery source maps discovered candidate battery percent to req
     assert.equal(client.getCachedStatus().state, "available");
 });
 
+test("vendor HID battery source does not emit a scalar for ambiguous metric keys", async () => {
+    const firstCandidate = buildTestCandidate({
+        candidateId: "receiver-route",
+        batteryPercent: 87,
+    });
+    const secondCandidate = buildTestCandidate({
+        candidateId: "wired-route",
+        batteryPercent: 42,
+    });
+    const client = new VendorHidBatterySourceClient({
+        isExperimentalVendorHidEnabled: () => true,
+        loadNativeHid: () => ({ state: "loaded", module: fakeNativeHidModule }),
+        discoverCandidates: () => Promise.resolve([firstCandidate, secondCandidate]),
+        wallClockNow: () => 2345,
+    });
+
+    const result = await client.readSnapshot([buildTestMetricKey()]);
+
+    assert.deepEqual(result.snapshot.metrics, {});
+    assert.deepEqual(result.valueMetadata, []);
+    assert.equal(result.unavailableMetrics.length, 1);
+    assert.equal(result.unavailableMetrics[0]?.metricId, buildTestMetricKey());
+    assert.equal(result.unavailableMetrics[0]?.reason, "noSourceReading");
+});
+
 test("vendor HID battery source defers full discovery when no selected route is registered", async () => {
     let loadNativeHidCalls = 0;
     const routeRegistry = new VendorHidBatteryRouteRegistry();
@@ -389,12 +414,13 @@ test("vendor HID candidate discovery keeps successful vendor candidates when ano
 });
 
 function buildTestCandidate(options: {
+    readonly candidateId?: string;
     readonly batteryPercent: number | undefined;
     readonly supportState?: BatteryDeviceDiscoveryCandidate["supportState"];
     readonly identity?: BatteryDeviceDiscoveryCandidate["identity"];
 }): BatteryDeviceDiscoveryCandidate {
     return {
-        candidateId: "logitech-test-candidate",
+        candidateId: options.candidateId ?? "logitech-test-candidate",
         displayName: "Logitech Test Mouse",
         transport: "usbReceiver",
         receiverKind: "bolt",

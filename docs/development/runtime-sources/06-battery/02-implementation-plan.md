@@ -128,10 +128,11 @@ Receiver-backed devices must also carry a receiver kind when known:
 The user-facing label may say `[Dongle]`; the internal transport remains
 `usbReceiver`.
 
-## Identity And Coalescing Standard
+## Identity Standard
 
-Coalescing is required in v1. Do not ship a first version that treats every USB
-path, Bluetooth path, and receiver route as unrelated by default.
+Automatic route merging is deferred. V1 keeps each discovered route as its
+own descriptor so receiver, wired, Bluetooth, and vendor HID paths do not get
+silently merged while hardware behavior is still being debugged.
 
 Persist a stable peripheral binding identity bundle, not a raw HID path. The
 bundle must allow fallback matching with multiple signals:
@@ -145,21 +146,11 @@ bundle must allow fallback matching with multiple signals:
   identity;
 - last selected display model only as a weak fallback.
 
-Matching order:
-
-1. Exact per-unit id match, such as HID serial or a known vendor unit id.
-2. Exact known model identity plus exactly one current candidate.
-3. Verified vendor-family route rule for mutually exclusive paths, such as a
-   known ROG wired PID and Omni receiver PID pair.
-4. Last selected model plus route evidence when it resolves to exactly one
-   current candidate.
-5. Otherwise keep candidates separate and mark the selection ambiguous/no-data.
-
-When multiple same-model candidates exist and no per-unit id exists, do not
-silently merge them. Show separate candidates or keep the binding unresolved.
-
-If two coalesced paths repeatedly report large conflicting battery values, split
-them back into separate displayed devices for the current session.
+If multiple current candidates resolve to the same persisted metric key, show
+separate runtime descriptors and mark them ambiguous instead of inventing a
+route-local persisted identity. A later implementation may reintroduce explicit
+per-vendor merge rules only after the hardware behavior is measured and the
+rule source is documented.
 
 ## Fixes After Manual Verification
 
@@ -205,7 +196,7 @@ This plan intentionally uses ten implementation steps. The split is based on
 ownership boundaries, not file count. Adjacent steps should not be merged unless
 this document is updated first, because merging them would hide one of these
 boundaries: contracts, product surface, standard OS telemetry, native HID
-security, identity/coalescing, vendor protocols, runtime integration,
+security, identity, vendor protocols, runtime integration,
 packaging, or evidence.
 
 Likely locations are orientation, not an exhaustive placement rule. The binding
@@ -444,7 +435,7 @@ Done when:
 This step must not be merged with protocol parsing. The native dependency
 boundary must be audited before any device-specific code depends on it.
 
-## Step 5. Implement Battery Discovery, Identity, And Coalescing
+## Step 5. Implement Battery Discovery And Identity
 
 Likely locations:
 
@@ -461,34 +452,30 @@ Work:
 
 - Implement a battery device discovery service that returns descriptors, not
   metric samples.
-- Merge candidates into physical devices using the identity and coalescing
-  standard from this document.
+- Return one descriptor per visible candidate. If two candidates resolve to the
+  same persisted metric key, keep both as separate ambiguous descriptors.
 - Return connection transport enum and receiver kind for every descriptor.
 - Hide unsupported and unknown devices from normal UI.
 - Preserve source-path diagnostics for logs and developer tooling.
-- Support session-only conflict splitting when coalesced paths report repeated
-  large disagreements.
 
 Rules:
 
 - Do not persist discovered descriptors.
 - Do not use HID path as the only stored binding.
-- Do not coalesce duplicate same-model devices unless only one candidate exists
-  or a per-unit id matches.
-- Do not average conflicting battery values.
+- Do not automatically merge candidates by unit id, model id, Bluetooth
+  freshness, receiver slot, Easy-Switch slot, or route family.
+- Do not average battery values across routes.
 
 Done when:
 
-- Unit tests cover exact unit id match, unique model fallback, duplicate model
-  ambiguity, receiver slot not being identity, Easy-Switch slot not being
-  identity, and conflict split.
-- Tests cover Bluetooth/receiver coalescing preference: prefer fresh Bluetooth
-  OS telemetry for display when available because it avoids vendor HID.
+- Unit tests cover one-descriptor-per-candidate behavior, duplicate metric-key
+  ambiguity, receiver slot not being identity, and Easy-Switch slot not being
+  identity.
 - Tests prove disabling experimental vendor HID does not break an already
   stored vendor HID binding.
 
 This step must not be merged with Logitech or ASUS protocol implementation.
-Identity/coalescing must be protocol-neutral before protocol readers attach to
+Identity resolution must be protocol-neutral before protocol readers attach to
 it.
 
 ## Step 6. Implement Logitech HID++ Battery Support
@@ -684,7 +671,7 @@ Done when:
   disabled.
 - Tests prove `onWillDisappear` cleans up action-owned subscriptions.
 - Action tests cover percent, no-data, disabled experimental toggle, stale
-  sample, and coalescing conflict.
+  sample, and duplicate-device ambiguity.
 - PI tests cover labels `[Bluetooth]`, `[Dongle]`, and `[Wired]`.
 - No-data logging is throttled and does not emit per polling tick forever.
 

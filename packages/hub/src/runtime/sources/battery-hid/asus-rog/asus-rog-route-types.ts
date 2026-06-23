@@ -22,7 +22,7 @@ export interface AsusRogKeyboardRouteDescriptor {
      * ShoMetrics canonical model key.
      *
      * This is not an ASUS protocol field. It is the stable product-family key
-     * used for fallback identity and route coalescing.
+     * used for fallback identity and duplicate detection.
      */
     readonly modelId: string;
     /** Transport represented by this PID in the current allowlist. */
