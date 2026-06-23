@@ -6,6 +6,11 @@ import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
+    copyNoticeFile,
+    readHubNoticePath,
+    updateThirdPartyNotices,
+} from "../../../../scripts/generate-third-party-notices.mjs";
+import {
     assertNodeHidDependencyPinned,
     assertStagedNodeHidNativeAddons,
     NODE_HID_PACKAGE_NAME,
@@ -46,6 +51,8 @@ await packStreamDeckPlugin(process.argv.slice(2));
 async function packStreamDeckPlugin(argumentList) {
     const packOptions = parsePackOptions(argumentList);
 
+    await updateThirdPartyNotices(["hub"]);
+
     await rm(stagingRootDirectory, { recursive: true, force: true });
     await rm(packageOutputDirectory, { recursive: true, force: true });
     await rm(legacyPackagePath, { force: true });
@@ -56,6 +63,7 @@ async function packStreamDeckPlugin(argumentList) {
         recursive: true,
         filter: sourcePath => shouldStagePluginPath(sourcePath),
     });
+    await copyNoticeFile(readHubNoticePath(), join(stagingPluginDirectory, "THIRD_PARTY_NOTICES.md"));
     await assertNodeHidDependencyPinned({ packageJsonPath, packageLockPath });
     await stageRuntimeDependencies({ nativeAddonTarget: packOptions.nativeAddonTarget });
     await assertRuntimeDependenciesComplete({ nativeAddonTarget: packOptions.nativeAddonTarget });
