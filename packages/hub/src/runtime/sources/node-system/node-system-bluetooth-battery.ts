@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import si, { type Systeminformation } from "systeminformation";
 import { logger } from "../../../logging/logger";
@@ -12,6 +11,17 @@ import {
     buildBluetoothBatteryPercentMetricKey,
     isBluetoothBatteryMetricKey,
 } from "../../metric-keys";
+import {
+    readMacOsBluetoothBatteryMetrics,
+    readMacOsBluetoothDescriptorDevices,
+    type MacOsBluetoothDeviceReader,
+} from "./node-system-bluetooth-battery-macos";
+import {
+    buildBluetoothIdentifier,
+    normalizeBluetoothDeviceAddress,
+    normalizeNonEmptyText,
+    resolveBluetoothBatteryPercentValue,
+} from "./node-system-bluetooth-identity";
 import type { BatteryDeviceDescriptor } from "../battery/battery-device-descriptor";
 import {
     buildScalarMetricValue,
@@ -54,6 +64,9 @@ interface SelectedBluetoothBatteryRoute {
     readonly instanceId: string;
 }
 
+/**
+ * Reads Bluetooth battery metrics for requested metric keys on the active platform.
+ */
 export type BluetoothBatteryMetricReader = (
     systemInformation: Pick<typeof si, "bluetoothDevices">,
     platform: NodeJS.Platform,
@@ -87,8 +100,13 @@ export async function readBluetoothBatteryDeviceDescriptors(
     systemInformation: Pick<typeof si, "bluetoothDevices"> = si,
     platform: NodeJS.Platform = process.platform,
     listWindowsBluetoothDevices: () => Promise<readonly WindowsBluetoothDeviceRouteData[]> = listWindowsBluetoothDevicesFromPowerShell,
+    readMacOsBluetoothDevices?: MacOsBluetoothDeviceReader,
 ): Promise<readonly BatteryDeviceDescriptor[]> {
     try {
+        if (platform === "darwin") {
+            return await readMacOsBluetoothDescriptorDevices(readMacOsBluetoothDevices);
+        }
+
         const devices = platform === "win32"
             ? resolveWindowsBluetoothDescriptorDevices(await listWindowsBluetoothDevices())
             : resolveSystemInformationBluetoothDescriptorDevices(await systemInformation.bluetoothDevices());
@@ -116,19 +134,24 @@ export async function readBluetoothBatteryMetrics(
         instanceIds: readonly string[],
     ) => Promise<readonly WindowsBluetoothBatteryData[]> = readWindowsBluetoothBatteriesFromPowerShell,
     routeRegistry: BluetoothBatteryRouteRegistry = bluetoothBatteryRouteRegistry,
+    readMacOsBluetoothDevices?: MacOsBluetoothDeviceReader,
 ): Promise<Record<string, MetricValue>> {
     const bluetoothMetricKeys = requestedMetricKeys.filter(isBluetoothBatteryMetricKey);
     if (bluetoothMetricKeys.length === 0) {
         return {};
     }
 
-    return platform === "win32"
-        ? await readWindowsBluetoothBatteryMetrics(
+    if (platform === "win32") {
+        return await readWindowsBluetoothBatteryMetrics(
             bluetoothMetricKeys,
             listWindowsBluetoothDevices,
             readWindowsBluetoothBatteries,
             routeRegistry,
-        )
+        );
+    }
+
+    return platform === "darwin"
+        ? await readMacOsBluetoothBatteryMetrics(bluetoothMetricKeys, readMacOsBluetoothDevices)
         : buildSystemInformationBluetoothBatteryMetrics(await systemInformation.bluetoothDevices(), bluetoothMetricKeys);
 }
 
@@ -456,39 +479,12 @@ function buildBluetoothPeripheralIdentity(options: {
     };
 }
 
-function buildBluetoothIdentifier(
-    kind: ResolvedSystemBluetoothPeripheralIdentifier["kind"],
-    rawIdentifier: string,
-): ResolvedSystemBluetoothPeripheralIdentifier {
-    // Persisted settings store only the hash; raw MAC addresses, InstanceIds, and
-    // AEP ids must stay inside this runtime boundary.
-    return {
-        kind,
-        hash: createHash("sha256").update(rawIdentifier).digest("hex"),
-    };
-}
-
 function resolveBluetoothBatteryDisplayName(
     bluetoothDevice: WindowsBluetoothDeviceRouteData | Systeminformation.BluetoothDeviceData,
 ): string {
     return normalizeUnknownText(bluetoothDevice.name)
         ?? normalizeNonEmptyText("device" in bluetoothDevice ? bluetoothDevice.device : undefined)
         ?? "Bluetooth device";
-}
-
-function normalizeBluetoothDeviceAddress(value: unknown): string | undefined {
-    const normalizedValue = normalizeUnknownText(value)?.replaceAll("-", ":").toLowerCase();
-    if (normalizedValue === undefined) {
-        return undefined;
-    }
-
-    if (/^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/u.test(normalizedValue)) {
-        return normalizedValue;
-    }
-
-    return /^[0-9a-f]{12}$/u.test(normalizedValue)
-        ? normalizedValue.replace(/../gu, "$&:").slice(0, -1)
-        : undefined;
 }
 
 function normalizeWindowsInstanceId(value: unknown): string | undefined {
@@ -506,16 +502,7 @@ function resolveBluetoothBatteryPercent(value: unknown): number | undefined {
     const rawBatteryPercent = typeof value === "object" && value !== null && "batteryPercent" in value
         ? (value as { readonly batteryPercent?: unknown }).batteryPercent
         : value;
-    const batteryPercent = typeof rawBatteryPercent === "string"
-        ? Number(rawBatteryPercent.trim().replace(/%$/u, ""))
-        : rawBatteryPercent;
-
-    return typeof batteryPercent === "number"
-        && Number.isFinite(batteryPercent)
-        && batteryPercent >= 0
-        && batteryPercent <= 100
-        ? batteryPercent
-        : undefined;
+    return resolveBluetoothBatteryPercentValue(rawBatteryPercent);
 }
 
 function logWindowsBluetoothMetricSummary(options: {
@@ -548,11 +535,6 @@ function logBluetoothBatteryFailure(operation: string, error: unknown): void {
     log.atWarn()
         .everyMs(`bluetooth-battery:${operation}`, BLUETOOTH_BATTERY_FAILURE_LOG_INTERVAL_MILLISECONDS)
         .log(message);
-}
-
-function normalizeNonEmptyText(value: string | undefined): string | undefined {
-    const trimmedValue = value?.trim();
-    return trimmedValue === undefined || trimmedValue.length === 0 ? undefined : trimmedValue;
 }
 
 async function listWindowsBluetoothDevicesFromPowerShell(): Promise<readonly WindowsBluetoothDeviceRouteData[]> {

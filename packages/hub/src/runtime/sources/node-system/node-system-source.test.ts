@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { test } from "vitest";
 import type { Systeminformation } from "systeminformation";
 import {
+    buildScalarMetricValue,
     MetricUnit,
     readRequiredMetricSnapshotTimestampMilliseconds,
     type MetricSnapshot,
@@ -306,23 +307,22 @@ test("node system source omits built-in system battery on unavailable platform d
     assert.equal(callCounts.battery, 1);
 });
 
-test("node system source polls Bluetooth battery percent when the OS reports a stable device address", async () => {
+test("node system source polls Bluetooth battery metrics through the Bluetooth reader", async () => {
     const callCounts = buildCallCounts();
     const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
     const source = new NodeSystemSource({
         platform: "darwin",
-        systemInformation: buildCountingSystemInformation(callCounts, {
-            bluetoothDevices: async () => {
-                callCounts.bluetoothDevices += 1;
-                return [
-                    buildBluetoothDeviceData({
-                        name: "Magic Mouse",
-                        macDevice: "AA-BB-CC-DD-EE-FF",
-                        batteryPercent: "74%",
-                    }),
-                ];
-            },
-        }),
+        systemInformation: buildCountingSystemInformation(callCounts),
+        readBluetoothBatteryMetrics: async (_systemInformation, platform, requestedMetricKeys) => {
+            assert.equal(platform, "darwin");
+            assert.deepEqual(requestedMetricKeys, [bluetoothMetricKey]);
+            callCounts.bluetoothDevices += 1;
+            return {
+                [bluetoothMetricKey]: buildScalarMetricValue(74, {
+                    unit: MetricUnit.PERCENT,
+                }),
+            };
+        },
     });
 
     const snapshot = await source.pollMetrics([bluetoothMetricKey]);
@@ -338,28 +338,16 @@ test("node system source polls Bluetooth battery percent when the OS reports a s
     assert.equal(callCounts.battery, 0);
 });
 
-test("node system source omits Bluetooth battery devices without stable identity or valid percent", async () => {
+test("node system source omits Bluetooth battery metrics when the Bluetooth reader emits none", async () => {
     const callCounts = buildCallCounts();
     const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
     const source = new NodeSystemSource({
         platform: "darwin",
-        systemInformation: buildCountingSystemInformation(callCounts, {
-            bluetoothDevices: async () => {
-                callCounts.bluetoothDevices += 1;
-                return [
-                    buildBluetoothDeviceData({
-                        name: "Missing MAC",
-                        macDevice: "",
-                        batteryPercent: 55,
-                    }),
-                    buildBluetoothDeviceData({
-                        name: "Invalid percent",
-                        macDevice: "AA-BB-CC-DD-EE-FF",
-                        batteryPercent: "unknown",
-                    }),
-                ];
-            },
-        }),
+        systemInformation: buildCountingSystemInformation(callCounts),
+        readBluetoothBatteryMetrics: async () => {
+            callCounts.bluetoothDevices += 1;
+            return {};
+        },
     });
 
     const snapshot = await source.pollMetrics([bluetoothMetricKey]);
@@ -1697,24 +1685,6 @@ function buildBatteryData(overrides: Partial<Systeminformation.BatteryData>): Sy
         serial: "",
         ...overrides,
     };
-}
-
-function buildBluetoothDeviceData(
-    overrides: Partial<Omit<Systeminformation.BluetoothDeviceData, "batteryPercent">> & {
-        readonly batteryPercent?: number | string;
-    },
-): Systeminformation.BluetoothDeviceData {
-    return {
-        device: "Bluetooth Device",
-        name: "Bluetooth Device",
-        macDevice: "AA-BB-CC-DD-EE-FF",
-        macHost: "11-22-33-44-55-66",
-        batteryPercent: 50,
-        manufacturer: "Apple",
-        type: "Mouse",
-        connected: true,
-        ...overrides,
-    } as Systeminformation.BluetoothDeviceData;
 }
 
 function sha256Hex(value: string): string {
