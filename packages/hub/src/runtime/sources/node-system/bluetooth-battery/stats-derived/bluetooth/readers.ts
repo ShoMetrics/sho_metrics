@@ -35,15 +35,20 @@
  *   `plutil`, which is not an equivalent cfprefs merged view.
  */
 
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { logger } from "../../../../../../logging/logger";
+import { fetchAppleDeviceManagementHIDEventServiceProperties } from "../../iokit-hid-event-service";
+import {
+    asArray,
+    asRecord,
+    buildMacOsBluetoothExecFileOptions,
+    parsePlistXmlRecord,
+} from "../../macos-process";
 
 const log = logger.for("Source:NodeSystem:BluetoothBattery:StatsDerived");
 const execFileAsync = promisify(execFile);
 
-const STATS_BLUETOOTH_COMMAND_TIMEOUT_MILLISECONDS = 5_000;
-const STATS_BLUETOOTH_COMMAND_MAX_BUFFER_BYTES = 1024 * 1024;
 const STATS_BLUETOOTH_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 60_000;
 const BLUETOOTH_CACHE_PLIST_PATH = "/Library/Preferences/com.apple.Bluetooth.plist";
 
@@ -130,6 +135,10 @@ export async function readStatsBluetoothDevices(
             ? -1
             : devices.findIndex(device => {
                 const deviceName = (device.name ?? "").trim().toLowerCase();
+                // Source parity: Stats uses bidirectional substring matching
+                // for pmset name merges. Keep it here so the port stays
+                // traceable, but guard the empty-name case because JavaScript
+                // `includes("")` differs from Swift `contains("")`.
                 return deviceName === pmsetName
                     || deviceName.includes(pmsetName)
                     || (deviceName.length > 0 && pmsetName.includes(deviceName));
@@ -196,6 +205,13 @@ export async function readStatsBluetoothDevices(
         durationMilliseconds: performance.now() - startedAtMilliseconds,
     });
     logStatsBluetoothDeviceShapes("final", finalDevices);
+    logStatsBluetoothFinalEvidence(finalDevices, {
+        cachedDevices,
+        iokitHid,
+        profilerConnectedDevices: SPB[0],
+        profilerNotConnectedAddresses: SPB[1],
+        pmsetLevels,
+    });
     logStatsBluetoothDroppedDeviceShapes("profiler-not-connected", profilerFilteredDevices);
     logStatsBluetoothDroppedDeviceShapes("missing-battery", finalBatteryFilteredDevices);
 
@@ -210,13 +226,12 @@ export async function readStatsBluetoothDevices(
  *
  * DELIBERATE DIVERGENCE FROM Stats:
  * Stats calls IOKit directly and receives `NSDictionary` values. ShoMetrics
- * uses `/usr/sbin/ioreg -r -c AppleDeviceManagementHIDEventService -l -w 0` as
- * a Node-only equivalence shim. `ioreg -a` archive output is not usable here on
- * the tested macOS host because it fails with `can't open file`. When `BD_ADDR`
- * is emitted as ioreg `<hex>` data, ShoMetrics keeps the hex string; Stats
- * decodes the native `Data` value as UTF-8. This source is only a fallback
- * identity signal, so the value must be treated as stable but representation-
- * specific.
+ * imports a Node-only equivalence query from `../../iokit-hid-event-service`,
+ * which replaces Stats `fetchIOService` with a narrow ioreg-backed source.
+ * When `BD_ADDR` is emitted as ioreg data, ShoMetrics keeps a hex string;
+ * Stats decodes the native `Data` value as UTF-8. This source is only a
+ * fallback identity signal, so the value must be treated as stable but
+ * representation-specific.
  *
  * This is not the native HID package transport. It only reads IOKit registry
  * properties that macOS already exposes, so it does not open HID interfaces or
@@ -653,17 +668,7 @@ export interface StatsBluetoothQuery {
  */
 export function createStatsBluetoothQuery(): StatsBluetoothQuery {
     return {
-        fetchAppleDeviceManagementHIDEventServiceProperties: async () => {
-            const { stdout } = await execFileAsync("/usr/sbin/ioreg", [
-                "-r",
-                "-c",
-                "AppleDeviceManagementHIDEventService",
-                "-l",
-                "-w",
-                "0",
-            ], buildExecFileOptions());
-            return parseIoregDeviceManagementHIDEventServiceOutput(stdout);
-        },
+        fetchAppleDeviceManagementHIDEventServiceProperties,
         readBluetoothCachePlist: async () => {
             const { stdout } = await execFileAsync("/usr/bin/plutil", [
                 "-convert",
@@ -671,14 +676,14 @@ export function createStatsBluetoothQuery(): StatsBluetoothQuery {
                 "-o",
                 "-",
                 BLUETOOTH_CACHE_PLIST_PATH,
-            ], buildExecFileOptions());
+            ], buildMacOsBluetoothExecFileOptions());
             return asRecord(JSON.parse(stdout) as unknown) ?? {};
         },
         systemProfilerBluetoothJson: async () => {
             const { stdout } = await execFileAsync("/usr/sbin/system_profiler", [
                 "SPBluetoothDataType",
                 "-json",
-            ], buildExecFileOptions());
+            ], buildMacOsBluetoothExecFileOptions());
             return stdout;
         },
         pmsetAccessoryPowerSourcesXml: async () => {
@@ -686,7 +691,7 @@ export function createStatsBluetoothQuery(): StatsBluetoothQuery {
                 "-g",
                 "accps",
                 "-xml",
-            ], buildExecFileOptions());
+            ], buildMacOsBluetoothExecFileOptions());
             return stdout;
         },
         parsePlistXml: parsePlistXmlRecord,
@@ -886,6 +891,70 @@ function logStatsBluetoothDroppedDeviceShapes(reason: string, devices: readonly 
         ].join(" "));
 }
 
+function logStatsBluetoothFinalEvidence(devices: readonly StatsBleDevice[], sources: {
+    readonly cachedDevices: readonly StatsBleDevice[];
+    readonly iokitHid: readonly StatsBleDevice[];
+    readonly profilerConnectedDevices: readonly StatsBleDevice[];
+    readonly profilerNotConnectedAddresses: readonly string[];
+    readonly pmsetLevels: readonly StatsBleDevice[];
+}): void {
+    log.atDebug()
+        .everyMs("stats-bluetooth-final-evidence", STATS_BLUETOOTH_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "statsBluetoothFinalEvidence",
+            `count=${devices.length}`,
+            `devices=${devices.slice(0, 12).map(device => formatStatsBluetoothFinalEvidenceShape(device, sources)).join(";")}`,
+        ].join(" "));
+}
+
+function formatStatsBluetoothFinalEvidenceShape(device: StatsBleDevice, sources: {
+    readonly cachedDevices: readonly StatsBleDevice[];
+    readonly iokitHid: readonly StatsBleDevice[];
+    readonly profilerConnectedDevices: readonly StatsBleDevice[];
+    readonly profilerNotConnectedAddresses: readonly string[];
+    readonly pmsetLevels: readonly StatsBleDevice[];
+}): string {
+    const sourceNames = [
+        hasMatchingStatsDevice(device, sources.cachedDevices) ? "cache" : undefined,
+        hasMatchingStatsDevice(device, sources.iokitHid) ? "iokitHid" : undefined,
+        hasMatchingStatsDevice(device, sources.profilerConnectedDevices) ? "profilerConnected" : undefined,
+        hasMatchingStatsDevice(device, sources.pmsetLevels) ? "pmset" : undefined,
+    ].filter((sourceName): sourceName is string => sourceName !== undefined);
+
+    return [
+        `name=${formatDiagnosticText(device.name)}`,
+        `address=${formatDiagnosticAddressShape(device.address)}`,
+        `sources=${sourceNames.join("|") || "unknown"}`,
+        `profilerNotConnected=${sources.profilerNotConnectedAddresses.includes(device.address)}`,
+        `batteryKeys=${device.batteryLevel.map(level => level.key).join("|") || "none"}`,
+    ].join(",");
+}
+
+function hasMatchingStatsDevice(device: StatsBleDevice, candidates: readonly StatsBleDevice[]): boolean {
+    return candidates.some(candidate => {
+        if (candidate.address === device.address) {
+            return true;
+        }
+
+        if (
+            candidate.vendorId !== undefined
+            && candidate.productId !== undefined
+            && candidate.vendorId === device.vendorId
+            && candidate.productId === device.productId
+        ) {
+            return true;
+        }
+
+        const deviceName = device.name?.trim().toLowerCase();
+        const candidateName = candidate.name?.trim().toLowerCase();
+        return deviceName !== undefined
+            && deviceName.length !== 0
+            && candidateName !== undefined
+            && candidateName.length !== 0
+            && deviceName === candidateName;
+    });
+}
+
 function formatStatsBluetoothDeviceShape(device: StatsBleDevice): string {
     return [
         `name=${formatDiagnosticText(device.name)}`,
@@ -902,7 +971,7 @@ function formatDiagnosticText(value: string | undefined): string {
         return "empty";
     }
 
-    return JSON.stringify(normalizedValue);
+    return `present:${normalizedValue.length}`;
 }
 
 function formatDiagnosticAddressShape(value: string): string {
@@ -915,81 +984,6 @@ function formatDiagnosticAddressShape(value: string): string {
     }
 
     return `non-mac-like:${value.length}`;
-}
-
-function buildExecFileOptions(): {
-    readonly timeout: number;
-    readonly maxBuffer: number;
-} {
-    return {
-        timeout: STATS_BLUETOOTH_COMMAND_TIMEOUT_MILLISECONDS,
-        maxBuffer: STATS_BLUETOOTH_COMMAND_MAX_BUFFER_BYTES,
-    };
-}
-
-async function parsePlistXmlValue(xml: string): Promise<unknown> {
-    const stdout = await spawnWithStdin("/usr/bin/plutil", [
-        "-convert",
-        "json",
-        "-o",
-        "-",
-        "-",
-    ], xml);
-    return JSON.parse(stdout) as unknown;
-}
-
-async function parsePlistXmlRecord(xml: string): Promise<Record<string, unknown>> {
-    return asRecord(await parsePlistXmlValue(xml)) ?? {};
-}
-
-async function spawnWithStdin(path: string, arguments_: readonly string[], stdin: string): Promise<string> {
-    return await new Promise((resolve, reject) => {
-        const child = spawn(path, arguments_, {
-            stdio: ["pipe", "pipe", "pipe"],
-        });
-        const stdoutChunks: Buffer[] = [];
-        const stderrChunks: Buffer[] = [];
-        const timeout = setTimeout(() => {
-            child.kill();
-            reject(new Error(`${path} timed out after ${STATS_BLUETOOTH_COMMAND_TIMEOUT_MILLISECONDS}ms`));
-        }, STATS_BLUETOOTH_COMMAND_TIMEOUT_MILLISECONDS);
-
-        child.stdout.on("data", chunk => {
-            stdoutChunks.push(bufferFromProcessChunk(chunk));
-        });
-        child.stderr.on("data", chunk => {
-            stderrChunks.push(bufferFromProcessChunk(chunk));
-        });
-        child.on("error", error => {
-            clearTimeout(timeout);
-            reject(error);
-        });
-        child.on("close", code => {
-            clearTimeout(timeout);
-            if (code !== 0) {
-                reject(new Error(`${path} exited with code ${code}: ${Buffer.concat(stderrChunks).toString("utf8")}`));
-                return;
-            }
-
-            resolve(Buffer.concat(stdoutChunks).toString("utf8"));
-        });
-
-        child.stdin.end(stdin);
-    });
-}
-
-function bufferFromProcessChunk(chunk: unknown): Buffer {
-    return Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-        ? value as Record<string, unknown>
-        : undefined;
-}
-
-function asArray(value: unknown): readonly unknown[] | undefined {
-    return Array.isArray(value) ? value : undefined;
 }
 
 function readRecordProperty(value: Record<string, unknown> | undefined, key: string): Record<string, unknown> | undefined {
@@ -1027,58 +1021,6 @@ function readNumberProperty(value: Record<string, unknown> | undefined, key: str
 function readBooleanProperty(value: Record<string, unknown> | undefined, key: string): boolean | undefined {
     const property = value?.[key];
     return typeof property === "boolean" ? property : undefined;
-}
-
-function parseIoregDeviceManagementHIDEventServiceOutput(stdout: string): readonly Record<string, unknown>[] {
-    const list: Record<string, unknown>[] = [];
-    let currentDevice: Record<string, unknown> | undefined;
-
-    // Node-only shim for Stats' `fetchIOService` helper. The text shape is not
-    // a formal API, so source-summary warnings above report when parsed devices
-    // unexpectedly disappear.
-    for (const line of stdout.split(/\r?\n/u)) {
-        if (line.includes("+-o AppleDeviceManagementHIDEventService")) {
-            if (currentDevice !== undefined) {
-                list.push(currentDevice);
-            }
-            currentDevice = {};
-            continue;
-        }
-
-        const match = line.match(/^\s*(?:\|\s*)?"([^"]+)" = (.*)$/u);
-        if (currentDevice === undefined || match?.[1] === undefined || match[2] === undefined) {
-            continue;
-        }
-
-        currentDevice[match[1]] = parseIoregPropertyValue(match[2]);
-    }
-
-    if (currentDevice !== undefined) {
-        list.push(currentDevice);
-    }
-
-    return list;
-}
-
-function parseIoregPropertyValue(value: string): unknown {
-    const trimmedValue = value.trim();
-    if (trimmedValue === "Yes") {
-        return true;
-    }
-    if (trimmedValue === "No") {
-        return false;
-    }
-    if (trimmedValue.startsWith("\"") && trimmedValue.endsWith("\"")) {
-        return trimmedValue.slice(1, -1);
-    }
-    if (/^-?\d+$/u.test(trimmedValue)) {
-        return Number(trimmedValue);
-    }
-    if (/^<[0-9a-fA-F]+>$/u.test(trimmedValue)) {
-        return trimmedValue.slice(1, -1).toLowerCase();
-    }
-
-    return trimmedValue;
 }
 
 async function readOrDefault<TValue>(

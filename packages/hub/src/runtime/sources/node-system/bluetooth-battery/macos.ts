@@ -46,6 +46,7 @@ interface MacOsBluetoothDescriptorResolution {
     readonly multiPartSkippedCount: number;
     readonly skippedDeviceShapes: readonly string[];
     readonly opaqueIdentityShapes: readonly string[];
+    readonly identityShapes: readonly string[];
 }
 
 interface MacOsBluetoothBatteryPart {
@@ -135,6 +136,7 @@ function resolveMacOsBluetoothDescriptorDevices(
     let multiPartSkippedCount = 0;
     const skippedDeviceShapes: string[] = [];
     const opaqueIdentityShapes: string[] = [];
+    const identityShapes: string[] = [];
     const devices: MacOsBluetoothDescriptorDevice[] = [];
 
     for (const bluetoothDevice of bluetoothDevices) {
@@ -163,13 +165,23 @@ function resolveMacOsBluetoothDescriptorDevices(
                 continue;
             }
 
-            devices.push(buildMacOsBluetoothDescriptorDevice({
+            const descriptorDevice = buildMacOsBluetoothDescriptorDevice({
                 bluetoothDevice,
                 identitySeed,
                 batteryPart,
                 displayName: batteryPart.displaySuffix === undefined
                     ? baseDisplayName ?? "Bluetooth device"
                     : `${baseDisplayName} ${batteryPart.displaySuffix}`,
+            });
+            devices.push(descriptorDevice);
+            const descriptorIdentityEvidence = descriptorDevice.descriptor.identity?.evidence;
+            identityShapes.push(formatMacOsBluetoothIdentityShape({
+                bluetoothDevice,
+                identitySeed,
+                batteryPart,
+                primaryIdentifier: descriptorIdentityEvidence?.kind === "bluetooth"
+                    ? descriptorIdentityEvidence.primaryIdentifier
+                    : undefined,
             }));
         }
     }
@@ -182,6 +194,7 @@ function resolveMacOsBluetoothDescriptorDevices(
         multiPartSkippedCount,
         skippedDeviceShapes,
         opaqueIdentityShapes,
+        identityShapes,
     };
 
     logMacOsBluetoothDescriptorResolution({
@@ -192,6 +205,7 @@ function resolveMacOsBluetoothDescriptorDevices(
         multiPartSkippedCount,
         skippedDeviceShapes,
         opaqueIdentityShapes,
+        identityShapes,
     });
 
     return resolution;
@@ -370,6 +384,7 @@ function logMacOsBluetoothDescriptorResolution(options: {
     readonly multiPartSkippedCount: number;
     readonly skippedDeviceShapes: readonly string[];
     readonly opaqueIdentityShapes: readonly string[];
+    readonly identityShapes: readonly string[];
 }): void {
     log.atDebug()
         .everyMs("macos-bluetooth-descriptor-resolution", BLUETOOTH_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
@@ -382,6 +397,15 @@ function logMacOsBluetoothDescriptorResolution(options: {
             `multiPartSkipped=${options.multiPartSkippedCount}`,
             `skipped=${options.skippedDeviceShapes.slice(0, 12).join(";") || "none"}`,
             `opaqueIdentities=${options.opaqueIdentityShapes.slice(0, 12).join(";") || "none"}`,
+            `identities=${options.identityShapes.slice(0, 12).join(";") || "none"}`,
+        ].join(" "));
+
+    log.atDebug()
+        .everyMs("macos-bluetooth-identity-stability", BLUETOOTH_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "macosBluetoothIdentityStability",
+            `count=${options.identityShapes.length}`,
+            `devices=${options.identityShapes.slice(0, 12).join(";") || "none"}`,
         ].join(" "));
 
     if (options.opaqueIdentityShapes.length > 0) {
@@ -437,6 +461,21 @@ function formatMacOsBluetoothSkippedDeviceShape(reason: string, bluetoothDevice:
     ].join(",");
 }
 
+function formatMacOsBluetoothIdentityShape(options: {
+    readonly bluetoothDevice: StatsBleDevice;
+    readonly identitySeed: MacOsBluetoothIdentitySeed;
+    readonly batteryPart: MacOsBluetoothBatteryPart;
+    readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
+}): string {
+    return [
+        `name=${formatBluetoothDiagnosticText(options.bluetoothDevice.name)}`,
+        `seed=${options.identitySeed.bluetoothAddress === undefined ? "opaque" : "mac"}`,
+        `part=${options.batteryPart.identitySuffix ?? "single"}`,
+        `hash=${formatBluetoothDiagnosticHash(options.primaryIdentifier?.hash)}`,
+        `batteryKeys=${options.bluetoothDevice.batteryLevel.map(level => level.key).join("|") || "none"}`,
+    ].join(",");
+}
+
 function formatMacOsBluetoothOpaqueIdentityShape(bluetoothDevice: StatsBleDevice): string {
     return [
         `name=${formatBluetoothDiagnosticText(bluetoothDevice.name)}`,
@@ -451,7 +490,11 @@ function formatBluetoothDiagnosticText(value: string | undefined): string {
         return "empty";
     }
 
-    return JSON.stringify(normalizedValue);
+    return `present:${normalizedValue.length}`;
+}
+
+function formatBluetoothDiagnosticHash(value: string | undefined): string {
+    return value === undefined ? "missing" : value.slice(0, 12);
 }
 
 function formatBluetoothDiagnosticAddressShape(value: string): string {
