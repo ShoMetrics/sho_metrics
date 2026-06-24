@@ -4,6 +4,9 @@ This directory contains direct HID battery readers for vendor-specific receivers
 and peripherals. Treat every new HID route as hardware-facing protocol work, not
 as a local ShoMetrics convention.
 
+The `vendor-hid-battery-*` files in this directory own the runtime source
+client, route registry, and HID operation coordination for those vendor readers.
+
 ## Adding Devices To An Existing Vendor
 
 - A new VID/PID/interface/usage route must have a credible source:

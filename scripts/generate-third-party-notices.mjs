@@ -95,7 +95,7 @@ async function buildHubThirdPartyNotices() {
         "",
         "### Stats",
         "",
-        "macOS Bluetooth battery query helpers under `packages/hub/src/runtime/sources/node-system/stats-derived` are adapted from Stats.",
+        "macOS Bluetooth battery query helpers under `packages/hub/src/runtime/sources/node-system/bluetooth-battery/stats-derived` are adapted from Stats.",
         "",
         "- Project: <https://github.com/exelban/stats>",
         "- Referenced commit: 3f3255c4c4f904c558486c707394ed7e7d082737",

@@ -91,7 +91,7 @@ import { buildSystemBatteryMetrics } from "./node-system-battery";
 import {
     type BluetoothBatteryMetricReader,
     readBluetoothBatteryMetrics,
-} from "./node-system-bluetooth-battery";
+} from "./bluetooth-battery/bluetooth-battery";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");

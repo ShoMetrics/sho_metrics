@@ -3,7 +3,7 @@ import { createMetricSourceClient, type SourceClient, type SourceClientStatus } 
 import { CustomHttpSourceClient } from "./custom-http/custom-http-source-client";
 import type { SourceMetadataInvalidationListener } from "./source-planning-metadata";
 import { WindowsHelperSourceClient } from "./windows-helper/windows-helper-source-client";
-import { VendorHidBatterySourceClient } from "./battery/vendor-hid-battery-source-client";
+import { VendorHidBatterySourceClient } from "./battery-hid/vendor-hid-battery-source-client";
 import { shouldEnableVendorHidBatterySupport } from "../source-capabilities/vendor-hid-battery-platform-capabilities";
 
 /** Options for default source registry creation. */

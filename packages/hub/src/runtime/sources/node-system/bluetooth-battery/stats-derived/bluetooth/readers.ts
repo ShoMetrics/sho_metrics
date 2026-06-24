@@ -23,7 +23,13 @@
  * - Stats can rely on native IOBluetooth/CoreBluetooth identity sources to
  *   provide device names before `pmset` battery levels are merged. ShoMetrics
  *   does not port those native identity sources, so a `pmset` match may fill an
- *   empty existing name while preserving Stats' battery merge precedence.
+ *   empty existing name while preserving Stats' battery merge precedence. Once
+ *   filled, that name can affect later `pmset` fuzzy matches in the same read;
+ *   this is the intended consequence of the pure Node identity-source gap.
+ * - Most string readers normalize `""` to absent. Stats' Swift `as? String`
+ *   accepts empty strings, but treating blanks as absent keeps empty device
+ *   names out of fuzzy matching and prevents blank battery strings from being
+ *   interpreted as 0%.
  * - Stats reads Bluetooth cache with `UserDefaults(suiteName:)`, which uses
  *   cfprefs semantics. ShoMetrics attempts a direct plist read through
  *   `plutil`, which is not an equivalent cfprefs merged view.
@@ -31,7 +37,7 @@
 
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { logger } from "../../../../../logging/logger";
+import { logger } from "../../../../../../logging/logger";
 
 const log = logger.for("Source:NodeSystem:BluetoothBattery:StatsDerived");
 const execFileAsync = promisify(execFile);
@@ -206,7 +212,11 @@ export async function readStatsBluetoothDevices(
  * Stats calls IOKit directly and receives `NSDictionary` values. ShoMetrics
  * uses `/usr/sbin/ioreg -r -c AppleDeviceManagementHIDEventService -l -w 0` as
  * a Node-only equivalence shim. `ioreg -a` archive output is not usable here on
- * the tested macOS host because it fails with `can't open file`.
+ * the tested macOS host because it fails with `can't open file`. When `BD_ADDR`
+ * is emitted as ioreg `<hex>` data, ShoMetrics keeps the hex string; Stats
+ * decodes the native `Data` value as UTF-8. This source is only a fallback
+ * identity signal, so the value must be treated as stable but representation-
+ * specific.
  *
  * This is not the native HID package transport. It only reads IOKit registry
  * properties that macOS already exposes, so it does not open HID interfaces or
@@ -997,6 +1007,10 @@ function readStringArrayProperty(value: Record<string, unknown> | undefined, key
 
 function readStringProperty(value: Record<string, unknown> | undefined, key: string): string | undefined {
     const property = value?.[key];
+    // DELIBERATE DIVERGENCE FROM Stats: Swift `as? String` accepts `""`.
+    // ShoMetrics normalizes blank strings to absent for source identity fields
+    // and battery text, so empty names cannot enter fuzzy matching and empty
+    // battery values cannot become JavaScript's numeric 0.
     return typeof property === "string" && property.length !== 0 ? property : undefined;
 }
 

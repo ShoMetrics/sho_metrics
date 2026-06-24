@@ -1,13 +1,13 @@
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../../logging/logger";
 import type {
     ResolvedSystemBluetoothPeripheralIdentifier,
     ResolvedSystemPeripheralIdentity,
-} from "../../../settings/resolved-settings";
+} from "../../../../settings/resolved-settings";
 import {
     buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
     buildBluetoothBatteryPercentMetricKey,
-} from "../../metric-keys";
-import type { BatteryDeviceDescriptor } from "../battery/battery-device-descriptor";
+} from "../../../metric-keys";
+import type { BatteryDeviceDescriptor } from "../../battery/battery-device-descriptor";
 import {
     readStatsBluetoothDevices,
     type StatsBleDevice,
@@ -17,13 +17,13 @@ import {
     buildScalarMetricValue,
     MetricUnit,
     type MetricValue,
-} from "../metric-source";
+} from "../../metric-source";
 import {
     buildBluetoothIdentifier,
     normalizeBluetoothDeviceAddress,
     normalizeNonEmptyText,
     resolveBluetoothBatteryPercentValue,
-} from "./node-system-bluetooth-identity";
+} from "./identity";
 
 const log = logger.for("Source:NodeSystem:BluetoothBattery:MacOS");
 const BLUETOOTH_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 60_000;

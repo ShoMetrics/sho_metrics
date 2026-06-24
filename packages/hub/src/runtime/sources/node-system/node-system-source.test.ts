@@ -43,8 +43,8 @@ import {
     NodeSystemSource,
     resolveCollectorGroups,
 } from "./node-system-source";
-import { readBluetoothBatteryMetrics } from "./node-system-bluetooth-battery";
-import { BluetoothBatteryRouteRegistry } from "./node-system-bluetooth-battery-route-registry";
+import { readBluetoothBatteryMetrics } from "./bluetooth-battery/bluetooth-battery";
+import { BluetoothBatteryRouteRegistry } from "./bluetooth-battery/route-registry";
 import {
     buildNetworkInterface,
     buildNetworkStats,

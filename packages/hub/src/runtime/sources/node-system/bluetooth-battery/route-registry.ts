@@ -1,4 +1,4 @@
-import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
+import type { ResolvedSystemPeripheralIdentity } from "../../../../settings/resolved-settings";
 
 export interface BluetoothBatteryRouteDefinition {
     readonly metricKey: string;

@@ -1,38 +1,38 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import si, { type Systeminformation } from "systeminformation";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../../logging/logger";
 import type {
     ResolvedSystemBluetoothPeripheralIdentifier,
     ResolvedSystemPeripheralIdentity,
-} from "../../../settings/resolved-settings";
+} from "../../../../settings/resolved-settings";
 import {
     buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
     buildBluetoothBatteryPercentMetricKey,
     isBluetoothBatteryMetricKey,
-} from "../../metric-keys";
+} from "../../../metric-keys";
 import {
     readMacOsBluetoothBatteryMetrics,
     readMacOsBluetoothDescriptorDevices,
     type MacOsBluetoothDeviceReader,
-} from "./node-system-bluetooth-battery-macos";
+} from "./macos";
 import {
     buildBluetoothIdentifier,
     normalizeBluetoothDeviceAddress,
     normalizeNonEmptyText,
     resolveBluetoothBatteryPercentValue,
-} from "./node-system-bluetooth-identity";
-import type { BatteryDeviceDescriptor } from "../battery/battery-device-descriptor";
+} from "./identity";
+import type { BatteryDeviceDescriptor } from "../../battery/battery-device-descriptor";
 import {
     buildScalarMetricValue,
     MetricUnit,
     type MetricValue,
-} from "../metric-source";
+} from "../../metric-source";
 import {
     bluetoothBatteryRouteRegistry,
     type BluetoothBatteryRouteDefinition,
     type BluetoothBatteryRouteRegistry,
-} from "./node-system-bluetooth-battery-route-registry";
+} from "./route-registry";
 
 const log = logger.for("Source:NodeSystem:BluetoothBattery");
 const execFileAsync = promisify(execFile);
