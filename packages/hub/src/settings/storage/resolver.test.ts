@@ -17,6 +17,7 @@ import {
     StackedMetricSlotSchema,
     StackedMetricWidgetSchema,
     StoredWidgetSettingsSchema,
+    SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind,
 } from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedSingleMetricWidget,
@@ -1096,6 +1097,71 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.kind, "batteryPercent");
         assert.equal(target.reading.peripheralIdentity, undefined);
         assert.equal(target.reading.detectedPeripheralDisplayName, undefined);
+        assert.equal(settings.preferences.pollingFrequencySeconds, 60);
+    });
+
+    it("defaults Bluetooth battery polling to five minutes", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {
+                                    peripheralIdentity: {
+                                        evidence: {
+                                            case: "bluetoothIdentity",
+                                            value: {
+                                                primaryIdentifier: {
+                                                    kind: SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind.PLATFORM_INSTANCE_ID,
+                                                    hash: "0".repeat(64),
+                                                },
+                                            },
+                                        },
+                                        productName: "MX Master 3 Bluetooth",
+                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_BLUETOOTH",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "system");
+        assert.equal(target.reading.kind, "batteryPercent");
+        assert.equal(target.reading.peripheralIdentity?.bindingTransport, "bluetooth");
+        assert.equal(settings.preferences.pollingFrequencySeconds, 300);
+    });
+
+    it("defaults vendor HID battery polling to one hour", () => {
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings({
+                singleMetric: {
+                    slot: {
+                        metric: {
+                            system: {
+                                battery: {
+                                    peripheralIdentity: {
+                                        vendorId: 0x046d,
+                                        productId: 0xc548,
+                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }).settings,
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "system");
+        assert.equal(target.reading.kind, "batteryPercent");
+        assert.equal(target.reading.peripheralIdentity?.bindingTransport, "usbReceiver");
+        assert.equal(settings.preferences.pollingFrequencySeconds, 3600);
     });
 
     it("resolves System battery color thresholds in battery order", () => {

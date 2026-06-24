@@ -1,5 +1,5 @@
 import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
-import { buildPeripheralBatteryPercentMetricKey } from "../../metric-keys";
+import { buildVendorHidBatteryPercentMetricKey } from "../../metric-keys";
 
 export function buildBatteryDeviceDescriptorIdFromIdentity(
     identity: ResolvedSystemPeripheralIdentity,
@@ -10,11 +10,7 @@ export function buildBatteryDeviceDescriptorIdFromIdentity(
 export function buildBatteryMetricKeyFromIdentity(
     identity: ResolvedSystemPeripheralIdentity,
 ): string {
-    return buildBatteryMetricKeyFromDescriptorId(buildBatteryDeviceDescriptorIdFromIdentity(identity));
-}
-
-export function buildBatteryMetricKeyFromDescriptorId(descriptorId: string): string {
-    return buildPeripheralBatteryPercentMetricKey(descriptorId);
+    return buildVendorHidBatteryPercentMetricKey(buildBatteryDeviceDescriptorIdFromIdentity(identity));
 }
 
 /**

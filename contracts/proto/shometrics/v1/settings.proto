@@ -359,6 +359,51 @@ message SystemBatteryMetricTarget {
 }
 
 message SystemPeripheralIdentity {
+  oneof evidence {
+    BluetoothIdentity bluetooth_identity = 14;
+  }
+
+  message BluetoothIdentity {
+    // Primary identity signal used to rebind the selected Bluetooth device to
+    // an exact platform query route. This signal may be less durable than the
+    // fallback signal; for example, a Windows PnP InstanceId can change after
+    // re-pairing or re-enumeration even when the Bluetooth address remains the
+    // same.
+    optional Identifier primary_identifier = 1;
+
+    // Secondary identity signal used only to recover when the primary route no
+    // longer matches. This is best-effort identity recovery, not the normal
+    // query route and not a cross-platform guarantee.
+    optional Identifier fallback_identifier = 2;
+
+    message Identifier {
+      Kind kind = 1 [(buf.validate.field).enum = {
+        defined_only: true
+        not_in: [0]
+      }];
+
+      // Opaque SHA-256 hex hash of the raw identifier. Callers must not parse
+      // this value or assume that hashes from different kinds are comparable.
+      // The pattern intentionally rejects raw MAC addresses, Windows InstanceIds,
+      // and AEP ids.
+      string hash = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+
+      enum Kind {
+        KIND_UNSPECIFIED = 0;
+
+        // OS-owned paired-device instance id, such as a Windows PnP InstanceId.
+        KIND_PLATFORM_INSTANCE_ID = 1;
+
+        // Windows Association Endpoint address property. The Windows prefix is
+        // intentional: AEP is a platform-locked identity source.
+        KIND_WINDOWS_AEP_ADDRESS = 2;
+
+        // Bluetooth device address exposed by the platform.
+        KIND_BLUETOOTH_DEVICE_ADDRESS = 3;
+      }
+    }
+  }
+
   optional uint32 vendor_id = 1 [(buf.validate.field).uint32.lte = 65535];
   optional uint32 product_id = 2 [(buf.validate.field).uint32.lte = 65535];
   optional string manufacturer = 3 [(buf.validate.field).string.max_len = 256];
@@ -371,7 +416,8 @@ message SystemPeripheralIdentity {
 
   // Transport observed when the binding was captured. This is only a fallback
   // matching signal; current display connection is observed at runtime, not
-  // from this stored fallback.
+  // from this stored fallback. When evidence is present, evidence is the
+  // authoritative identity mode and this field remains a weak hint.
   optional SystemPeripheralBindingTransport binding_transport = 9 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]

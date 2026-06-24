@@ -9,6 +9,7 @@ import {
     CPU_USAGE_METRIC_KEY,
     GPU_USAGE_METRIC_KEY,
     SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    isBluetoothBatteryMetricKey,
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
@@ -52,6 +53,10 @@ export function isNodeSystemMetricSupportedOnPlatform(
 
     if (metricKey === SYSTEM_BATTERY_PERCENT_METRIC_KEY) {
         return platform === "win32" || platform === "darwin";
+    }
+
+    if (isBluetoothBatteryMetricKey(metricKey)) {
+        return true;
     }
 
     if (isDiskThroughputMetricKey(metricKey)) {

@@ -246,6 +246,7 @@ export type ResolvedSystemReading =
     };
 
 export interface ResolvedSystemPeripheralIdentity {
+    readonly evidence?: ResolvedSystemPeripheralIdentityEvidence | undefined;
     readonly vendorId: number | undefined;
     readonly productId: number | undefined;
     readonly manufacturer: string | undefined;
@@ -260,6 +261,23 @@ export interface ResolvedSystemPeripheralIdentity {
     readonly modelId: string | undefined;
     readonly receiverSlot: number | undefined;
 }
+
+export type ResolvedSystemPeripheralIdentityEvidence =
+    | {
+        readonly kind: "bluetooth";
+        readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
+        readonly fallbackIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
+    };
+
+export interface ResolvedSystemBluetoothPeripheralIdentifier {
+    readonly kind: ResolvedSystemBluetoothPeripheralIdentifierKind;
+    readonly hash: string;
+}
+
+export type ResolvedSystemBluetoothPeripheralIdentifierKind =
+    | "platformInstanceId"
+    | "windowsAepAddress"
+    | "bluetoothDeviceAddress";
 
 export type SystemPeripheralBindingTransport =
     | "bluetooth"

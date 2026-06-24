@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
-import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../runtime/metric-keys";
+import {
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    buildBluetoothBatteryPercentMetricKey,
+} from "../runtime/metric-keys";
 import {
     buildBatteryDeviceDescriptorIdFromIdentity,
     buildBatteryMetricKeyFromIdentity,
@@ -47,10 +50,19 @@ test("System action keeps selected peripheral battery metric keys distinct", () 
     );
 });
 
-test("System peripheral battery metric keys ignore route-local identity fields", () => {
+test("System battery metric keys separate Bluetooth from vendor HID peripherals", () => {
     const receiverIdentity = buildPeripheralIdentity();
+    const bluetoothPrimaryIdentifierHash = "a".repeat(64);
     const bluetoothIdentity: ResolvedSystemPeripheralIdentity = {
         ...receiverIdentity,
+        evidence: {
+            kind: "bluetooth",
+            primaryIdentifier: {
+                kind: "platformInstanceId",
+                hash: bluetoothPrimaryIdentifierHash,
+            },
+            fallbackIdentifier: undefined,
+        },
         productId: 0xBEEF,
         productName: "MX Master 4 Bluetooth",
         interfaceNumber: undefined,
@@ -58,12 +70,37 @@ test("System peripheral battery metric keys ignore route-local identity fields",
         usageId: undefined,
         bindingTransport: "bluetooth",
         receiverKind: undefined,
+        vendorUnitId: undefined,
         receiverSlot: undefined,
     };
 
     assert.equal(
+        resolveSystemMetricKeys(buildSystemTarget(receiverIdentity))[0],
         buildBatteryMetricKeyFromIdentity(receiverIdentity),
-        buildBatteryMetricKeyFromIdentity(bluetoothIdentity),
+    );
+    assert.equal(
+        resolveSystemMetricKeys(buildSystemTarget(bluetoothIdentity))[0],
+        buildBluetoothBatteryPercentMetricKey(`device-${bluetoothPrimaryIdentifierHash}`),
+    );
+});
+
+test("System battery metric keys degrade malformed Bluetooth evidence to unmatched Bluetooth keys", () => {
+    const missingPrimaryIdentifierIdentity: ResolvedSystemPeripheralIdentity = {
+        ...buildPeripheralIdentity(),
+        evidence: {
+            kind: "bluetooth",
+            primaryIdentifier: undefined,
+            fallbackIdentifier: undefined,
+        },
+        bindingTransport: "bluetooth",
+        receiverKind: undefined,
+        vendorUnitId: undefined,
+        receiverSlot: undefined,
+    };
+
+    assert.equal(
+        resolveSystemMetricKeys(buildSystemTarget(missingPrimaryIdentifierIdentity))[0],
+        buildBluetoothBatteryPercentMetricKey("missing-primary-identifier"),
     );
 });
 

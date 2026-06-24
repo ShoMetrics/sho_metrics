@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "vitest";
 import type { Systeminformation } from "systeminformation";
 import {
@@ -41,11 +42,16 @@ import {
     NodeSystemSource,
     resolveCollectorGroups,
 } from "./node-system-source";
+import { readBluetoothBatteryMetrics } from "./node-system-bluetooth-battery";
+import { BluetoothBatteryRouteRegistry } from "./node-system-bluetooth-battery-route-registry";
 import {
     buildNetworkInterface,
     buildNetworkStats,
 } from "./node-system-source-test-helpers";
-import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../../metric-keys";
+import {
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    buildBluetoothBatteryPercentMetricKey,
+} from "../../metric-keys";
 import type {
     NodeSystemGpuTelemetryData,
     NodeSystemInformationClient,
@@ -175,6 +181,41 @@ test("node system source polls built-in system battery percent", async () => {
     assert.equal(callCounts.networkInterfaces, 0);
 });
 
+test("node system source keeps system battery when Bluetooth battery polling fails", async () => {
+    const callCounts = buildCallCounts();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
+    const source = new NodeSystemSource({
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            battery: async () => {
+                callCounts.battery += 1;
+                return buildBatteryData({
+                    hasBattery: true,
+                    percent: 72,
+                    isCharging: false,
+                    acConnected: false,
+                });
+            },
+        }),
+        readBluetoothBatteryMetrics: async () => {
+            throw new Error("bluetooth unavailable");
+        },
+    });
+
+    const snapshot = await source.pollMetrics([
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+        bluetoothMetricKey,
+    ]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        [SYSTEM_BATTERY_PERCENT_METRIC_KEY]: {
+            scalar: 72,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.battery, 1);
+});
+
 test("node system source omits built-in system battery when no battery is present", async () => {
     const callCounts = buildCallCounts();
     const source = new NodeSystemSource({
@@ -263,6 +304,178 @@ test("node system source omits built-in system battery on unavailable platform d
 
     assert.deepEqual(metrics, {});
     assert.equal(callCounts.battery, 1);
+});
+
+test("node system source polls Bluetooth battery percent when the OS reports a stable device address", async () => {
+    const callCounts = buildCallCounts();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
+    const source = new NodeSystemSource({
+        platform: "darwin",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            bluetoothDevices: async () => {
+                callCounts.bluetoothDevices += 1;
+                return [
+                    buildBluetoothDeviceData({
+                        name: "Magic Mouse",
+                        macDevice: "AA-BB-CC-DD-EE-FF",
+                        batteryPercent: "74%",
+                    }),
+                ];
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics([bluetoothMetricKey]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        [bluetoothMetricKey]: {
+            scalar: 74,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.bluetoothDevices, 1);
+    assert.equal(callCounts.battery, 0);
+});
+
+test("node system source omits Bluetooth battery devices without stable identity or valid percent", async () => {
+    const callCounts = buildCallCounts();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
+    const source = new NodeSystemSource({
+        platform: "darwin",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            bluetoothDevices: async () => {
+                callCounts.bluetoothDevices += 1;
+                return [
+                    buildBluetoothDeviceData({
+                        name: "Missing MAC",
+                        macDevice: "",
+                        batteryPercent: 55,
+                    }),
+                    buildBluetoothDeviceData({
+                        name: "Invalid percent",
+                        macDevice: "AA-BB-CC-DD-EE-FF",
+                        batteryPercent: "unknown",
+                    }),
+                ];
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics([bluetoothMetricKey]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {});
+    assert.equal(callCounts.bluetoothDevices, 1);
+});
+
+test("Windows Bluetooth battery fallback reads PnP battery percent when systeminformation omits it", async () => {
+    const instanceId = "BTHLE\\DEV_D5E8757B145B\\8&BA047EA&0&D5E8757B145B";
+    const lastConnectedTime = new Date().toISOString();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex(instanceId.toUpperCase())}`);
+    const metrics = await readBluetoothBatteryMetrics({
+        bluetoothDevices: async () => [],
+    }, "win32", [bluetoothMetricKey], async () => [{
+        name: "MX Master 3",
+        instanceId,
+        bluetoothAddress: "d5e8757b145b",
+        lastConnectedTime,
+    }], async instanceIds => {
+        assert.deepEqual(instanceIds, [instanceId.toUpperCase()]);
+        return [{
+            instanceId: instanceId.toUpperCase(),
+            batteryPercent: 100,
+            lastConnectedTime,
+        }];
+    });
+
+    assert.deepEqual(toPlainMetricValue(metrics[bluetoothMetricKey]), {
+        scalar: 100,
+        unit: MetricUnit.PERCENT,
+    });
+});
+
+test("Windows Bluetooth battery emits cached PnP battery percent without stale-time filtering", async () => {
+    const instanceId = "BTHLE\\DEV_44F72368F524\\8&OLD&0&44F72368F524";
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex(instanceId.toUpperCase())}`);
+    const metrics = await readBluetoothBatteryMetrics({
+        bluetoothDevices: async () => [],
+    }, "win32", [bluetoothMetricKey], async () => [{
+        name: "Old iPhone",
+        instanceId,
+        bluetoothAddress: "44f72368f524",
+    }], async instanceIds => {
+        assert.deepEqual(instanceIds, [instanceId.toUpperCase()]);
+        return [{
+            instanceId: instanceId.toUpperCase(),
+            batteryPercent: 52,
+        }];
+    });
+
+    assert.deepEqual(toPlainMetricValue(metrics[bluetoothMetricKey]), {
+        scalar: 52,
+        unit: MetricUnit.PERCENT,
+    });
+});
+
+test("Windows Bluetooth battery fallback rebinds a stale primary route by hashed Bluetooth address", async () => {
+    const oldInstanceId = "BTHLE\\DEV_D5E8757B145B\\8&OLD&0&D5E8757B145B";
+    const newInstanceId = "BTHLE\\DEV_D5E8757B145B\\8&NEW&0&D5E8757B145B";
+    const address = "d5:e8:75:7b:14:5b";
+    const lastConnectedTime = new Date().toISOString();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex(oldInstanceId.toUpperCase())}`);
+    const routeRegistry = new BluetoothBatteryRouteRegistry();
+    routeRegistry.register({
+        metricKey: bluetoothMetricKey,
+        ownerId: "action-1",
+        identity: {
+            evidence: {
+                kind: "bluetooth",
+                primaryIdentifier: {
+                    kind: "platformInstanceId",
+                    hash: sha256Hex(oldInstanceId.toUpperCase()),
+                },
+                fallbackIdentifier: {
+                    kind: "bluetoothDeviceAddress",
+                    hash: sha256Hex(address),
+                },
+            },
+            vendorId: undefined,
+            productId: undefined,
+            manufacturer: undefined,
+            productName: "MX Master 3",
+            serialNumber: undefined,
+            interfaceNumber: undefined,
+            usagePage: undefined,
+            usageId: undefined,
+            bindingTransport: "bluetooth",
+            receiverKind: undefined,
+            vendorUnitId: undefined,
+            modelId: undefined,
+            receiverSlot: undefined,
+        },
+    });
+
+    const metrics = await readBluetoothBatteryMetrics({
+        bluetoothDevices: async () => [],
+    }, "win32", [bluetoothMetricKey], async () => [{
+        name: "MX Master 3",
+        instanceId: newInstanceId,
+        bluetoothAddress: address,
+        lastConnectedTime,
+    }], async instanceIds => {
+        assert.deepEqual(instanceIds, [newInstanceId.toUpperCase()]);
+        return [{
+            instanceId: newInstanceId.toUpperCase(),
+            batteryPercent: 88,
+            lastConnectedTime,
+        }];
+    }, routeRegistry);
+
+    assert.deepEqual(toPlainMetricValue(metrics[bluetoothMetricKey]), {
+        scalar: 88,
+        unit: MetricUnit.PERCENT,
+    });
 });
 
 test("node system source polls only the requested CPU group and exposes cached CPU info on the next poll", async () => {
@@ -1315,6 +1528,7 @@ interface NodeSystemSourceCallCounts {
     cpu: number;
     mem: number;
     battery: number;
+    bluetoothDevices: number;
     fsSize: number;
     blockDevices: number;
     diskLayout: number;
@@ -1333,6 +1547,7 @@ function buildCallCounts(): NodeSystemSourceCallCounts {
         cpu: 0,
         mem: 0,
         battery: 0,
+        bluetoothDevices: 0,
         fsSize: 0,
         blockDevices: 0,
         diskLayout: 0,
@@ -1366,6 +1581,10 @@ function buildCountingSystemInformation(
         battery: async () => {
             callCounts.battery += 1;
             return buildBatteryData({});
+        },
+        bluetoothDevices: async () => {
+            callCounts.bluetoothDevices += 1;
+            return [];
         },
         fsSize: async () => {
             callCounts.fsSize += 1;
@@ -1478,6 +1697,28 @@ function buildBatteryData(overrides: Partial<Systeminformation.BatteryData>): Sy
         serial: "",
         ...overrides,
     };
+}
+
+function buildBluetoothDeviceData(
+    overrides: Partial<Omit<Systeminformation.BluetoothDeviceData, "batteryPercent">> & {
+        readonly batteryPercent?: number | string;
+    },
+): Systeminformation.BluetoothDeviceData {
+    return {
+        device: "Bluetooth Device",
+        name: "Bluetooth Device",
+        macDevice: "AA-BB-CC-DD-EE-FF",
+        macHost: "11-22-33-44-55-66",
+        batteryPercent: 50,
+        manufacturer: "Apple",
+        type: "Mouse",
+        connected: true,
+        ...overrides,
+    } as Systeminformation.BluetoothDeviceData;
+}
+
+function sha256Hex(value: string): string {
+    return createHash("sha256").update(value).digest("hex");
 }
 
 function buildFileSystem(overrides: Partial<Systeminformation.FsSizeData> = {}): Systeminformation.FsSizeData {

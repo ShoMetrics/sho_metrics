@@ -65,6 +65,7 @@ export interface BatteryDeviceHiddenCandidateDiagnostic {
 
 export type BatteryDeviceHiddenCandidateReason =
     | "experimentalDisabled"
+    | "bluetoothHandledBySystem"
     | "unsupported"
     | "unknownSupport";
 

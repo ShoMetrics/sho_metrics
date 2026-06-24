@@ -1,6 +1,10 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader } from "../../runtime/metric-store";
-import { SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../../runtime/metric-keys";
+import {
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
+    buildBluetoothBatteryPercentMetricKey,
+} from "../../runtime/metric-keys";
 import { buildBatteryMetricKeyFromIdentity } from "../../runtime/sources/battery/battery-metric-key";
 import {
     requireResolvedSingleMetricWidget,
@@ -9,6 +13,8 @@ import {
 } from "../../settings/resolved-settings";
 import type { SingleMetricViewOptions } from "../../view-updates/runner";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
+
+const MISSING_BLUETOOTH_PRIMARY_IDENTIFIER_DESCRIPTOR_ID = "missing-primary-identifier";
 
 export function buildSystemViewOptions(options: {
     readonly event: WillAppearEvent;
@@ -39,9 +45,21 @@ export function resolveSystemMetricKeys(target: ResolvedSystemMetricTarget): rea
 }
 
 function resolveSystemMetricKey(target: ResolvedSystemMetricTarget): string {
-    if (target.reading.peripheralIdentity === undefined) {
+    const peripheralIdentity = target.reading.peripheralIdentity;
+    if (peripheralIdentity === undefined) {
         return SYSTEM_BATTERY_PERCENT_METRIC_KEY;
     }
 
-    return buildBatteryMetricKeyFromIdentity(target.reading.peripheralIdentity);
+    if (peripheralIdentity.evidence?.kind === "bluetooth") {
+        const primaryIdentifier = peripheralIdentity.evidence.primaryIdentifier;
+        if (primaryIdentifier === undefined) {
+            // Malformed Bluetooth evidence should fail closed without crossing into vendor HID routing.
+            return buildBluetoothBatteryPercentMetricKey(MISSING_BLUETOOTH_PRIMARY_IDENTIFIER_DESCRIPTOR_ID);
+        }
+
+        const descriptorId = buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(primaryIdentifier.hash);
+        return buildBluetoothBatteryPercentMetricKey(descriptorId);
+    }
+
+    return buildBatteryMetricKeyFromIdentity(peripheralIdentity);
 }

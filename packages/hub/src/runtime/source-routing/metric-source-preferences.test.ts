@@ -21,7 +21,8 @@ import {
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
     SYSTEM_BATTERY_PERCENT_METRIC_KEY,
-    buildPeripheralBatteryPercentMetricKey,
+    buildBluetoothBatteryPercentMetricKey,
+    buildVendorHidBatteryPercentMetricKey,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
 } from "../metric-keys";
@@ -94,7 +95,8 @@ test("local auto source preference routes ping keys to node-system on all suppor
 });
 
 test("local auto source preference routes battery metrics to battery sources", () => {
-    const peripheralBatteryMetricKey = buildPeripheralBatteryPercentMetricKey("logitech.bolt.slot-2");
+    const vendorHidBatteryMetricKey = buildVendorHidBatteryPercentMetricKey("logitech.bolt.slot-2");
+    const bluetoothBatteryMetricKey = buildBluetoothBatteryPercentMetricKey("device-aabbccddeeff");
 
     assert.deepEqual(
         resolveLocalAutoMetricSourceCandidates(SYSTEM_BATTERY_PERCENT_METRIC_KEY, "win32"),
@@ -109,11 +111,24 @@ test("local auto source preference routes battery metrics to battery sources", (
         [],
     );
     assert.deepEqual(
-        resolveLocalAutoMetricSourceCandidates(peripheralBatteryMetricKey, "win32"),
+        resolveLocalAutoMetricSourceCandidates(vendorHidBatteryMetricKey, "win32"),
         VENDOR_HID_BATTERY_CANDIDATES,
     );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(vendorHidBatteryMetricKey, "darwin"),
+        [],
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(bluetoothBatteryMetricKey, "win32"),
+        NODE_SYSTEM_CANDIDATES,
+    );
+    assert.deepEqual(
+        resolveLocalAutoMetricSourceCandidates(bluetoothBatteryMetricKey, "darwin"),
+        NODE_SYSTEM_CANDIDATES,
+    );
     assert.equal(hasExplicitLocalAutoMetricSourcePreference(SYSTEM_BATTERY_PERCENT_METRIC_KEY), true);
-    assert.equal(hasExplicitLocalAutoMetricSourcePreference(peripheralBatteryMetricKey), true);
+    assert.equal(hasExplicitLocalAutoMetricSourcePreference(vendorHidBatteryMetricKey), true);
+    assert.equal(hasExplicitLocalAutoMetricSourcePreference(bluetoothBatteryMetricKey), true);
 });
 
 test("local auto source preference uses only Windows helper for helper-owned stable metrics", () => {

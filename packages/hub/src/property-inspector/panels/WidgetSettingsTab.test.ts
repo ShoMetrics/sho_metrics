@@ -1609,7 +1609,8 @@ test("system widget settings keep selected battery snapshot while descriptors re
         },
     });
 
-    assert.match(markup, /Searching\.\.\. \[Dongle\] MX Master 4/);
+    assert.match(markup, /\[Dongle\] MX Master 4/);
+    assert.match(markup, /Searching devices\.\.\./);
     assert.doesNotMatch(markup, /Unavailable: \[Dongle\] MX Master 4/);
     assert.doesNotMatch(markup, /The selected device is not currently connected or responding/);
 });
@@ -1692,6 +1693,32 @@ test("system widget settings hide vendor HID battery support outside Windows", (
     assert.doesNotMatch(markup, /MX Master 4/);
     assert.doesNotMatch(markup, /USB Device/);
     assert.doesNotMatch(markup, /Enable experimental support/);
+});
+
+test("system widget settings use system polling options for Bluetooth battery devices", () => {
+    const bluetoothDevice = buildBluetoothBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            preferences: {
+                pollingFrequencySeconds: 60,
+            },
+            system: {
+                peripheralIdentity: bluetoothDevice.identity,
+                detectedPeripheralDisplayName: bluetoothDevice.displayName,
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [bluetoothDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /\[Bluetooth\] MX Master 3 Bluetooth/);
+    assert.match(markup, /60s/);
+    assert.doesNotMatch(markup, /This device is checked infrequently since the support is experimental/);
 });
 
 function renderWidgetSettings(options: {
@@ -1831,7 +1858,7 @@ function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
     return {
         descriptorId: "logitech.bolt.slot-2",
         displayName: "MX Master 4",
-        metricKey: "peripheral.battery_percent:logitech.bolt.slot-2",
+        metricKey: "vendor_hid.battery_percent:logitech.bolt.slot-2",
         transport: "usbReceiver",
         receiverKind: "bolt",
         isExperimental: true,
@@ -1850,6 +1877,41 @@ function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
             vendorUnitId: "unit-2",
             modelId: "mx-master-4",
             receiverSlot: 2,
+        },
+    };
+}
+
+function buildBluetoothBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+    return {
+        descriptorId: "bluetooth.device",
+        displayName: "MX Master 3 Bluetooth",
+        metricKey: "node_system.bluetooth_battery_percent:bluetooth.device",
+        transport: "bluetooth",
+        receiverKind: undefined,
+        isExperimental: false,
+        supportState: "supported",
+        identity: {
+            evidence: {
+                kind: "bluetooth",
+                primaryIdentifier: {
+                    kind: "platformInstanceId",
+                    hash: "0".repeat(64),
+                },
+                fallbackIdentifier: undefined,
+            },
+            vendorId: undefined,
+            productId: undefined,
+            manufacturer: "Logitech",
+            productName: "MX Master 3 Bluetooth",
+            serialNumber: undefined,
+            interfaceNumber: undefined,
+            usagePage: undefined,
+            usageId: undefined,
+            bindingTransport: "bluetooth",
+            receiverKind: undefined,
+            vendorUnitId: undefined,
+            modelId: undefined,
+            receiverSlot: undefined,
         },
     };
 }

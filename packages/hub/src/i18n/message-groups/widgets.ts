@@ -199,6 +199,11 @@ export const systemMessages = {
         zh_CN: "查找中...",
         ja: "検索中...",
     },
+    searchingBatteryDevicesNote: {
+        en: "Searching devices...",
+        zh_CN: "正在查找设备...",
+        ja: "デバイスを検索中...",
+    },
     noBatteryDevicesOption: {
         en: "No battery devices detected",
         zh_CN: "未检测到电池设备",
@@ -213,12 +218,6 @@ export const systemMessages = {
         en: "Unavailable: {label}",
         zh_CN: "不可用：{label}",
         ja: "利用不可: {label}",
-    },
-    searchingBatterySelectionOption: {
-        // Keep this prefix short; it appears inside a narrow select option before a device name.
-        en: "Searching... {label}",
-        zh_CN: "查找中... {label}",
-        ja: "検索中... {label}",
     },
     unavailableBatterySelectionNote: {
         en: "The selected device is currently sleeping, or not currently connected.",

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
     BatteryDeviceDiscoveryService,
+    buildBatteryDeviceDiscoveryDiagnostics,
     resolveBatteryDeviceDescriptors,
     type BatteryDeviceDiscoveryCandidate,
 } from "./battery-device-discovery";
@@ -179,8 +180,8 @@ test("battery discovery keeps Easy-Switch slot as diagnostics only", () => {
     );
 });
 
-test("battery discovery does not prefer Bluetooth telemetry over receiver telemetry automatically", () => {
-    const descriptors = resolveBatteryDeviceDescriptors([
+test("battery discovery hides Bluetooth candidates for the OS battery path", () => {
+    const candidates = [
         buildCandidate({
             candidateId: "bolt",
             transport: "usbReceiver",
@@ -197,17 +198,12 @@ test("battery discovery does not prefer Bluetooth telemetry over receiver teleme
             isExperimental: false,
             batteryTelemetryFreshness: "fresh",
         }),
-    ], enabledDiscoveryOptions());
+    ];
+    const descriptors = resolveBatteryDeviceDescriptors(candidates, enabledDiscoveryOptions());
+    const diagnostics = buildBatteryDeviceDiscoveryDiagnostics(candidates, descriptors, enabledDiscoveryOptions());
 
-    assert.equal(descriptors.length, 2);
-    assert.deepEqual(
-        descriptors.map(descriptor => descriptor.transport),
-        ["bluetooth", "usbReceiver"],
-    );
-    assert.deepEqual(
-        descriptors.map(descriptor => descriptor.supportState),
-        ["ambiguous", "ambiguous"],
-    );
+    assert.deepEqual(descriptors.map(descriptor => descriptor.transport), ["usbReceiver"]);
+    assert.deepEqual(diagnostics.hiddenCandidates.map(candidate => candidate.reason), ["bluetoothHandledBySystem"]);
 });
 
 test("battery discovery hides unsupported and unknown devices", () => {
@@ -239,7 +235,7 @@ test("battery discovery hides experimental vendor HID descriptors when disabled"
         isExperimentalVendorHidEnabled: false,
     });
 
-    assert.deepEqual(descriptors.map(descriptor => descriptor.transport), ["bluetooth"]);
+    assert.deepEqual(descriptors.map(descriptor => descriptor.transport), []);
 });
 
 test("battery discovery service returns descriptors from multiple discoverers", async () => {
@@ -262,7 +258,7 @@ test("battery discovery service returns descriptors from multiple discoverers", 
 
     const descriptors = await service.discoverBatteryDevices(enabledDiscoveryOptions());
 
-    assert.deepEqual(descriptors.map(descriptor => descriptor.transport), ["bluetooth", "usbWired"]);
+    assert.deepEqual(descriptors.map(descriptor => descriptor.transport), ["usbWired"]);
 });
 
 function enabledDiscoveryOptions(): Parameters<typeof resolveBatteryDeviceDescriptors>[1] {
