@@ -337,9 +337,8 @@ function resolveWindowsBluetoothDescriptorDevices(
         const fallbackIdentifier = resolveWindowsBluetoothFallbackIdentifier(bluetoothDevice);
         const descriptorId = buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(primaryIdentifier.hash);
         const metricKey = buildBluetoothBatteryPercentMetricKey(descriptorId);
+        const displayName = resolveBluetoothBatteryDisplayName(bluetoothDevice);
         const identity = buildBluetoothPeripheralIdentity({
-            bluetoothDevice,
-            displayName: resolveBluetoothBatteryDisplayName(bluetoothDevice),
             primaryIdentifier,
             fallbackIdentifier,
         });
@@ -349,7 +348,7 @@ function resolveWindowsBluetoothDescriptorDevices(
             batteryPercent: undefined,
             descriptor: {
                 descriptorId,
-                displayName: identity.productName ?? "Bluetooth device",
+                displayName,
                 metricKey,
                 transport: "bluetooth",
                 receiverKind: undefined,
@@ -385,9 +384,8 @@ function resolveSystemInformationBluetoothDescriptorDevices(
         const descriptorId = buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(primaryIdentifier.hash);
         const metricKey = buildBluetoothBatteryPercentMetricKey(descriptorId);
         const batteryPercent = resolveBluetoothBatteryPercent(bluetoothDevice);
+        const displayName = resolveBluetoothBatteryDisplayName(bluetoothDevice);
         const identity = buildBluetoothPeripheralIdentity({
-            bluetoothDevice,
-            displayName: resolveBluetoothBatteryDisplayName(bluetoothDevice),
             primaryIdentifier,
             fallbackIdentifier: undefined,
         });
@@ -397,7 +395,7 @@ function resolveSystemInformationBluetoothDescriptorDevices(
             batteryPercent,
             descriptor: {
                 descriptorId,
-                displayName: identity.productName ?? "Bluetooth device",
+                displayName,
                 metricKey,
                 transport: "bluetooth",
                 receiverKind: undefined,
@@ -452,8 +450,6 @@ function resolveWindowsBluetoothFallbackIdentifier(
 }
 
 function buildBluetoothPeripheralIdentity(options: {
-    readonly bluetoothDevice: WindowsBluetoothDeviceRouteData | Systeminformation.BluetoothDeviceData;
-    readonly displayName: string;
     readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier;
     readonly fallbackIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
 }): ResolvedSystemPeripheralIdentity {
@@ -463,19 +459,6 @@ function buildBluetoothPeripheralIdentity(options: {
             primaryIdentifier: options.primaryIdentifier,
             fallbackIdentifier: options.fallbackIdentifier,
         },
-        vendorId: undefined,
-        productId: undefined,
-        manufacturer: normalizeUnknownText(options.bluetoothDevice.manufacturer),
-        productName: options.displayName,
-        serialNumber: undefined,
-        interfaceNumber: undefined,
-        usagePage: undefined,
-        usageId: undefined,
-        bindingTransport: "bluetooth",
-        receiverKind: undefined,
-        vendorUnitId: undefined,
-        modelId: undefined,
-        receiverSlot: undefined,
     };
 }
 

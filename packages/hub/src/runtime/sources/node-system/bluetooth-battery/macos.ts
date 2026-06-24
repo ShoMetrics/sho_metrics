@@ -239,8 +239,6 @@ function buildMacOsBluetoothDescriptorDevice(options: {
     const descriptorId = buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(primaryIdentifier.hash);
     const metricKey = buildBluetoothBatteryPercentMetricKey(descriptorId);
     const identity = buildBluetoothPeripheralIdentity({
-        bluetoothDevice: options.bluetoothDevice,
-        displayName: options.displayName,
         primaryIdentifier,
     });
 
@@ -248,7 +246,7 @@ function buildMacOsBluetoothDescriptorDevice(options: {
         batteryPercent: options.batteryPart.batteryPercent,
         descriptor: {
             descriptorId,
-            displayName: identity.productName ?? options.displayName,
+            displayName: options.displayName,
             metricKey,
             transport: "bluetooth",
             receiverKind: undefined,
@@ -346,8 +344,6 @@ function resolveMacOsBluetoothBatteryPartIdentity(key: string): Pick<MacOsBlueto
 }
 
 function buildBluetoothPeripheralIdentity(options: {
-    readonly bluetoothDevice: StatsBleDevice;
-    readonly displayName: string;
     readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier;
 }): ResolvedSystemPeripheralIdentity {
     return {
@@ -356,19 +352,6 @@ function buildBluetoothPeripheralIdentity(options: {
             primaryIdentifier: options.primaryIdentifier,
             fallbackIdentifier: undefined,
         },
-        vendorId: options.bluetoothDevice.vendorId,
-        productId: options.bluetoothDevice.productId,
-        manufacturer: undefined,
-        productName: options.displayName,
-        serialNumber: undefined,
-        interfaceNumber: undefined,
-        usagePage: undefined,
-        usageId: undefined,
-        bindingTransport: "bluetooth",
-        receiverKind: undefined,
-        vendorUnitId: undefined,
-        modelId: undefined,
-        receiverSlot: undefined,
     };
 }
 

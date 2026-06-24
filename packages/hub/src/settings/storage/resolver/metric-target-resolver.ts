@@ -15,6 +15,7 @@ import {
     type SystemBatteryMetricTarget as StoredSystemBatteryMetricTarget,
     SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind as StoredBluetoothIdentifierKind,
     type SystemPeripheralIdentity_BluetoothIdentity_Identifier as StoredBluetoothIdentifier,
+    type SystemPeripheralIdentity_VendorHidIdentity as StoredVendorHidIdentity,
     type SystemMetricTarget as StoredSystemMetricTarget,
     type SystemPeripheralIdentity as StoredSystemPeripheralIdentity,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
@@ -46,6 +47,7 @@ import type {
     ResolvedSystemBluetoothPeripheralIdentifierKind,
     ResolvedSystemPeripheralIdentity,
     ResolvedSystemPeripheralIdentityEvidence,
+    ResolvedSystemVendorHidPeripheralIdentity,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
 import { readPositiveRuntimeMaximum } from "./display-settings-resolver";
@@ -150,8 +152,35 @@ function resolveSystemPeripheralIdentity(
     }
 
     const evidence = resolveSystemPeripheralIdentityEvidence(storedIdentity);
+    return evidence === undefined ? undefined : { evidence };
+}
+
+function resolveSystemPeripheralIdentityEvidence(
+    storedIdentity: StoredSystemPeripheralIdentity,
+): ResolvedSystemPeripheralIdentityEvidence | undefined {
+    switch (storedIdentity.evidence.case) {
+        case "vendorHidIdentity":
+            return resolveSystemVendorHidPeripheralIdentity(storedIdentity.evidence.value);
+        case "bluetoothIdentity":
+            return {
+                kind: "bluetooth",
+                primaryIdentifier: resolveSystemBluetoothPeripheralIdentifier(
+                    storedIdentity.evidence.value.primaryIdentifier,
+                ),
+                fallbackIdentifier: resolveSystemBluetoothPeripheralIdentifier(
+                    storedIdentity.evidence.value.fallbackIdentifier,
+                ),
+            };
+        case undefined:
+            return undefined;
+    }
+}
+
+function resolveSystemVendorHidPeripheralIdentity(
+    storedIdentity: StoredVendorHidIdentity,
+): ResolvedSystemVendorHidPeripheralIdentity {
     return {
-        ...(evidence === undefined ? {} : { evidence }),
+        kind: "vendorHid",
         vendorId: storedIdentity.vendorId,
         productId: storedIdentity.productId,
         manufacturer: normalizeOptionalText(storedIdentity.manufacturer),
@@ -169,25 +198,6 @@ function resolveSystemPeripheralIdentity(
         modelId: normalizeOptionalText(storedIdentity.modelId),
         receiverSlot: storedIdentity.receiverSlot,
     };
-}
-
-function resolveSystemPeripheralIdentityEvidence(
-    storedIdentity: StoredSystemPeripheralIdentity,
-): ResolvedSystemPeripheralIdentityEvidence | undefined {
-    switch (storedIdentity.evidence.case) {
-        case "bluetoothIdentity":
-            return {
-                kind: "bluetooth",
-                primaryIdentifier: resolveSystemBluetoothPeripheralIdentifier(
-                    storedIdentity.evidence.value.primaryIdentifier,
-                ),
-                fallbackIdentifier: resolveSystemBluetoothPeripheralIdentifier(
-                    storedIdentity.evidence.value.fallbackIdentifier,
-                ),
-            };
-        case undefined:
-            return undefined;
-    }
 }
 
 function resolveSystemBluetoothPeripheralIdentifier(

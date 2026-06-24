@@ -3,6 +3,7 @@ import type {
     SystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";
 import { logger } from "../../../logging/logger";
 import { buildVendorHidBatteryPercentMetricKey } from "../../metric-keys";
 import {
@@ -144,6 +145,8 @@ function buildHiddenCandidateDiagnostic(
     candidate: BatteryDeviceDiscoveryCandidate,
     options: BatteryDeviceDiscoveryOptions,
 ): BatteryDeviceHiddenCandidateDiagnostic {
+    const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(candidate.identity);
+
     return {
         candidateId: candidate.candidateId,
         displayName: candidate.displayName,
@@ -151,14 +154,14 @@ function buildHiddenCandidateDiagnostic(
         receiverKind: candidate.receiverKind,
         supportState: mapCandidateSupportState(candidate.supportState),
         reason: resolveHiddenCandidateReason(candidate, options),
-        vendorId: candidate.identity.vendorId,
-        productId: candidate.identity.productId,
-        modelId: candidate.identity.modelId,
-        manufacturer: candidate.identity.manufacturer,
-        productName: candidate.identity.productName,
-        interfaceNumber: candidate.identity.interfaceNumber,
-        usagePage: candidate.identity.usagePage,
-        usageId: candidate.identity.usageId,
+        vendorId: vendorHidIdentity?.vendorId,
+        productId: vendorHidIdentity?.productId,
+        modelId: vendorHidIdentity?.modelId,
+        manufacturer: vendorHidIdentity?.manufacturer,
+        productName: vendorHidIdentity?.productName,
+        interfaceNumber: vendorHidIdentity?.interfaceNumber,
+        usagePage: vendorHidIdentity?.usagePage,
+        usageId: vendorHidIdentity?.usageId,
         receiverSlot: candidate.diagnostics?.receiverSlot,
         sourcePathId: candidate.diagnostics?.sourcePathId,
     };

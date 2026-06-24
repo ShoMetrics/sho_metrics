@@ -1574,6 +1574,7 @@ test("system widget settings render battery selector and experimental vendor HID
         settings: buildWidgetSettings("system", {
             system: {
                 peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
             },
         }),
         runtimeCache: {
@@ -1864,19 +1865,22 @@ function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
         isExperimental: true,
         supportState: "experimental",
         identity: {
-            vendorId: 0x046D,
-            productId: 0xC548,
-            manufacturer: "Logitech",
-            productName: "MX Master 4",
-            serialNumber: undefined,
-            interfaceNumber: 2,
-            usagePage: 0xFF00,
-            usageId: undefined,
-            bindingTransport: "usbReceiver",
-            receiverKind: "bolt",
-            vendorUnitId: "unit-2",
-            modelId: "mx-master-4",
-            receiverSlot: 2,
+            evidence: {
+                kind: "vendorHid",
+                vendorId: 0x046D,
+                productId: 0xC548,
+                manufacturer: "Logitech",
+                productName: "MX Master 4",
+                serialNumber: undefined,
+                interfaceNumber: 2,
+                usagePage: 0xFF00,
+                usageId: undefined,
+                bindingTransport: "usbReceiver",
+                receiverKind: "bolt",
+                vendorUnitId: "unit-2",
+                modelId: "mx-master-4",
+                receiverSlot: 2,
+            },
         },
     };
 }
@@ -1899,19 +1903,6 @@ function buildBluetoothBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
                 },
                 fallbackIdentifier: undefined,
             },
-            vendorId: undefined,
-            productId: undefined,
-            manufacturer: "Logitech",
-            productName: "MX Master 3 Bluetooth",
-            serialNumber: undefined,
-            interfaceNumber: undefined,
-            usagePage: undefined,
-            usageId: undefined,
-            bindingTransport: "bluetooth",
-            receiverKind: undefined,
-            vendorUnitId: undefined,
-            modelId: undefined,
-            receiverSlot: undefined,
         },
     };
 }

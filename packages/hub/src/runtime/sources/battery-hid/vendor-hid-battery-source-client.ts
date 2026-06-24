@@ -1,5 +1,6 @@
 import { logger } from "../../../logging/logger";
 import { pluginGlobalSettingsStore } from "../../../settings/global-settings-store";
+import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";
 import { monotonicNowMilliseconds, wallClockNowMilliseconds } from "../../../shared/clock";
 import { isVendorHidBatteryMetricKey as isRuntimeVendorHidBatteryMetricKey } from "../../metric-keys";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit, type MetricValue } from "../metric-source";
@@ -852,9 +853,11 @@ function buildUnavailableReports(
 }
 
 function buildBatteryRawSensorIdentity(descriptor: BatteryDeviceDescriptor): SourceMetricValueMetadata["rawSensorIdentity"] {
+    const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(descriptor.identity);
+
     return {
         sourceSensorId: descriptor.descriptorId,
-        hardwareId: descriptor.identity?.vendorUnitId ?? descriptor.identity?.modelId ?? descriptor.descriptorId,
+        hardwareId: vendorHidIdentity?.vendorUnitId ?? vendorHidIdentity?.modelId ?? descriptor.descriptorId,
         hardwareType: "Peripheral",
         sensorName: "Battery",
         sourceSensorType: "Battery",

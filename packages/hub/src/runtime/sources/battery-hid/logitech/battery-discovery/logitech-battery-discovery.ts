@@ -1,6 +1,10 @@
 import { logger } from "../../../../../logging/logger";
 import { monotonicNowMilliseconds } from "../../../../../shared/clock";
-import type { ResolvedSystemPeripheralIdentity } from "../../../../../settings/resolved-settings";
+import type {
+    ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
+} from "../../../../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../../../../settings/resolved-settings";
 import { buildBatteryMetricKeyFromIdentity } from "../../../battery/battery-metric-key";
 import type { NativeHidDeviceInfo, NativeHidModule } from "../../native-hid-loader-internal";
 import type { BatteryDeviceDiscoveryCandidate } from "../../../battery/battery-device-discovery";
@@ -200,21 +204,23 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
         identity: ResolvedSystemPeripheralIdentity,
         deviceInfoList: readonly NativeHidDeviceInfo[],
     ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
+        const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(identity);
         if (
-            identity.vendorId !== LOGITECH_HIDPP_VENDOR_ID ||
-            !hasSelectedLogitechReceiverSlot(identity) ||
-            !isSupportedLogitechReceiverKind(identity.receiverKind)
+            vendorHidIdentity?.vendorId !== LOGITECH_HIDPP_VENDOR_ID ||
+            !hasSelectedLogitechReceiverSlot(vendorHidIdentity) ||
+            !isSupportedLogitechReceiverKind(vendorHidIdentity.receiverKind)
         ) {
             return Promise.resolve(undefined);
         }
 
         const receiverDeviceGroups = groupLogitechReceiverDevices(deviceInfoList, LOGITECH_RECEIVERS)
             .filter(receiverDeviceGroup =>
-                receiverDeviceGroup.receiver.receiverKind === identity.receiverKind &&
-                (identity.productId === undefined || receiverDeviceGroup.receiver.productId === identity.productId),
+                receiverDeviceGroup.receiver.receiverKind === vendorHidIdentity.receiverKind &&
+                (vendorHidIdentity.productId === undefined
+                    || receiverDeviceGroup.receiver.productId === vendorHidIdentity.productId),
             );
         for (const receiverDeviceGroup of receiverDeviceGroups) {
-            const candidate = this.readBatteryDeviceFromReceiverGroup(metricKey, identity, receiverDeviceGroup);
+            const candidate = this.readBatteryDeviceFromReceiverGroup(metricKey, vendorHidIdentity, receiverDeviceGroup);
             if (candidate !== undefined) {
                 return Promise.resolve(candidate);
             }
@@ -225,7 +231,7 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
 
     private readBatteryDeviceFromReceiverGroup(
         metricKey: string,
-        identity: ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number },
+        identity: ResolvedSystemVendorHidPeripheralIdentity & { readonly receiverSlot: number },
         receiverDeviceGroup: LogitechReceiverDeviceGroup,
     ): BatteryDeviceDiscoveryCandidate | undefined {
         const transport = this.openReceiverDeviceGroup(receiverDeviceGroup);
@@ -306,19 +312,19 @@ type LogitechBatteryNoDataReason = Extract<LogitechBatteryReadResult, { readonly
 type LogitechBatteryResult = Extract<LogitechBatteryReadResult, { readonly state: "battery" }>;
 
 function isSupportedLogitechReceiverKind(
-    receiverKind: ResolvedSystemPeripheralIdentity["receiverKind"],
+    receiverKind: ResolvedSystemVendorHidPeripheralIdentity["receiverKind"],
 ): receiverKind is LogitechReceiverDescriptor["receiverKind"] {
     return receiverKind === "bolt" || receiverKind === "unifying" || receiverKind === "lightspeed";
 }
 
 function hasSelectedLogitechReceiverSlot(
-    identity: ResolvedSystemPeripheralIdentity,
-): identity is ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number } {
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
+): identity is ResolvedSystemVendorHidPeripheralIdentity & { readonly receiverSlot: number } {
     return identity.receiverSlot !== undefined;
 }
 
 function buildSelectedLogitechSlotRoute(
-    identity: ResolvedSystemPeripheralIdentity & { readonly receiverSlot: number },
+    identity: ResolvedSystemVendorHidPeripheralIdentity & { readonly receiverSlot: number },
 ): LogitechReceiverSlotRoute {
     return {
         receiverSlot: identity.receiverSlot,
@@ -329,7 +335,7 @@ function buildSelectedLogitechSlotRoute(
 }
 
 function matchesSelectedLogitechDeviceInformation(
-    identity: ResolvedSystemPeripheralIdentity,
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
     liveDeviceInformation: LogitechBatteryResult["deviceInformation"],
 ): boolean {
     if (identity.vendorUnitId === undefined && identity.modelId === undefined) {

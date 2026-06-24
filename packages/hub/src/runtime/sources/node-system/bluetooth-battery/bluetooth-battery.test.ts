@@ -161,7 +161,7 @@ test("macOS Bluetooth descriptors fall back from empty Stats-derived names", asy
     }]);
 
     assert.equal(descriptors[0]?.displayName, "Bluetooth device");
-    assert.equal(descriptors[0]?.identity?.productName, "Bluetooth device");
+    assert.equal(descriptors[0]?.identity?.evidence.kind, "bluetooth");
 });
 
 function sha256Hex(value: string): string {

@@ -17,6 +17,8 @@ import {
 } from "./hidpp-protocol";
 import { LogitechBatteryReader } from "./battery-discovery/logitech-battery-discovery";
 import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
+import type { BatteryDeviceDiscoveryCandidate } from "../../battery/battery-device-discovery";
+import type { ResolvedSystemVendorHidPeripheralIdentity } from "../../../../settings/resolved-settings";
 
 const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
 
@@ -33,9 +35,9 @@ test("Logitech discovery emits Bolt receiver candidates from online pairing regi
     assert.equal(candidates[0].displayName, "MX Master 3S");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "bolt");
-    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
-    assert.equal(candidates[0].identity.modelId, "logitech:1a83-1a85-0000:ext-01");
-    assert.equal(candidates[0].identity.receiverSlot, 2);
+    assert.equal(readVendorHidIdentity(candidates[0]).vendorUnitId, "12345678");
+    assert.equal(readVendorHidIdentity(candidates[0]).modelId, "logitech:1a83-1a85-0000:ext-01");
+    assert.equal(readVendorHidIdentity(candidates[0]).receiverSlot, 2);
     assert.equal(candidates[0].diagnostics?.receiverSlot, 2);
 });
 
@@ -62,7 +64,7 @@ test("Logitech discovery uses Unifying arrival events as the online slot source"
     assert.equal(candidates[0].displayName, "Logitech Unifying mouse (slot 1)");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "unifying");
-    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
+    assert.equal(readVendorHidIdentity(candidates[0]).vendorUnitId, "12345678");
     assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
 });
 
@@ -79,7 +81,7 @@ test("Logitech discovery emits LIGHTSPEED candidates from responsive slot 1", as
     assert.equal(candidates[0].displayName, "G502 X PLUS");
     assert.equal(candidates[0].transport, "usbReceiver");
     assert.equal(candidates[0].receiverKind, "lightspeed");
-    assert.equal(candidates[0].identity.vendorUnitId, "12345678");
+    assert.equal(readVendorHidIdentity(candidates[0]).vendorUnitId, "12345678");
     assert.equal(candidates[0].diagnostics?.receiverSlot, 1);
     assert.equal(candidates[0].diagnostics?.batteryPercentSource, "voltageEstimated");
     assert.equal(candidates[0].diagnostics?.batteryVoltageMillivolts, 4166);
@@ -94,6 +96,14 @@ test("Logitech discovery leaves direct HID++ paths to OS or future wired support
 
     assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
 });
+
+function readVendorHidIdentity(
+    candidate: BatteryDeviceDiscoveryCandidate,
+): ResolvedSystemVendorHidPeripheralIdentity {
+    const identity = candidate.identity.evidence;
+    assert.equal(identity.kind, "vendorHid");
+    return identity;
+}
 
 function buildBoltReceiverDeviceInfo(): NativeHidDeviceInfo {
     return {

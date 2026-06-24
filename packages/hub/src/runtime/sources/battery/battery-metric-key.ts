@@ -1,8 +1,23 @@
-import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
+import type {
+    ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
+} from "../../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";
 import { buildVendorHidBatteryPercentMetricKey } from "../../metric-keys";
 
 export function buildBatteryDeviceDescriptorIdFromIdentity(
     identity: ResolvedSystemPeripheralIdentity,
+): string {
+    const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(identity);
+    if (vendorHidIdentity === undefined) {
+        throw new Error("Vendor HID battery descriptor id requires vendor HID identity evidence.");
+    }
+
+    return buildBatteryDeviceDescriptorIdFromVendorHidIdentity(vendorHidIdentity);
+}
+
+export function buildBatteryDeviceDescriptorIdFromVendorHidIdentity(
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
 ): string {
     return buildStableDescriptorParts(identity).join(".");
 }
@@ -21,7 +36,7 @@ export function buildBatteryMetricKeyFromIdentity(
  * re-pairing or moving the same device between routes.
  */
 export function buildBatteryDeviceVendorUnitIdentityKey(
-    identity: ResolvedSystemPeripheralIdentity,
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
 ): string | undefined {
     if (!hasText(identity.vendorUnitId)) {
         return undefined;
@@ -42,7 +57,7 @@ export function buildBatteryDeviceVendorUnitIdentityKey(
  * must remain ambiguous.
  */
 export function buildBatteryDeviceFallbackIdentityKey(
-    identity: ResolvedSystemPeripheralIdentity,
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
 ): string | undefined {
     if (hasText(identity.modelId)) {
         return stringifyIdentityKey([
@@ -101,7 +116,7 @@ function formatTextIdentityParts(
     });
 }
 
-function buildStableDescriptorParts(identity: ResolvedSystemPeripheralIdentity): readonly string[] {
+function buildStableDescriptorParts(identity: ResolvedSystemVendorHidPeripheralIdentity): readonly string[] {
     const vendorPart = formatHexIdentityPart("vendor_id", identity.vendorId);
     const productPart = formatHexIdentityPart("product_id", identity.productId);
     const vendorUnitKey = buildBatteryDeviceVendorUnitIdentityKey(identity);

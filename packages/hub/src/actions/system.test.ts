@@ -13,6 +13,7 @@ import {
 import type {
     ResolvedSystemMetricTarget,
     ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
 } from "../settings/resolved-settings";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import {
@@ -39,9 +40,11 @@ test("System action subscribes to the selected battery metric", () => {
 test("System action keeps selected peripheral battery metric keys distinct", () => {
     const firstIdentity = buildPeripheralIdentity();
     const secondIdentity: ResolvedSystemPeripheralIdentity = {
-        ...firstIdentity,
-        vendorUnitId: "unit-3",
-        receiverSlot: 3,
+        evidence: {
+            ...(firstIdentity.evidence as ResolvedSystemVendorHidPeripheralIdentity),
+            vendorUnitId: "unit-3",
+            receiverSlot: 3,
+        },
     };
 
     assert.notDeepEqual(
@@ -54,7 +57,6 @@ test("System battery metric keys separate Bluetooth from vendor HID peripherals"
     const receiverIdentity = buildPeripheralIdentity();
     const bluetoothPrimaryIdentifierHash = "a".repeat(64);
     const bluetoothIdentity: ResolvedSystemPeripheralIdentity = {
-        ...receiverIdentity,
         evidence: {
             kind: "bluetooth",
             primaryIdentifier: {
@@ -63,15 +65,6 @@ test("System battery metric keys separate Bluetooth from vendor HID peripherals"
             },
             fallbackIdentifier: undefined,
         },
-        productId: 0xBEEF,
-        productName: "MX Master 4 Bluetooth",
-        interfaceNumber: undefined,
-        usagePage: undefined,
-        usageId: undefined,
-        bindingTransport: "bluetooth",
-        receiverKind: undefined,
-        vendorUnitId: undefined,
-        receiverSlot: undefined,
     };
 
     assert.equal(
@@ -86,16 +79,11 @@ test("System battery metric keys separate Bluetooth from vendor HID peripherals"
 
 test("System battery metric keys degrade malformed Bluetooth evidence to unmatched Bluetooth keys", () => {
     const missingPrimaryIdentifierIdentity: ResolvedSystemPeripheralIdentity = {
-        ...buildPeripheralIdentity(),
         evidence: {
             kind: "bluetooth",
             primaryIdentifier: undefined,
             fallbackIdentifier: undefined,
         },
-        bindingTransport: "bluetooth",
-        receiverKind: undefined,
-        vendorUnitId: undefined,
-        receiverSlot: undefined,
     };
 
     assert.equal(
@@ -106,10 +94,12 @@ test("System battery metric keys degrade malformed Bluetooth evidence to unmatch
 
 test("System peripheral battery descriptor ids keep private identity fields out of the key", () => {
     const longIdentity: ResolvedSystemPeripheralIdentity = {
-        ...buildPeripheralIdentity(),
-        serialNumber: "s".repeat(512),
-        vendorUnitId: "u".repeat(512),
-        modelId: "m".repeat(256),
+        evidence: {
+            ...(buildPeripheralIdentity().evidence as ResolvedSystemVendorHidPeripheralIdentity),
+            serialNumber: "s".repeat(512),
+            vendorUnitId: "u".repeat(512),
+            modelId: "m".repeat(256),
+        },
     };
 
     const descriptorId = buildBatteryDeviceDescriptorIdFromIdentity(longIdentity);
@@ -211,19 +201,22 @@ function buildSystemTarget(
 
 function buildPeripheralIdentity(): ResolvedSystemPeripheralIdentity {
     return {
-        vendorId: 0x046D,
-        productId: 0xC548,
-        manufacturer: "Logitech",
-        productName: "MX Master 4",
-        serialNumber: undefined,
-        interfaceNumber: 2,
-        usagePage: 0xFF00,
-        usageId: undefined,
-        bindingTransport: "usbReceiver",
-        receiverKind: "bolt",
-        vendorUnitId: "unit-2",
-        modelId: "mx-master-4",
-        receiverSlot: 2,
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+        },
     };
 }
 

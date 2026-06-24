@@ -12,6 +12,7 @@ import type {
     ResolvedSystemMetricTarget,
     ResolvedSystemPeripheralIdentity,
 } from "../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
 import type { SelectOption } from "../inspector/types";
 import { SelectSetting } from "../controls/SelectSetting";
@@ -68,8 +69,9 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
         loadStatus: props.context.runtimeCacheStatus.batteryDeviceOptionsStatus,
         t,
     });
-    const isVendorHidPeripheralSelected = props.target.reading.peripheralIdentity !== undefined
-        && props.target.reading.peripheralIdentity.bindingTransport !== "bluetooth";
+    const isVendorHidPeripheralSelected = readSystemVendorHidPeripheralIdentity(
+        props.target.reading.peripheralIdentity,
+    ) !== undefined;
     const isBatteryDeviceSearchPending = props.context.runtimeCacheStatus.batteryDeviceOptionsStatus === "pending";
 
     return (
@@ -287,10 +289,12 @@ function resolveSelectedBatteryUnavailableLabel(target: ResolvedSystemMetricTarg
     }
 
     const displayName = target.reading.detectedPeripheralDisplayName
-        ?? target.reading.peripheralIdentity.productName
         ?? "selected-peripheral";
+    const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(target.reading.peripheralIdentity);
     return `[${formatBatteryTransportLabel({
-        transport: target.reading.peripheralIdentity.bindingTransport ?? "usbReceiver",
+        transport: target.reading.peripheralIdentity.evidence.kind === "bluetooth"
+            ? "bluetooth"
+            : vendorHidIdentity?.bindingTransport ?? "usbReceiver",
     })}] ${displayName}`;
 }
 
@@ -309,19 +313,7 @@ function arePeripheralIdentitiesEqual(
     left: ResolvedSystemPeripheralIdentity,
     right: ResolvedSystemPeripheralIdentity,
 ): boolean {
-    return left.vendorId === right.vendorId
-        && left.productId === right.productId
-        && left.manufacturer === right.manufacturer
-        && left.productName === right.productName
-        && left.serialNumber === right.serialNumber
-        && left.interfaceNumber === right.interfaceNumber
-        && left.usagePage === right.usagePage
-        && left.usageId === right.usageId
-        && left.bindingTransport === right.bindingTransport
-        && left.receiverKind === right.receiverKind
-        && left.vendorUnitId === right.vendorUnitId
-        && left.modelId === right.modelId
-        && left.receiverSlot === right.receiverSlot;
+    return JSON.stringify(left.evidence) === JSON.stringify(right.evidence);
 }
 
 function formatBatteryTransportLabel(input: Pick<BatteryDeviceDescriptor, "transport">): string {
