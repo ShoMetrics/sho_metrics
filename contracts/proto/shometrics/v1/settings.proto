@@ -398,7 +398,11 @@ message SystemPeripheralIdentity {
         // intentional: AEP is a platform-locked identity source.
         KIND_WINDOWS_AEP_ADDRESS = 2;
 
-        // Bluetooth device address exposed by the platform.
+        // Bluetooth-based device identity. The hash is usually derived from a
+        // Bluetooth device address exposed by the platform. Some OS sources
+        // expose a stable opaque accessory identifier instead, such as macOS
+        // `pmset` for AirPods battery parts; callers must still treat the hash
+        // as opaque and must not parse it back as a literal address.
         KIND_BLUETOOTH_DEVICE_ADDRESS = 3;
       }
     }
