@@ -5,10 +5,10 @@ import {
     type BatteryDeviceDescriptor,
 } from "../runtime/sources/battery/battery-device-descriptor";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
-import { readVendorHidBatteryDeviceDescriptorSnapshot } from "../runtime/sources/battery/vendor-hid-battery-source-client";
-import { vendorHidBatteryRouteRegistry } from "../runtime/sources/battery/vendor-hid-battery-route-registry";
-import { readBluetoothBatteryDeviceDescriptors } from "../runtime/sources/node-system/node-system-bluetooth-battery";
-import { bluetoothBatteryRouteRegistry } from "../runtime/sources/node-system/node-system-bluetooth-battery-route-registry";
+import { readVendorHidBatteryDeviceDescriptorSnapshot } from "../runtime/sources/battery-hid/vendor-hid-battery-source-client";
+import { vendorHidBatteryRouteRegistry } from "../runtime/sources/battery-hid/vendor-hid-battery-route-registry";
+import { readBluetoothBatteryDeviceDescriptors } from "../runtime/sources/node-system/bluetooth-battery/bluetooth-battery";
+import { bluetoothBatteryRouteRegistry } from "../runtime/sources/node-system/bluetooth-battery/route-registry";
 import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
 import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";

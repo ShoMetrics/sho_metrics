@@ -12,7 +12,7 @@ import type {
     NativeHidModule,
 } from "../native-hid-loader-internal";
 import type { BatteryDeviceDiscoveryCandidate } from "../../battery/battery-device-discovery";
-import type { VendorHidBatteryReader } from "../../battery/vendor-hid-battery-reader";
+import type { VendorHidBatteryReader } from "../vendor-hid-battery-reader";
 import {
     ASUS_ROG_KEYBOARD_VENDOR_USAGE_PAGE,
     ASUS_ROG_OMNI_RECEIVER_PRODUCT_ID,

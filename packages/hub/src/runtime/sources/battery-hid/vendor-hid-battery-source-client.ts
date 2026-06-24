@@ -8,10 +8,10 @@ import type {
     NativeHidDeviceInfo,
     NativeHidLoadResult,
     NativeHidModule,
-} from "../battery-hid/native-hid-loader-internal";
-import { loadNativeHidModule } from "../battery-hid/native-hid-loader";
-import { AsusRogBatteryReader } from "../battery-hid/asus-rog/asus-rog-battery-discovery";
-import { LogitechBatteryReader } from "../battery-hid/logitech/battery-discovery/logitech-battery-discovery";
+} from "./native-hid-loader-internal";
+import { loadNativeHidModule } from "./native-hid-loader";
+import { AsusRogBatteryReader } from "./asus-rog/asus-rog-battery-discovery";
+import { LogitechBatteryReader } from "./logitech/battery-discovery/logitech-battery-discovery";
 import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";
 import type {
     MetricUnavailableReport,
@@ -24,13 +24,13 @@ import type { SourceMetricPollingGroupResolution } from "../source-polling-group
 import type {
     BatteryDeviceDescriptor,
     BatteryDeviceDiscoveryDiagnostics,
-} from "./battery-device-descriptor";
+} from "../battery/battery-device-descriptor";
 import {
     buildBatteryDeviceDiscoveryDiagnostics,
     type BatteryDeviceDiscoveryCandidate,
     resolveBatteryDeviceDescriptors,
-} from "./battery-device-discovery";
-import { buildBatteryMetricKeyFromIdentity } from "./battery-metric-key";
+} from "../battery/battery-device-discovery";
+import { buildBatteryMetricKeyFromIdentity } from "../battery/battery-metric-key";
 import type { VendorHidBatteryReader } from "./vendor-hid-battery-reader";
 import {
     vendorHidBatteryRouteRegistry,

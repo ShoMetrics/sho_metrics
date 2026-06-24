@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ResolvedSystemBluetoothPeripheralIdentifier } from "../../../settings/resolved-settings";
+import type { ResolvedSystemBluetoothPeripheralIdentifier } from "../../../../settings/resolved-settings";
 
 /**
  * Builds the persisted Bluetooth binding identity from a runtime-only raw identifier.

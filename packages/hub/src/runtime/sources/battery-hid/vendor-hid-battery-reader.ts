@@ -1,5 +1,5 @@
-import type { NativeHidDeviceInfo } from "../battery-hid/native-hid-loader-internal";
-import type { BatteryDeviceDiscoveryCandidate } from "./battery-device-discovery";
+import type { NativeHidDeviceInfo } from "./native-hid-loader-internal";
+import type { BatteryDeviceDiscoveryCandidate } from "../battery/battery-device-discovery";
 import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
 
 /**

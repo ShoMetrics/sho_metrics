@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { MetricUnit, type MetricValue } from "../metric-source";
-import type { NativeHidDevice, NativeHidDeviceInfo, NativeHidModule } from "../battery-hid/native-hid-loader-internal";
+import type { NativeHidDevice, NativeHidDeviceInfo, NativeHidModule } from "./native-hid-loader-internal";
 import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";
-import { buildBatteryMetricKeyFromIdentity } from "./battery-metric-key";
-import type { BatteryDeviceDiscoveryCandidate } from "./battery-device-discovery";
+import { buildBatteryMetricKeyFromIdentity } from "../battery/battery-metric-key";
+import type { BatteryDeviceDiscoveryCandidate } from "../battery/battery-device-discovery";
 import {
     VendorHidBatterySourceClient,
     discoverVendorHidBatteryCandidatesFromReaders,

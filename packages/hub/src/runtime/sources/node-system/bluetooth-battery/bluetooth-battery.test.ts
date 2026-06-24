@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "vitest";
-import { buildBluetoothBatteryPercentMetricKey } from "../../metric-keys";
-import { MetricUnit, type MetricValue } from "../metric-source";
+import { buildBluetoothBatteryPercentMetricKey } from "../../../metric-keys";
+import { MetricUnit, type MetricValue } from "../../metric-source";
 import {
     readBluetoothBatteryDeviceDescriptors,
     readBluetoothBatteryMetrics,
-} from "./node-system-bluetooth-battery";
+} from "./bluetooth-battery";
 
 test("macOS Bluetooth descriptors use Stats-derived single battery readings", async () => {
     const airPodsAccessoryIdentifier = "12345678-1234-1234-1234-123456789abc";

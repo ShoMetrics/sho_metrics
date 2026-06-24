@@ -4,7 +4,7 @@ import type { ResolvedSystemPeripheralIdentity } from "../../../../../settings/r
 import { buildBatteryMetricKeyFromIdentity } from "../../../battery/battery-metric-key";
 import type { NativeHidDeviceInfo, NativeHidModule } from "../../native-hid-loader-internal";
 import type { BatteryDeviceDiscoveryCandidate } from "../../../battery/battery-device-discovery";
-import type { VendorHidBatteryReader } from "../../../battery/vendor-hid-battery-reader";
+import type { VendorHidBatteryReader } from "../../vendor-hid-battery-reader";
 import { LOGITECH_HIDPP_VENDOR_ID } from "../hidpp-protocol";
 import {
     LogitechHidppSession,
