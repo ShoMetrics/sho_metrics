@@ -13,6 +13,8 @@ import {
     type MetricSourcePolicy as StoredMetricSourcePolicy,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
     type SystemBatteryMetricTarget as StoredSystemBatteryMetricTarget,
+    SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind as StoredBluetoothIdentifierKind,
+    type SystemPeripheralIdentity_BluetoothIdentity_Identifier as StoredBluetoothIdentifier,
     type SystemMetricTarget as StoredSystemMetricTarget,
     type SystemPeripheralIdentity as StoredSystemPeripheralIdentity,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
@@ -40,7 +42,10 @@ import type {
     ResolvedMetricTarget,
     ResolvedNetworkDisplaySettings,
     ResolvedNetworkReading,
+    ResolvedSystemBluetoothPeripheralIdentifier,
+    ResolvedSystemBluetoothPeripheralIdentifierKind,
     ResolvedSystemPeripheralIdentity,
+    ResolvedSystemPeripheralIdentityEvidence,
 } from "../../resolved-settings";
 import type { ResolveStoredSettingsRuntimeContext } from "./resolver-types";
 import { readPositiveRuntimeMaximum } from "./display-settings-resolver";
@@ -144,7 +149,9 @@ function resolveSystemPeripheralIdentity(
         return undefined;
     }
 
+    const evidence = resolveSystemPeripheralIdentityEvidence(storedIdentity);
     return {
+        ...(evidence === undefined ? {} : { evidence }),
         vendorId: storedIdentity.vendorId,
         productId: storedIdentity.productId,
         manufacturer: normalizeOptionalText(storedIdentity.manufacturer),
@@ -163,6 +170,45 @@ function resolveSystemPeripheralIdentity(
         receiverSlot: storedIdentity.receiverSlot,
     };
 }
+
+function resolveSystemPeripheralIdentityEvidence(
+    storedIdentity: StoredSystemPeripheralIdentity,
+): ResolvedSystemPeripheralIdentityEvidence | undefined {
+    switch (storedIdentity.evidence.case) {
+        case "bluetoothIdentity":
+            return {
+                kind: "bluetooth",
+                primaryIdentifier: resolveSystemBluetoothPeripheralIdentifier(
+                    storedIdentity.evidence.value.primaryIdentifier,
+                ),
+                fallbackIdentifier: resolveSystemBluetoothPeripheralIdentifier(
+                    storedIdentity.evidence.value.fallbackIdentifier,
+                ),
+            };
+        case undefined:
+            return undefined;
+    }
+}
+
+function resolveSystemBluetoothPeripheralIdentifier(
+    storedIdentifier: StoredBluetoothIdentifier | undefined,
+): ResolvedSystemBluetoothPeripheralIdentifier | undefined {
+    const kind = storedIdentifier === undefined
+        ? undefined
+        : systemBluetoothIdentifierKindByProto[storedIdentifier.kind];
+    const hash = normalizeOptionalText(storedIdentifier?.hash);
+    return kind === undefined || hash === undefined
+        ? undefined
+        : { kind, hash };
+}
+
+const systemBluetoothIdentifierKindByProto: Partial<
+    Record<StoredBluetoothIdentifierKind, ResolvedSystemBluetoothPeripheralIdentifierKind>
+> = {
+    [StoredBluetoothIdentifierKind.PLATFORM_INSTANCE_ID]: "platformInstanceId",
+    [StoredBluetoothIdentifierKind.WINDOWS_AEP_ADDRESS]: "windowsAepAddress",
+    [StoredBluetoothIdentifierKind.BLUETOOTH_DEVICE_ADDRESS]: "bluetoothDeviceAddress",
+};
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
     const normalizedValue = value?.trim();

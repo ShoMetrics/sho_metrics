@@ -4,9 +4,9 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
 import { logger } from "../../../logging/logger";
+import { buildVendorHidBatteryPercentMetricKey } from "../../metric-keys";
 import {
     buildBatteryDeviceDescriptorIdFromIdentity,
-    buildBatteryMetricKeyFromDescriptorId,
     buildBatteryMetricKeyFromIdentity,
 } from "./battery-metric-key";
 import type {
@@ -129,6 +129,10 @@ function isVisibleCandidate(
     candidate: BatteryDeviceDiscoveryCandidate,
     options: BatteryDeviceDiscoveryOptions,
 ): boolean {
+    if (candidate.transport === "bluetooth") {
+        return false;
+    }
+
     if (candidate.supportState === "unsupported" || candidate.supportState === "unknown") {
         return false;
     }
@@ -178,6 +182,10 @@ function resolveHiddenCandidateReason(
     candidate: BatteryDeviceDiscoveryCandidate,
     options: BatteryDeviceDiscoveryOptions,
 ): BatteryDeviceHiddenCandidateReason {
+    if (candidate.transport === "bluetooth") {
+        return "bluetoothHandledBySystem";
+    }
+
     if (!options.isExperimentalVendorHidEnabled && candidate.isExperimental) {
         return "experimentalDisabled";
     }
@@ -240,7 +248,7 @@ function buildBatteryDeviceDescriptor(
     return {
         descriptorId,
         displayName: candidate.displayName,
-        metricKey: buildBatteryMetricKeyFromDescriptorId(bindingDescriptorId),
+        metricKey: buildVendorHidBatteryPercentMetricKey(bindingDescriptorId),
         transport: candidate.transport,
         receiverKind: candidate.receiverKind,
         isExperimental: candidate.isExperimental,

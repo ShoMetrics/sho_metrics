@@ -34,24 +34,39 @@ export const RAM_USED_METRIC_KEY = "ram.used";
 export const RAM_TOTAL_METRIC_KEY = "ram.total";
 
 export const SYSTEM_BATTERY_PERCENT_METRIC_KEY = "system.battery_percent";
-export const PERIPHERAL_BATTERY_PERCENT_METRIC_KEY_PREFIX = "peripheral.battery_percent:";
+export const VENDOR_HID_BATTERY_PERCENT_METRIC_KEY_PREFIX = "vendor_hid.battery_percent:";
+export const BLUETOOTH_BATTERY_PERCENT_METRIC_KEY_PREFIX = "bluetooth.battery_percent:";
 
 export const SYSTEM_METRIC_KEYS = [
     SYSTEM_BATTERY_PERCENT_METRIC_KEY,
 ] as const;
 
 /**
- * Builds the runtime-only metric key for one discovered peripheral battery.
+ * Builds the runtime-only metric key for one discovered vendor HID peripheral battery.
  *
  * The descriptor id is owned by the battery discovery layer and must not be a
  * raw HID path. Stored settings keep a peripheral identity bundle instead.
  */
-export function buildPeripheralBatteryPercentMetricKey(descriptorId: string): string {
-    if (!/^[a-z0-9][a-z0-9._-]*$/u.test(descriptorId)) {
-        throw new Error("Peripheral battery descriptor id must be a normalized runtime id.");
+export function buildVendorHidBatteryPercentMetricKey(descriptorId: string): string {
+    assertNormalizedBatteryDescriptorId(descriptorId);
+
+    return `${VENDOR_HID_BATTERY_PERCENT_METRIC_KEY_PREFIX}${descriptorId}`;
+}
+
+/** Builds the runtime-only metric key for one OS-reported Bluetooth battery. */
+export function buildBluetoothBatteryPercentMetricKey(descriptorId: string): string {
+    assertNormalizedBatteryDescriptorId(descriptorId);
+
+    return `${BLUETOOTH_BATTERY_PERCENT_METRIC_KEY_PREFIX}${descriptorId}`;
+}
+
+/** Builds the runtime descriptor id from a stored Bluetooth identity hash. */
+export function buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(identifierHash: string): string {
+    if (!/^[0-9a-f]{64}$/u.test(identifierHash)) {
+        throw new Error("Bluetooth battery identifier hash must be lowercase SHA-256 hex.");
     }
 
-    return `${PERIPHERAL_BATTERY_PERCENT_METRIC_KEY_PREFIX}${descriptorId}`;
+    return `device-${identifierHash}`;
 }
 
 const CPU_METRIC_KEY_SET = new Set<string>(CPU_METRIC_KEYS);
@@ -80,5 +95,20 @@ export function isSystemMetricKey(metricKey: string): boolean {
 
 export function isBatteryMetricKey(metricKey: string): boolean {
     return metricKey === SYSTEM_BATTERY_PERCENT_METRIC_KEY
-        || metricKey.startsWith(PERIPHERAL_BATTERY_PERCENT_METRIC_KEY_PREFIX);
+        || isVendorHidBatteryMetricKey(metricKey)
+        || isBluetoothBatteryMetricKey(metricKey);
+}
+
+export function isVendorHidBatteryMetricKey(metricKey: string): boolean {
+    return metricKey.startsWith(VENDOR_HID_BATTERY_PERCENT_METRIC_KEY_PREFIX);
+}
+
+export function isBluetoothBatteryMetricKey(metricKey: string): boolean {
+    return metricKey.startsWith(BLUETOOTH_BATTERY_PERCENT_METRIC_KEY_PREFIX);
+}
+
+function assertNormalizedBatteryDescriptorId(descriptorId: string): void {
+    if (!/^[a-z0-9][a-z0-9._-]*$/u.test(descriptorId)) {
+        throw new Error("Battery descriptor id must be a normalized runtime id.");
+    }
 }

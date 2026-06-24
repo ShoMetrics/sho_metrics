@@ -7,12 +7,16 @@ import {
     SYSTEM_METRIC_KEYS,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
-    buildPeripheralBatteryPercentMetricKey,
+    buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
+    buildBluetoothBatteryPercentMetricKey,
+    buildVendorHidBatteryPercentMetricKey,
+    isBluetoothBatteryMetricKey,
     isBatteryMetricKey,
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
     isSystemMetricKey,
+    isVendorHidBatteryMetricKey,
 } from "./metric-keys";
 
 test("metric key classifiers are backed by stable key inventories", () => {
@@ -41,19 +45,44 @@ test("metric key classifiers do not accept unclassified prefixes", () => {
     assert.equal(isBatteryMetricKey("battery.future_metric"), false);
 });
 
-test("peripheral battery metric keys are runtime-only normalized keys", () => {
-    const metricKey = buildPeripheralBatteryPercentMetricKey("logitech.bolt.slot-2");
+test("vendor HID battery metric keys are runtime-only normalized keys", () => {
+    const metricKey = buildVendorHidBatteryPercentMetricKey("logitech.bolt.slot-2");
 
-    assert.equal(metricKey, "peripheral.battery_percent:logitech.bolt.slot-2");
+    assert.equal(metricKey, "vendor_hid.battery_percent:logitech.bolt.slot-2");
     assert.equal(isBatteryMetricKey(metricKey), true);
+    assert.equal(isVendorHidBatteryMetricKey(metricKey), true);
+    assert.equal(isBluetoothBatteryMetricKey(metricKey), false);
     assert.equal(isSystemMetricKey(metricKey), false);
     assert.equal(isBatteryMetricKey(SYSTEM_BATTERY_PERCENT_METRIC_KEY), true);
     assert.throws(
-        () => buildPeripheralBatteryPercentMetricKey("hid path"),
+        () => buildVendorHidBatteryPercentMetricKey("hid path"),
         /normalized runtime id/,
     );
     assert.throws(
-        () => buildPeripheralBatteryPercentMetricKey("logitech:bolt:slot-2"),
+        () => buildVendorHidBatteryPercentMetricKey("logitech:bolt:slot-2"),
         /normalized runtime id/,
+    );
+});
+
+test("Bluetooth battery metric keys are node-system owned runtime keys", () => {
+    const metricKey = buildBluetoothBatteryPercentMetricKey("device-aabbccddeeff");
+
+    assert.equal(metricKey, "bluetooth.battery_percent:device-aabbccddeeff");
+    assert.equal(isBatteryMetricKey(metricKey), true);
+    assert.equal(isBluetoothBatteryMetricKey(metricKey), true);
+    assert.equal(isVendorHidBatteryMetricKey(metricKey), false);
+    assert.equal(isSystemMetricKey(metricKey), false);
+});
+
+test("Bluetooth battery descriptor ids are built from primary identifier hashes", () => {
+    const primaryIdentifierHash = "a".repeat(64);
+
+    assert.equal(
+        buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(primaryIdentifierHash),
+        `device-${primaryIdentifierHash}`,
+    );
+    assert.throws(
+        () => buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash("not-a-hash"),
+        /lowercase SHA-256 hex/,
     );
 });

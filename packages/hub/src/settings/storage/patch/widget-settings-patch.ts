@@ -24,6 +24,9 @@ import {
     StoredWidgetSettingsSchema,
     SystemBatteryMetricTargetSchema,
     SystemMetricTargetSchema,
+    SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind as StoredBluetoothIdentifierKind,
+    SystemPeripheralIdentity_BluetoothIdentity_IdentifierSchema,
+    SystemPeripheralIdentity_BluetoothIdentitySchema,
     SystemPeripheralIdentitySchema,
     WidgetPreferencesSchema,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
@@ -46,6 +49,7 @@ import {
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedMetricTarget,
+    ResolvedSystemBluetoothPeripheralIdentifier,
     ResolvedSystemPeripheralIdentity,
 } from "../../resolved-settings";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../../runtime/sources/source-ids";
@@ -596,6 +600,7 @@ function buildStoredSystemPeripheralIdentity(
         manufacturer: identity.manufacturer,
         productName: identity.productName,
         serialNumber: identity.serialNumber,
+        evidence: buildStoredSystemPeripheralIdentityEvidence(identity),
         interfaceNumber: identity.interfaceNumber,
         usagePage: identity.usagePage,
         usageId: identity.usageId,
@@ -610,6 +615,49 @@ function buildStoredSystemPeripheralIdentity(
         receiverSlot: identity.receiverSlot,
     });
 }
+
+function buildStoredSystemPeripheralIdentityEvidence(
+    identity: ResolvedSystemPeripheralIdentity,
+): StoredSystemPeripheralIdentity["evidence"] {
+    switch (identity.evidence?.kind) {
+        case "bluetooth":
+            return {
+                case: "bluetoothIdentity",
+                value: create(SystemPeripheralIdentity_BluetoothIdentitySchema, {
+                    primaryIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
+                        identity.evidence.primaryIdentifier,
+                    ),
+                    fallbackIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
+                        identity.evidence.fallbackIdentifier,
+                    ),
+                }),
+            };
+        case undefined:
+            return { case: undefined };
+    }
+}
+
+function buildStoredSystemBluetoothPeripheralIdentifier(
+    identifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined,
+) {
+    if (identifier === undefined) {
+        return undefined;
+    }
+
+    return create(SystemPeripheralIdentity_BluetoothIdentity_IdentifierSchema, {
+        kind: storedBluetoothIdentifierKindByResolved[identifier.kind],
+        hash: identifier.hash,
+    });
+}
+
+const storedBluetoothIdentifierKindByResolved: Record<
+    ResolvedSystemBluetoothPeripheralIdentifier["kind"],
+    StoredBluetoothIdentifierKind
+> = {
+    platformInstanceId: StoredBluetoothIdentifierKind.PLATFORM_INSTANCE_ID,
+    windowsAepAddress: StoredBluetoothIdentifierKind.WINDOWS_AEP_ADDRESS,
+    bluetoothDeviceAddress: StoredBluetoothIdentifierKind.BLUETOOTH_DEVICE_ADDRESS,
+};
 
 function requireSingleMetricSlot(settings: StoredWidgetSettings): StoredMetricSlot {
     if (settings.widget.case !== "singleMetric") {

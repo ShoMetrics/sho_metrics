@@ -41,8 +41,10 @@ import {
     GPU_USAGE_METRIC_KEY,
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
+    isBluetoothBatteryMetricKey,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
     isCpuMetricKey,
     isGpuMetricKey,
     isRamMetricKey,
@@ -86,6 +88,10 @@ import { RefreshableCache, type RefreshableCacheReadResult } from "../refreshabl
 import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
 import { NODE_SYSTEM_SOURCE_ID } from "../source-ids";
 import { buildSystemBatteryMetrics } from "./node-system-battery";
+import {
+    type BluetoothBatteryMetricReader,
+    readBluetoothBatteryMetrics,
+} from "./node-system-bluetooth-battery";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");
@@ -131,6 +137,7 @@ interface NodeSystemSourceDependencies {
     pollSystemInformationGpuTelemetry?: (
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
+    readBluetoothBatteryMetrics?: BluetoothBatteryMetricReader;
 }
 
 interface CachedNetworkInterfaces {
@@ -160,6 +167,7 @@ export class NodeSystemSource implements MetricSource {
     private readonly pollSystemInformationGpuTelemetry: (
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
+    private readonly readBluetoothBatteryMetrics: BluetoothBatteryMetricReader;
     private readonly networkInterfaceCache: RefreshableCache<CachedNetworkInterfaces>;
     private readonly networkInterfaceRefreshBackoff: BackoffPolicy;
     private readonly cpuInformationCache: RefreshableCache<CachedCpuInformation>;
@@ -198,6 +206,7 @@ export class NodeSystemSource implements MetricSource {
         this.pollDarwinGpuTelemetry = dependencies.pollDarwinGpuTelemetry ?? pollDarwinIoAcceleratorGpuTelemetry;
         this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
             ?? pollSystemInformationGpuTelemetry;
+        this.readBluetoothBatteryMetrics = dependencies.readBluetoothBatteryMetrics ?? readBluetoothBatteryMetrics;
         this.networkInterfaceCache = new RefreshableCache({
             now: this.monotonicNow,
             ttlMilliseconds: NodeSystemSource.NETWORK_INTERFACE_CACHE_MS,
@@ -257,7 +266,7 @@ export class NodeSystemSource implements MetricSource {
             metricGroups.has("memory") ? this.pollMemory() : Promise.resolve({}),
             metricGroups.has("disk") ? this.pollDiskSafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("network") ? this.pollNetworkSafely(metricKeys) : Promise.resolve({}),
-            metricGroups.has("battery") ? this.pollBatterySafely() : Promise.resolve({}),
+            metricGroups.has("battery") ? this.pollBatterySafely(metricKeys) : Promise.resolve({}),
             metricGroups.has("gpu") ? this.pollGpu() : Promise.resolve(null),
         ]);
 
@@ -472,13 +481,44 @@ export class NodeSystemSource implements MetricSource {
         }
     }
 
-    private async pollBatterySafely(): Promise<Record<string, MetricValue>> {
+    private async pollBatterySafely(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
         try {
-            const batteryData = await this.systemInformation.battery();
+            const shouldPollSystemBattery = metricKeys.length === 0
+                || metricKeys.includes(SYSTEM_BATTERY_PERCENT_METRIC_KEY);
+            const shouldPollBluetoothBattery = metricKeys.some(isBluetoothBatteryMetricKey);
+            const [batteryData, bluetoothMetrics] = await Promise.all([
+                shouldPollSystemBattery
+                    ? this.pollSystemBatterySafely()
+                    : Promise.resolve(undefined),
+                shouldPollBluetoothBattery
+                    ? this.pollBluetoothBatterySafely(metricKeys)
+                    : Promise.resolve({}),
+            ]);
 
-            return buildSystemBatteryMetrics(batteryData);
+            return {
+                ...(batteryData === undefined ? {} : buildSystemBatteryMetrics(batteryData)),
+                ...bluetoothMetrics,
+            };
         } catch (error) {
             log.error(() => `Battery poll error: ${String(error)}`);
+            return {};
+        }
+    }
+
+    private async pollSystemBatterySafely(): Promise<Systeminformation.BatteryData | undefined> {
+        try {
+            return await this.systemInformation.battery();
+        } catch (error) {
+            log.error(() => `System battery poll error: ${String(error)}`);
+            return undefined;
+        }
+    }
+
+    private async pollBluetoothBatterySafely(metricKeys: readonly string[]): Promise<Record<string, MetricValue>> {
+        try {
+            return await this.readBluetoothBatteryMetrics(this.systemInformation, this.platform, metricKeys);
+        } catch (error) {
+            log.error(() => `Bluetooth battery poll error: ${String(error)}`);
             return {};
         }
     }
@@ -805,7 +845,7 @@ export function resolveNodeSystemMetricGroup(metricKey: string): NodeSystemMetri
         return "gpu";
     }
 
-    if (isSystemMetricKey(metricKey)) {
+    if (isSystemMetricKey(metricKey) || isBluetoothBatteryMetricKey(metricKey)) {
         return "battery";
     }
 

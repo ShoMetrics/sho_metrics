@@ -1,7 +1,7 @@
 import { logger } from "../../../logging/logger";
 import { pluginGlobalSettingsStore } from "../../../settings/global-settings-store";
 import { monotonicNowMilliseconds, wallClockNowMilliseconds } from "../../../shared/clock";
-import { isBatteryMetricKey, SYSTEM_BATTERY_PERCENT_METRIC_KEY } from "../../metric-keys";
+import { isVendorHidBatteryMetricKey as isRuntimeVendorHidBatteryMetricKey } from "../../metric-keys";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit, type MetricValue } from "../metric-source";
 import type {
     NativeHidDevice,
@@ -863,7 +863,7 @@ function buildBatteryRawSensorIdentity(descriptor: BatteryDeviceDescriptor): Sou
 }
 
 function isVendorHidBatteryMetricKey(metricKey: string): boolean {
-    return isBatteryMetricKey(metricKey) && metricKey !== SYSTEM_BATTERY_PERCENT_METRIC_KEY;
+    return isRuntimeVendorHidBatteryMetricKey(metricKey);
 }
 
 function createVendorHidBatteryDiscoveryNativeDiagnostics(): VendorHidBatteryDiscoveryNativeDiagnostics {

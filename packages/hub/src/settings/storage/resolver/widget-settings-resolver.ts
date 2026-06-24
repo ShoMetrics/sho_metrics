@@ -60,6 +60,7 @@ const DEFAULT_WIDGET_PREFERENCES: ResolvedWidgetPreferences = {
 const DEFAULT_DISK_USAGE_POLLING_FREQUENCY_SECONDS = 60;
 const DEFAULT_CUSTOM_METRIC_POLLING_FREQUENCY_SECONDS = 3;
 const DEFAULT_SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS = 60;
+const DEFAULT_BLUETOOTH_BATTERY_POLLING_FREQUENCY_SECONDS = 300;
 const DEFAULT_PERIPHERAL_BATTERY_POLLING_FREQUENCY_SECONDS = 3600;
 
 export function resolveStoredWidgetSettings(
@@ -326,8 +327,12 @@ function defaultPollingFrequencySeconds(resolvedTarget: ResolvedMetricTarget): n
     }
 
     if (resolvedTarget.domain === "system" && resolvedTarget.reading.kind === "batteryPercent") {
-        return resolvedTarget.reading.peripheralIdentity === undefined
-            ? DEFAULT_SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS
+        if (resolvedTarget.reading.peripheralIdentity === undefined) {
+            return DEFAULT_SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS;
+        }
+
+        return resolvedTarget.reading.peripheralIdentity.bindingTransport === "bluetooth"
+            ? DEFAULT_BLUETOOTH_BATTERY_POLLING_FREQUENCY_SECONDS
             : DEFAULT_PERIPHERAL_BATTERY_POLLING_FREQUENCY_SECONDS;
     }
 

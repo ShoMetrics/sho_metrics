@@ -11,6 +11,7 @@ import {
     CPU_USAGE_METRIC_KEY,
     GPU_METRIC_KEYS,
     isBatteryMetricKey,
+    isVendorHidBatteryMetricKey,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
     SYSTEM_BATTERY_PERCENT_METRIC_KEY,
@@ -26,6 +27,7 @@ import {
     WINDOWS_HELPER_SOURCE_ID,
 } from "../sources/source-ids";
 import { isNodeSystemMetricSupportedOnPlatform } from "../source-capabilities/node-system-platform-capabilities";
+import { shouldEnableVendorHidBatterySupport } from "../source-capabilities/vendor-hid-battery-platform-capabilities";
 import type { MetricSupportPlatform } from "../source-capabilities/metric-support-platform";
 
 const NODE_SYSTEM_ONLY_METRIC_KEYS = [
@@ -101,8 +103,8 @@ export function resolveLocalAutoMetricSourceCandidates(
     metricKey: string,
     platform: MetricSupportPlatform,
 ): readonly SourceCandidate[] {
-    if (isBatteryMetricKey(metricKey) && metricKey !== SYSTEM_BATTERY_PERCENT_METRIC_KEY) {
-        return VENDOR_HID_BATTERY_CANDIDATES;
+    if (isVendorHidBatteryMetricKey(metricKey)) {
+        return filterSourceCandidatesForMetricPlatform(VENDOR_HID_BATTERY_CANDIDATES, metricKey, platform);
     }
 
     if (WINDOWS_HELPER_ONLY_METRIC_KEY_SET.has(metricKey)) {
@@ -177,7 +179,7 @@ export function localSourceSupportsMetricOnPlatform(
         case WINDOWS_HELPER_SOURCE_ID:
             return platform === "win32";
         case VENDOR_HID_BATTERY_SOURCE_ID:
-            return isBatteryMetricKey(metricKey) && metricKey !== SYSTEM_BATTERY_PERCENT_METRIC_KEY;
+            return shouldEnableVendorHidBatterySupport(platform) && isVendorHidBatteryMetricKey(metricKey);
         case NODE_SYSTEM_SOURCE_ID:
             return isNodeSystemMetricSupportedOnPlatform(metricKey, platform);
         default:

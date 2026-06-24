@@ -68,7 +68,9 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
         loadStatus: props.context.runtimeCacheStatus.batteryDeviceOptionsStatus,
         t,
     });
-    const isPeripheralSelected = props.target.reading.peripheralIdentity !== undefined;
+    const isVendorHidPeripheralSelected = props.target.reading.peripheralIdentity !== undefined
+        && props.target.reading.peripheralIdentity.bindingTransport !== "bluetooth";
+    const isBatteryDeviceSearchPending = props.context.runtimeCacheStatus.batteryDeviceOptionsStatus === "pending";
 
     return (
         <>
@@ -100,6 +102,13 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                         });
                     }}
                 />
+                {isBatteryDeviceSearchPending && (
+                    <InspectorItem className="note-item note-item-caption">
+                        <p className="section-note">
+                            {t(systemMessages.searchingBatteryDevicesNote)}
+                        </p>
+                    </InspectorItem>
+                )}
                 {selectedBatteryDevice?.diagnostics?.batteryPercentSources.includes("voltageEstimated") === true && (
                     <InspectorItem className="note-item note-item-caption">
                         <p className="section-note">
@@ -170,10 +179,10 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
             <StandardColorSettings {...props} />
             <PollingSettings
                 {...props}
-                optionList={isPeripheralSelected
+                optionList={isVendorHidPeripheralSelected
                     ? PERIPHERAL_POLLING_FREQUENCY_OPTIONS
                     : SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS}
-                note={isPeripheralSelected ? t(systemMessages.infrequentPollingNote) : undefined}
+                note={isVendorHidPeripheralSelected ? t(systemMessages.infrequentPollingNote) : undefined}
             />
         </>
     );
@@ -223,23 +232,13 @@ function buildBatteryDeviceOptions(options: {
             || descriptor.supportState === "offline",
     }));
     const hasSelectedOption = optionList.some(option => option.value === options.selectedDescriptorId);
-    const pendingOption = {
-        value: "",
-        label: options.t(systemMessages.loadingBatteryDevicesOption),
-        disabled: true,
-    } satisfies SelectOption;
-    const visibleOptionList = options.loadStatus === "pending"
-        ? [pendingOption, ...optionList]
-        : optionList;
 
     if (!hasSelectedOption && options.selectedDescriptorId.length > 0) {
         if (options.loadStatus === "pending") {
             return [
                 {
                     value: options.selectedDescriptorId,
-                    label: options.t(systemMessages.searchingBatterySelectionOption, {
-                        label: options.selectedUnavailableLabel,
-                    }),
+                    label: options.selectedUnavailableLabel,
                     disabled: true,
                 },
                 ...optionList,
@@ -254,17 +253,17 @@ function buildBatteryDeviceOptions(options: {
                 }),
                 disabled: true,
             },
-            ...visibleOptionList,
+            ...optionList,
         ];
     }
 
-    if (visibleOptionList.length > 0) {
-        return visibleOptionList;
+    if (optionList.length > 0) {
+        return optionList;
     }
 
     switch (options.loadStatus) {
         case "pending":
-            return [pendingOption];
+            return [{ value: "", label: options.t(systemMessages.noBatteryDevicesOption), disabled: true }];
         case "failed":
             return [{ value: "", label: options.t(systemMessages.batteryDevicesUnavailableOption), disabled: true }];
         case "ready":
