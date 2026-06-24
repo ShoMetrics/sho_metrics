@@ -27,6 +27,7 @@ import {
     SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind as StoredBluetoothIdentifierKind,
     SystemPeripheralIdentity_BluetoothIdentity_IdentifierSchema,
     SystemPeripheralIdentity_BluetoothIdentitySchema,
+    SystemPeripheralIdentity_VendorHidIdentitySchema,
     SystemPeripheralIdentitySchema,
     WidgetPreferencesSchema,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
@@ -51,6 +52,7 @@ import type {
     ResolvedMetricTarget,
     ResolvedSystemBluetoothPeripheralIdentifier,
     ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
 } from "../../resolved-settings";
 import { BUILT_IN_WINDOWS_HELPER_SOURCE_PROFILE_ID } from "../../../runtime/sources/source-ids";
 import {
@@ -595,12 +597,43 @@ function buildStoredSystemPeripheralIdentity(
     identity: ResolvedSystemPeripheralIdentity,
 ): StoredSystemPeripheralIdentity {
     return create(SystemPeripheralIdentitySchema, {
+        evidence: buildStoredSystemPeripheralIdentityEvidence(identity),
+    });
+}
+
+function buildStoredSystemPeripheralIdentityEvidence(
+    identity: ResolvedSystemPeripheralIdentity,
+): StoredSystemPeripheralIdentity["evidence"] {
+    switch (identity.evidence.kind) {
+        case "vendorHid":
+            return {
+                case: "vendorHidIdentity",
+                value: buildStoredSystemVendorHidPeripheralIdentity(identity.evidence),
+            };
+        case "bluetooth":
+            return {
+                case: "bluetoothIdentity",
+                value: create(SystemPeripheralIdentity_BluetoothIdentitySchema, {
+                    primaryIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
+                        identity.evidence.primaryIdentifier,
+                    ),
+                    fallbackIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
+                        identity.evidence.fallbackIdentifier,
+                    ),
+                }),
+            };
+    }
+}
+
+function buildStoredSystemVendorHidPeripheralIdentity(
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
+) {
+    return create(SystemPeripheralIdentity_VendorHidIdentitySchema, {
         vendorId: identity.vendorId,
         productId: identity.productId,
         manufacturer: identity.manufacturer,
         productName: identity.productName,
         serialNumber: identity.serialNumber,
-        evidence: buildStoredSystemPeripheralIdentityEvidence(identity),
         interfaceNumber: identity.interfaceNumber,
         usagePage: identity.usagePage,
         usageId: identity.usageId,
@@ -614,27 +647,6 @@ function buildStoredSystemPeripheralIdentity(
         modelId: identity.modelId,
         receiverSlot: identity.receiverSlot,
     });
-}
-
-function buildStoredSystemPeripheralIdentityEvidence(
-    identity: ResolvedSystemPeripheralIdentity,
-): StoredSystemPeripheralIdentity["evidence"] {
-    switch (identity.evidence?.kind) {
-        case "bluetooth":
-            return {
-                case: "bluetoothIdentity",
-                value: create(SystemPeripheralIdentity_BluetoothIdentitySchema, {
-                    primaryIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
-                        identity.evidence.primaryIdentifier,
-                    ),
-                    fallbackIdentifier: buildStoredSystemBluetoothPeripheralIdentifier(
-                        identity.evidence.fallbackIdentifier,
-                    ),
-                }),
-            };
-        case undefined:
-            return { case: undefined };
-    }
 }
 
 function buildStoredSystemBluetoothPeripheralIdentifier(

@@ -5,6 +5,10 @@ import type { NativeHidDevice, NativeHidDeviceInfo, NativeHidModule } from "./na
 import { VENDOR_HID_BATTERY_SOURCE_ID } from "../source-ids";
 import { buildBatteryMetricKeyFromIdentity } from "../battery/battery-metric-key";
 import type { BatteryDeviceDiscoveryCandidate } from "../battery/battery-device-discovery";
+import type {
+    ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
+} from "../../../settings/resolved-settings";
 import {
     VendorHidBatterySourceClient,
     discoverVendorHidBatteryCandidatesFromReaders,
@@ -216,11 +220,10 @@ test("vendor HID battery source reads selected bindings without re-enumerating H
 test("vendor HID battery source keeps selected reads cheap when another requested device is offline", async () => {
     const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
     const selectedCandidate = buildTestCandidate({ batteryPercent: 89 });
-    const offlineMetricKey = buildBatteryMetricKeyFromIdentity({
-        ...testIdentity,
+    const offlineMetricKey = buildBatteryMetricKeyFromIdentity(buildTestIdentity({
         vendorUnitId: "offline-unit",
         modelId: "offline-device",
-    });
+    }));
     let devicesCalls = 0;
     let discoverCalls = 0;
     let selectedReadCalls = 0;
@@ -272,10 +275,9 @@ test("vendor HID battery source reports selected read failures without re-runnin
     const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
     const mismatchedCandidate = buildTestCandidate({
         batteryPercent: 42,
-        identity: {
-            ...testIdentity,
+        identity: buildTestIdentity({
             vendorUnitId: "other-unit",
-        },
+        }),
     });
     let devicesCalls = 0;
     let discoverCalls = 0;
@@ -466,21 +468,31 @@ function buildNativeHidDeviceInfo(overrides: Partial<NativeHidDeviceInfo> = {}):
     } satisfies NativeHidDeviceInfo;
 }
 
-const testIdentity = {
-    vendorId: 0x046D,
-    productId: 0xC548,
-    manufacturer: "Logitech",
-    productName: "Test Mouse",
-    serialNumber: undefined,
-    interfaceNumber: 2,
-    usagePage: 0xFF00,
-    usageId: undefined,
-    bindingTransport: "usbReceiver",
-    receiverKind: "bolt",
-    vendorUnitId: "unit-test",
-    modelId: "test-mouse",
-    receiverSlot: 1,
-} satisfies BatteryDeviceDiscoveryCandidate["identity"];
+function buildTestIdentity(
+    overrides: Partial<ResolvedSystemVendorHidPeripheralIdentity> = {},
+): ResolvedSystemPeripheralIdentity {
+    return {
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "Test Mouse",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-test",
+            modelId: "test-mouse",
+            receiverSlot: 1,
+            ...overrides,
+        },
+    };
+}
+
+const testIdentity = buildTestIdentity();
 
 class FakeNativeHidDevice implements NativeHidDevice {
     constructor(readonly path: string) {}

@@ -246,7 +246,19 @@ export type ResolvedSystemReading =
     };
 
 export interface ResolvedSystemPeripheralIdentity {
-    readonly evidence?: ResolvedSystemPeripheralIdentityEvidence | undefined;
+    readonly evidence: ResolvedSystemPeripheralIdentityEvidence;
+}
+
+export type ResolvedSystemPeripheralIdentityEvidence =
+    | ResolvedSystemVendorHidPeripheralIdentity
+    | {
+        readonly kind: "bluetooth";
+        readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
+        readonly fallbackIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
+    };
+
+export interface ResolvedSystemVendorHidPeripheralIdentity {
+    readonly kind: "vendorHid";
     readonly vendorId: number | undefined;
     readonly productId: number | undefined;
     readonly manufacturer: string | undefined;
@@ -262,12 +274,17 @@ export interface ResolvedSystemPeripheralIdentity {
     readonly receiverSlot: number | undefined;
 }
 
-export type ResolvedSystemPeripheralIdentityEvidence =
-    | {
-        readonly kind: "bluetooth";
-        readonly primaryIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
-        readonly fallbackIdentifier: ResolvedSystemBluetoothPeripheralIdentifier | undefined;
-    };
+export function readSystemVendorHidPeripheralIdentity(
+    identity: ResolvedSystemPeripheralIdentity | undefined,
+): ResolvedSystemVendorHidPeripheralIdentity | undefined {
+    return identity?.evidence.kind === "vendorHid" ? identity.evidence : undefined;
+}
+
+export function readSystemBluetoothPeripheralIdentity(
+    identity: ResolvedSystemPeripheralIdentity | undefined,
+): Extract<ResolvedSystemPeripheralIdentityEvidence, { readonly kind: "bluetooth" }> | undefined {
+    return identity?.evidence.kind === "bluetooth" ? identity.evidence : undefined;
+}
 
 export interface ResolvedSystemBluetoothPeripheralIdentifier {
     readonly kind: ResolvedSystemBluetoothPeripheralIdentifierKind;

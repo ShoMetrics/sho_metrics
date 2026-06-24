@@ -52,18 +52,21 @@ test("vendor HID battery route registry keeps shared metric keys until the last 
 
 function buildTestIdentity(): ResolvedSystemPeripheralIdentity {
     return {
-        vendorId: 0x046D,
-        productId: 0xC548,
-        manufacturer: "Logitech",
-        productName: "Test Mouse",
-        serialNumber: undefined,
-        interfaceNumber: 2,
-        usagePage: 0xFF00,
-        usageId: undefined,
-        bindingTransport: "usbReceiver",
-        receiverKind: "bolt",
-        vendorUnitId: "unit-test",
-        modelId: "test-mouse",
-        receiverSlot: 1,
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "Test Mouse",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-test",
+            modelId: "test-mouse",
+            receiverSlot: 1,
+        },
     };
 }

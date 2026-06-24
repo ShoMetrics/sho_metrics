@@ -12,6 +12,10 @@ import {
 import { AsusRogBatteryReader } from "./asus-rog-battery-discovery";
 import { ASUS_ROG_KNOWN_KEYBOARD_DEVICE_PID_ROUTES } from "./asus-rog-keyboard-routes";
 import { ASUS_ROG_KNOWN_MOUSE_DIRECT_PID_ROUTES } from "./asus-rog-mouse-routes";
+import type {
+    ResolvedSystemVendorHidPeripheralIdentity,
+} from "../../../../settings/resolved-settings";
+import type { BatteryDeviceDiscoveryCandidate } from "../../battery/battery-device-discovery";
 
 test("ASUS ROG discovery emits verified keyboard candidates", async () => {
     const nativeModule = new FakeNativeHidModule(
@@ -46,7 +50,7 @@ test("ASUS ROG discovery marks theory-backed mouse candidates experimental", asy
     assert.equal(candidates[0].supportState, "experimental");
     assert.equal(candidates[0].isExperimental, true);
     assert.equal(
-        candidates[0].identity.modelId,
+        readVendorHidIdentity(candidates[0]).modelId,
         "asus-rog-mouse:keris-wireless",
     );
 });
@@ -63,7 +67,7 @@ test("ASUS ROG discovery marks OpenRGB-derived keyboard routes experimental", as
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "ROG Strix Scope TKL");
     assert.equal(candidates[0].supportState, "experimental");
-    assert.equal(candidates[0].identity.interfaceNumber, 1);
+    assert.equal(readVendorHidIdentity(candidates[0]).interfaceNumber, 1);
 });
 
 test("ASUS ROG discovery covers known direct mouse battery routes from G-Helper", async () => {
@@ -102,7 +106,7 @@ test("ASUS ROG discovery covers known direct mouse battery routes from G-Helper"
         ).sort((left, right) => left - right),
     );
     assert.deepEqual(
-        candidates.map((candidate) => candidate.identity.modelId).sort(),
+        candidates.map((candidate) => readVendorHidIdentity(candidate).modelId).sort(),
         KNOWN_DIRECT_MOUSE_ROUTE_CASES.map(
             (routeCase) => routeCase.modelId,
         ).sort(),
@@ -268,7 +272,7 @@ test("ASUS ROG discovery names Omni keyboard routes from paired product ids", as
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0].displayName, "ROG Strix Scope II 96 RX Wireless");
-    assert.equal(candidates[0].identity.modelId, "asus-rog-keyboard:strix-scope-ii-96-rx-wireless");
+    assert.equal(readVendorHidIdentity(candidates[0]).modelId, "asus-rog-keyboard:strix-scope-ii-96-rx-wireless");
     assert.equal(candidates[0].receiverKind, "rogOmni");
 });
 
@@ -282,16 +286,22 @@ const KNOWN_DIRECT_MOUSE_ROUTE_CASES: ReadonlyArray<{
     modelId: route.modelId,
 }));
 
-function readRequiredProductId(candidate: {
-    readonly identity: { readonly productId?: number };
-}): number {
-    const productId = candidate.identity.productId;
+function readRequiredProductId(candidate: BatteryDeviceDiscoveryCandidate): number {
+    const productId = readVendorHidIdentity(candidate).productId;
     if (productId === undefined) {
         throw new assert.AssertionError({
             message: "Expected ASUS ROG candidate productId.",
         });
     }
     return productId;
+}
+
+function readVendorHidIdentity(
+    candidate: BatteryDeviceDiscoveryCandidate,
+): ResolvedSystemVendorHidPeripheralIdentity {
+    const identity = candidate.identity.evidence;
+    assert.equal(identity.kind, "vendorHid");
+    return identity;
 }
 
 function buildKeyboardDeviceInfo(

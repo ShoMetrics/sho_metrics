@@ -50,7 +50,7 @@ function resolveSystemMetricKey(target: ResolvedSystemMetricTarget): string {
         return SYSTEM_BATTERY_PERCENT_METRIC_KEY;
     }
 
-    if (peripheralIdentity.evidence?.kind === "bluetooth") {
+    if (peripheralIdentity.evidence.kind === "bluetooth") {
         const primaryIdentifier = peripheralIdentity.evidence.primaryIdentifier;
         if (primaryIdentifier === undefined) {
             // Malformed Bluetooth evidence should fail closed without crossing into vendor HID routing.

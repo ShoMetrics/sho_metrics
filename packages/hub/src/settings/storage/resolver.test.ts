@@ -1,7 +1,6 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { create } from "@bufbuild/protobuf";
-
 import {
     readStoredGlobalSettings,
     readStoredWidgetSettings,
@@ -17,7 +16,6 @@ import {
     StackedMetricSlotSchema,
     StackedMetricWidgetSchema,
     StoredWidgetSettingsSchema,
-    SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind,
 } from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
     ResolvedSingleMetricWidget,
@@ -1109,17 +1107,12 @@ describe("stored settings proto resolver", () => {
                             system: {
                                 battery: {
                                     peripheralIdentity: {
-                                        evidence: {
-                                            case: "bluetoothIdentity",
-                                            value: {
-                                                primaryIdentifier: {
-                                                    kind: SystemPeripheralIdentity_BluetoothIdentity_Identifier_Kind.PLATFORM_INSTANCE_ID,
-                                                    hash: "0".repeat(64),
-                                                },
+                                        bluetoothIdentity: {
+                                            primaryIdentifier: {
+                                                kind: "KIND_PLATFORM_INSTANCE_ID",
+                                                hash: "0".repeat(64),
                                             },
                                         },
-                                        productName: "MX Master 3 Bluetooth",
-                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_BLUETOOTH",
                                     },
                                 },
                             },
@@ -1132,7 +1125,7 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(target.domain, "system");
         assert.equal(target.reading.kind, "batteryPercent");
-        assert.equal(target.reading.peripheralIdentity?.bindingTransport, "bluetooth");
+        assert.equal(target.reading.peripheralIdentity?.evidence.kind, "bluetooth");
         assert.equal(settings.preferences.pollingFrequencySeconds, 300);
     });
 
@@ -1145,9 +1138,11 @@ describe("stored settings proto resolver", () => {
                             system: {
                                 battery: {
                                     peripheralIdentity: {
-                                        vendorId: 0x046d,
-                                        productId: 0xc548,
-                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
+                                        vendorHidIdentity: {
+                                            vendorId: 0x046d,
+                                            productId: 0xc548,
+                                            bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
+                                        },
                                     },
                                 },
                             },
@@ -1160,7 +1155,7 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(target.domain, "system");
         assert.equal(target.reading.kind, "batteryPercent");
-        assert.equal(target.reading.peripheralIdentity?.bindingTransport, "usbReceiver");
+        assert.equal(target.reading.peripheralIdentity?.evidence.kind, "vendorHid");
         assert.equal(settings.preferences.pollingFrequencySeconds, 3600);
     });
 
@@ -1198,19 +1193,21 @@ describe("stored settings proto resolver", () => {
                             system: {
                                 battery: {
                                     peripheralIdentity: {
-                                        vendorId: 0x046d,
-                                        productId: 0xc548,
-                                        manufacturer: " Logitech ",
-                                        productName: " MX Master ",
-                                        serialNumber: " 123 ",
-                                        interfaceNumber: 2,
-                                        usagePage: 0xff00,
-                                        usageId: 1,
-                                        bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
-                                        receiverKind: "SYSTEM_PERIPHERAL_RECEIVER_KIND_BOLT",
-                                        vendorUnitId: " unit-1 ",
-                                        modelId: " mx-master ",
-                                        receiverSlot: 2,
+                                        vendorHidIdentity: {
+                                            vendorId: 0x046d,
+                                            productId: 0xc548,
+                                            manufacturer: " Logitech ",
+                                            productName: " MX Master ",
+                                            serialNumber: " 123 ",
+                                            interfaceNumber: 2,
+                                            usagePage: 0xff00,
+                                            usageId: 1,
+                                            bindingTransport: "SYSTEM_PERIPHERAL_BINDING_TRANSPORT_USB_RECEIVER",
+                                            receiverKind: "SYSTEM_PERIPHERAL_RECEIVER_KIND_BOLT",
+                                            vendorUnitId: " unit-1 ",
+                                            modelId: " mx-master ",
+                                            receiverSlot: 2,
+                                        },
                                     },
                                     detectedPeripheralDisplayName: " MX Master 4 ",
                                 },
@@ -1224,24 +1221,27 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(target.domain, "system");
         assert.deepEqual(target.reading.peripheralIdentity, {
-            vendorId: 0x046d,
-            productId: 0xc548,
-            manufacturer: "Logitech",
-            productName: "MX Master",
-            serialNumber: "123",
-            interfaceNumber: 2,
-            usagePage: 0xff00,
-            usageId: 1,
-            bindingTransport: "usbReceiver",
-            receiverKind: "bolt",
-            vendorUnitId: "unit-1",
-            modelId: "mx-master",
-            receiverSlot: 2,
+            evidence: {
+                kind: "vendorHid",
+                vendorId: 0x046d,
+                productId: 0xc548,
+                manufacturer: "Logitech",
+                productName: "MX Master",
+                serialNumber: "123",
+                interfaceNumber: 2,
+                usagePage: 0xff00,
+                usageId: 1,
+                bindingTransport: "usbReceiver",
+                receiverKind: "bolt",
+                vendorUnitId: "unit-1",
+                modelId: "mx-master",
+                receiverSlot: 2,
+            },
         });
         assert.equal(target.reading.detectedPeripheralDisplayName, "MX Master 4");
     });
 
-    it("keeps insufficient System peripheral identity as safe no-data matching intent", () => {
+    it("drops insufficient System peripheral identity instead of keeping a partial identity", () => {
         const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings({
                 singleMetric: {
@@ -1260,21 +1260,7 @@ describe("stored settings proto resolver", () => {
         const target = settings.widget.slot.metric.target;
 
         assert.equal(target.domain, "system");
-        assert.deepEqual(target.reading.peripheralIdentity, {
-            vendorId: undefined,
-            productId: undefined,
-            manufacturer: undefined,
-            productName: undefined,
-            serialNumber: undefined,
-            interfaceNumber: undefined,
-            usagePage: undefined,
-            usageId: undefined,
-            bindingTransport: undefined,
-            receiverKind: undefined,
-            vendorUnitId: undefined,
-            modelId: undefined,
-            receiverSlot: undefined,
-        });
+        assert.equal(target.reading.peripheralIdentity, undefined);
     });
 
     it("resolves source profiles and source policy ids", () => {

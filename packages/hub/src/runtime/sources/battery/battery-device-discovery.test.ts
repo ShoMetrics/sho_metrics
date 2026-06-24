@@ -9,6 +9,7 @@ import {
 import { buildBatteryMetricKeyFromIdentity } from "./battery-metric-key";
 import type {
     ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
     SystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
@@ -304,22 +305,27 @@ function buildCandidate(
     };
 }
 
-function buildIdentity(overrides: Partial<ResolvedSystemPeripheralIdentity>): ResolvedSystemPeripheralIdentity {
+function buildIdentity(
+    overrides: Partial<ResolvedSystemVendorHidPeripheralIdentity>,
+): ResolvedSystemPeripheralIdentity {
     return {
-        vendorId: 0x046D,
-        productId: 0xC548,
-        manufacturer: "Logitech",
-        productName: "MX Master 4",
-        serialNumber: "serial-2",
-        interfaceNumber: 2,
-        usagePage: 0xFF00,
-        usageId: undefined,
-        bindingTransport: "usbReceiver",
-        receiverKind: "bolt",
-        vendorUnitId: "unit-2",
-        modelId: "mx-master-4",
-        receiverSlot: 2,
-        ...overrides,
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: "serial-2",
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+            ...overrides,
+        },
     };
 }
 

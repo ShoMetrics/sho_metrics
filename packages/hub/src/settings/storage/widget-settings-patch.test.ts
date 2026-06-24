@@ -844,19 +844,22 @@ test("widget patch writes selected System peripheral battery identity", () => {
         {
             system: {
                 peripheralIdentity: {
-                    vendorId: 0x046D,
-                    productId: 0xC548,
-                    manufacturer: "Logitech",
-                    productName: "MX Master 4",
-                    serialNumber: undefined,
-                    interfaceNumber: 2,
-                    usagePage: 0xFF00,
-                    usageId: undefined,
-                    bindingTransport: "usbReceiver",
-                    receiverKind: "bolt",
-                    vendorUnitId: "unit-2",
-                    modelId: "mx-master-4",
-                    receiverSlot: 2,
+                    evidence: {
+                        kind: "vendorHid",
+                        vendorId: 0x046D,
+                        productId: 0xC548,
+                        manufacturer: "Logitech",
+                        productName: "MX Master 4",
+                        serialNumber: undefined,
+                        interfaceNumber: 2,
+                        usagePage: 0xFF00,
+                        usageId: undefined,
+                        bindingTransport: "usbReceiver",
+                        receiverKind: "bolt",
+                        vendorUnitId: "unit-2",
+                        modelId: "mx-master-4",
+                        receiverSlot: 2,
+                    },
                 },
                 detectedPeripheralDisplayName: "MX Master 4",
             },
@@ -868,17 +871,21 @@ test("widget patch writes selected System peripheral battery identity", () => {
     if (target?.case === "system") {
         assert.equal(target.value.reading.case, "battery");
         const identity = target.value.reading.value.peripheralIdentity;
-        assert.equal(identity?.vendorId, 0x046D);
-        assert.equal(identity?.productId, 0xC548);
-        assert.equal(identity?.manufacturer, "Logitech");
-        assert.equal(identity?.productName, "MX Master 4");
-        assert.equal(identity?.interfaceNumber, 2);
-        assert.equal(identity?.usagePage, 0xFF00);
-        assert.equal(identity?.bindingTransport, StoredSystemPeripheralBindingTransport.USB_RECEIVER);
-        assert.equal(identity?.receiverKind, StoredSystemPeripheralReceiverKind.BOLT);
-        assert.equal(identity?.vendorUnitId, "unit-2");
-        assert.equal(identity?.modelId, "mx-master-4");
-        assert.equal(identity?.receiverSlot, 2);
+        assert.equal(identity?.evidence.case, "vendorHidIdentity");
+        const vendorHidIdentity = identity?.evidence.case === "vendorHidIdentity"
+            ? identity.evidence.value
+            : undefined;
+        assert.equal(vendorHidIdentity?.vendorId, 0x046D);
+        assert.equal(vendorHidIdentity?.productId, 0xC548);
+        assert.equal(vendorHidIdentity?.manufacturer, "Logitech");
+        assert.equal(vendorHidIdentity?.productName, "MX Master 4");
+        assert.equal(vendorHidIdentity?.interfaceNumber, 2);
+        assert.equal(vendorHidIdentity?.usagePage, 0xFF00);
+        assert.equal(vendorHidIdentity?.bindingTransport, StoredSystemPeripheralBindingTransport.USB_RECEIVER);
+        assert.equal(vendorHidIdentity?.receiverKind, StoredSystemPeripheralReceiverKind.BOLT);
+        assert.equal(vendorHidIdentity?.vendorUnitId, "unit-2");
+        assert.equal(vendorHidIdentity?.modelId, "mx-master-4");
+        assert.equal(vendorHidIdentity?.receiverSlot, 2);
         assert.equal(target.value.reading.value.detectedPeripheralDisplayName, "MX Master 4");
     }
 });

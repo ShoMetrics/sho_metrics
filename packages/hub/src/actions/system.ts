@@ -20,6 +20,7 @@ import type {
     ResolvedSystemPeripheralIdentity,
     ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
+import { readSystemBluetoothPeripheralIdentity, readSystemVendorHidPeripheralIdentity } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     buildSystemViewOptions,
@@ -61,12 +62,12 @@ export class System extends MetricAction {
         const metricKeys = resolveSystemMetricKeys(target);
         const previousVendorHidMetricKeys = this.registeredVendorHidMetricKeysByActionId.get(event.action.id)
             ?? new Set<string>();
-        const nextVendorHidMetricKeys = selectedIdentity === undefined || selectedIdentity.bindingTransport === "bluetooth"
+        const nextVendorHidMetricKeys = readSystemVendorHidPeripheralIdentity(selectedIdentity) === undefined
             ? new Set<string>()
             : new Set(metricKeys);
         const previousBluetoothMetricKeys = this.registeredBluetoothMetricKeysByActionId.get(event.action.id)
             ?? new Set<string>();
-        const nextBluetoothMetricKeys = selectedIdentity?.evidence?.kind === "bluetooth"
+        const nextBluetoothMetricKeys = readSystemBluetoothPeripheralIdentity(selectedIdentity) !== undefined
             ? new Set(metricKeys)
             : new Set<string>();
 
@@ -220,50 +221,53 @@ function formatBatterySelectionKindForLog(identity: ResolvedSystemPeripheralIden
         return "system";
     }
 
-    return identity.evidence?.kind === "bluetooth"
+    const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(identity);
+    return identity.evidence.kind === "bluetooth"
         ? "bluetooth"
-        : `vendorHid:${identity.bindingTransport ?? "unknown"}`;
+        : `vendorHid:${vendorHidIdentity?.bindingTransport ?? "unknown"}`;
 }
 
 function arePeripheralIdentitiesEqual(
     left: ResolvedSystemPeripheralIdentity,
     right: ResolvedSystemPeripheralIdentity,
 ): boolean {
-    return left.vendorId === right.vendorId
-        && left.productId === right.productId
-        && left.manufacturer === right.manufacturer
-        && left.productName === right.productName
-        && left.serialNumber === right.serialNumber
-        && left.interfaceNumber === right.interfaceNumber
-        && left.usagePage === right.usagePage
-        && left.usageId === right.usageId
-        && left.bindingTransport === right.bindingTransport
-        && left.receiverKind === right.receiverKind
-        && left.vendorUnitId === right.vendorUnitId
-        && left.modelId === right.modelId
-        && left.receiverSlot === right.receiverSlot
-        && arePeripheralIdentityEvidenceEqual(left, right);
+    return arePeripheralIdentityEvidenceEqual(left, right);
 }
 
 function arePeripheralIdentityEvidenceEqual(
     left: ResolvedSystemPeripheralIdentity,
     right: ResolvedSystemPeripheralIdentity,
 ): boolean {
-    if (left.evidence?.kind !== right.evidence?.kind) {
+    if (left.evidence.kind !== right.evidence.kind) {
         return false;
     }
 
-    switch (left.evidence?.kind) {
+    switch (left.evidence.kind) {
+        case "vendorHid": {
+            const rightEvidence = right.evidence.kind === "vendorHid" ? right.evidence : undefined;
+            return rightEvidence !== undefined
+                && left.evidence.vendorId === rightEvidence.vendorId
+                && left.evidence.productId === rightEvidence.productId
+                && left.evidence.manufacturer === rightEvidence.manufacturer
+                && left.evidence.productName === rightEvidence.productName
+                && left.evidence.serialNumber === rightEvidence.serialNumber
+                && left.evidence.interfaceNumber === rightEvidence.interfaceNumber
+                && left.evidence.usagePage === rightEvidence.usagePage
+                && left.evidence.usageId === rightEvidence.usageId
+                && left.evidence.bindingTransport === rightEvidence.bindingTransport
+                && left.evidence.receiverKind === rightEvidence.receiverKind
+                && left.evidence.vendorUnitId === rightEvidence.vendorUnitId
+                && left.evidence.modelId === rightEvidence.modelId
+                && left.evidence.receiverSlot === rightEvidence.receiverSlot;
+        }
         case "bluetooth":
             return areBluetoothIdentifiersEqual(
                 left.evidence.primaryIdentifier,
-                right.evidence?.kind === "bluetooth" ? right.evidence.primaryIdentifier : undefined,
+                right.evidence.kind === "bluetooth" ? right.evidence.primaryIdentifier : undefined,
             ) && areBluetoothIdentifiersEqual(
                 left.evidence.fallbackIdentifier,
-                right.evidence?.kind === "bluetooth" ? right.evidence.fallbackIdentifier : undefined,
+                right.evidence.kind === "bluetooth" ? right.evidence.fallbackIdentifier : undefined,
             );
-        case undefined:
-            return true;
     }
 }
 

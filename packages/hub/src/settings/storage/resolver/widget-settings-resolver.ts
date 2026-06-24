@@ -331,7 +331,7 @@ function defaultPollingFrequencySeconds(resolvedTarget: ResolvedMetricTarget): n
             return DEFAULT_SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS;
         }
 
-        return resolvedTarget.reading.peripheralIdentity.bindingTransport === "bluetooth"
+        return resolvedTarget.reading.peripheralIdentity.evidence.kind === "bluetooth"
             ? DEFAULT_BLUETOOTH_BATTERY_POLLING_FREQUENCY_SECONDS
             : DEFAULT_PERIPHERAL_BATTERY_POLLING_FREQUENCY_SECONDS;
     }

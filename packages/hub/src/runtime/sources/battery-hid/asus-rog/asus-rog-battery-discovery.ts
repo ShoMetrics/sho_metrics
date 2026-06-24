@@ -1,8 +1,10 @@
 import type {
     ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
     SystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind,
 } from "../../../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../../../settings/resolved-settings";
 import { logger } from "../../../../logging/logger";
 import { monotonicNowMilliseconds } from "../../../../shared/clock";
 import { buildBatteryMetricKeyFromIdentity } from "../../battery/battery-metric-key";
@@ -147,12 +149,13 @@ export class AsusRogBatteryReader implements VendorHidBatteryReader {
         identity: ResolvedSystemPeripheralIdentity,
         deviceInfoList: readonly NativeHidDeviceInfo[],
     ): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
-        if (identity.vendorId !== ASUS_ROG_VENDOR_ID) {
+        const vendorHidIdentity = readSystemVendorHidPeripheralIdentity(identity);
+        if (vendorHidIdentity?.vendorId !== ASUS_ROG_VENDOR_ID) {
             return Promise.resolve(undefined);
         }
 
         for (const deviceInfo of deviceInfoList) {
-            const route = resolveAsusRogSelectedBatteryRoute(deviceInfo, identity);
+            const route = resolveAsusRogSelectedBatteryRoute(deviceInfo, vendorHidIdentity);
             if (route === undefined) {
                 continue;
             }
@@ -387,7 +390,7 @@ function resolveAsusRogBatteryRoute(
 
 function resolveAsusRogSelectedBatteryRoute(
     deviceInfo: NativeHidDeviceInfo,
-    identity: ResolvedSystemPeripheralIdentity,
+    identity: ResolvedSystemVendorHidPeripheralIdentity,
 ): AsusRogBatteryRoute | undefined {
     if (
         identity.productId !== undefined &&
@@ -516,19 +519,22 @@ function buildAsusRogBatteryCandidate(
         transport: route.transport,
         receiverKind: route.receiverKind,
         identity: {
-            vendorId: ASUS_ROG_VENDOR_ID,
-            productId: deviceInfo.productId,
-            manufacturer: deviceInfo.manufacturer ?? ASUS_MANUFACTURER,
-            productName: deviceInfo.product ?? route.displayName,
-            serialNumber: deviceInfo.serialNumber,
-            interfaceNumber: deviceInfo.interface,
-            usagePage: deviceInfo.usagePage,
-            usageId: deviceInfo.usage,
-            bindingTransport: route.transport,
-            receiverKind: route.receiverKind,
-            vendorUnitId: undefined,
-            modelId: route.modelId,
-            receiverSlot: undefined,
+            evidence: {
+                kind: "vendorHid",
+                vendorId: ASUS_ROG_VENDOR_ID,
+                productId: deviceInfo.productId,
+                manufacturer: deviceInfo.manufacturer ?? ASUS_MANUFACTURER,
+                productName: deviceInfo.product ?? route.displayName,
+                serialNumber: deviceInfo.serialNumber,
+                interfaceNumber: deviceInfo.interface,
+                usagePage: deviceInfo.usagePage,
+                usageId: deviceInfo.usage,
+                bindingTransport: route.transport,
+                receiverKind: route.receiverKind,
+                vendorUnitId: undefined,
+                modelId: route.modelId,
+                receiverSlot: undefined,
+            },
         },
         supportState: route.supportState,
         isExperimental: true,
