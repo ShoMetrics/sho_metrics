@@ -177,60 +177,46 @@ message MetricSourcePolicy {
 }
 
 message CpuMetricTarget {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_USAGE = 1;
-    KIND_TEMPERATURE = 2;
-    KIND_POWER = 3;
+  oneof reading {
+    Usage usage = 1;
+    Temperature temperature = 2;
+    Power power = 3;
   }
 
-  optional Kind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  message Usage {}
 
-  // These display settings are meaningful only for the corresponding CPU
-  // metric kinds. If CPU target settings grow further, split kind-specific
-  // fields into oneof sub-messages together with the similar GPU/Disk cleanup.
-  optional uint32 maximum_temperature_celsius = 2 [(buf.validate.field).uint32 = {
-    gte: 1
-    lte: 200
-  }];
-  optional uint32 maximum_power_watts = 3 [(buf.validate.field).uint32 = {
-    gte: 1
-    lte: 2000
-  }];
-  optional TemperatureUnit temperature_unit = 4 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  message Temperature {
+    optional uint32 maximum_temperature_celsius = 1 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 200
+    }];
+    optional TemperatureUnit temperature_unit = 2 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+  }
+
+  message Power {
+    optional uint32 maximum_power_watts = 1 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 2000
+    }];
+  }
 }
 
 message MemoryMetricTarget {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_USAGE = 1;
+  oneof reading {
+    Usage usage = 1;
   }
 
-  optional Kind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  message Usage {}
 }
 
 message NetworkMetricTarget {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_TRAFFIC = 1;
-    KIND_PING = 2;
+  oneof reading {
+    Traffic traffic = 1;
+    Ping ping = 2;
   }
-
-  optional Kind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional Traffic traffic = 2;
-  optional Ping ping = 3;
 
   message Traffic {
     enum Direction {
@@ -263,79 +249,72 @@ message NetworkMetricTarget {
 }
 
 message DiskMetricTarget {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_USAGE = 1;
-    KIND_THROUGHPUT = 2;
+  oneof reading {
+    Usage usage = 1;
+    Throughput throughput = 2;
   }
 
-  enum ThroughputDirection {
-    THROUGHPUT_DIRECTION_UNSPECIFIED = 0;
-    THROUGHPUT_DIRECTION_BOTH = 1;
-    THROUGHPUT_DIRECTION_READ = 2;
-    THROUGHPUT_DIRECTION_WRITE = 3;
+  message Usage {
+    enum DisplayMode {
+      DISPLAY_MODE_UNSPECIFIED = 0;
+      DISPLAY_MODE_PERCENTAGE = 1;
+      DISPLAY_MODE_SPACE = 2;
+    }
+
+    optional string volume_id = 1 [(buf.validate.field).string.max_len = 512];
+    optional DisplayMode display_mode = 2 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional string bar_label = 3 [(buf.validate.field).string.max_len = 32];
   }
 
-  enum UsageDisplayMode {
-    USAGE_DISPLAY_MODE_UNSPECIFIED = 0;
-    USAGE_DISPLAY_MODE_PERCENTAGE = 1;
-    USAGE_DISPLAY_MODE_SPACE = 2;
+  message Throughput {
+    enum Direction {
+      DIRECTION_UNSPECIFIED = 0;
+      DIRECTION_BOTH = 1;
+      DIRECTION_READ = 2;
+      DIRECTION_WRITE = 3;
+    }
+
+    optional Direction direction = 1 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
   }
-
-  optional Kind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional string volume_id = 2 [(buf.validate.field).string.max_len = 512];
-
-  // Fields below are kind-specific. throughput_direction is only meaningful
-  // for Kind.KIND_THROUGHPUT; usage_display_mode and bar_label are only
-  // meaningful for Kind.KIND_USAGE. If either branch grows further, split
-  // into oneof sub-messages together with the similar GpuMetricTarget cleanup.
-  optional ThroughputDirection throughput_direction = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional UsageDisplayMode usage_display_mode = 4 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-
-  optional string bar_label = 5 [(buf.validate.field).string.max_len = 32];
 }
 
 message GpuMetricTarget {
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_USAGE = 1;
-    KIND_TEMPERATURE = 2;
-    KIND_VRAM = 3;
-    KIND_POWER = 4;
+  oneof reading {
+    Usage usage = 1;
+    Temperature temperature = 2;
+    Vram vram = 3;
+    Power power = 4;
   }
 
-  optional Kind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  optional string gpu_id = 2 [(buf.validate.field).string.max_len = 256];
+  optional string gpu_id = 10 [(buf.validate.field).string.max_len = 256];
 
-  // These display ceilings are meaningful only for the corresponding GPU
-  // metric kinds. Keeping them on the GPU target avoids one widget-level value
-  // being shared accidentally by future multi-slot widgets. If GPU target
-  // settings grow further, split kind-specific fields into oneof sub-messages
-  // together with the similar DiskMetricTarget cleanup.
-  optional uint32 maximum_temperature_celsius = 3 [(buf.validate.field).uint32 = {
-    gte: 1
-    lte: 200
-  }];
-  optional uint32 maximum_power_watts = 4 [(buf.validate.field).uint32 = {
-    gte: 1
-    lte: 2000
-  }];
-  optional TemperatureUnit temperature_unit = 5 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
+  message Usage {}
+
+  message Temperature {
+    optional uint32 maximum_temperature_celsius = 1 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 200
+    }];
+    optional TemperatureUnit temperature_unit = 2 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+  }
+
+  message Vram {}
+
+  message Power {
+    optional uint32 maximum_power_watts = 1 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 2000
+    }];
+  }
 }
 
 message SystemMetricTarget {

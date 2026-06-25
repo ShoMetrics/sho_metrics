@@ -3,18 +3,25 @@ import {
     AppearanceSettingsSchema,
     CatalogMetricTargetSchema,
     CustomMetricTargetSchema,
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
+    CpuMetricTarget_PowerSchema,
+    CpuMetricTarget_TemperatureSchema,
+    CpuMetricTarget_UsageSchema,
     CpuMetricTargetSchema,
     DenseMetricSlotSchema,
     DiskMetricTargetSchema,
+    DiskMetricTarget_ThroughputSchema,
+    DiskMetricTarget_UsageSchema,
+    GpuMetricTarget_PowerSchema,
+    GpuMetricTarget_TemperatureSchema,
+    GpuMetricTarget_UsageSchema,
+    GpuMetricTarget_VramSchema,
     GpuMetricTargetSchema,
-    MemoryMetricTarget_Kind as StoredMemoryMetricKind,
+    MemoryMetricTarget_UsageSchema,
     MemoryMetricTargetSchema,
     MetricSelectionSchema,
     MetricSourcePolicySchema,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricSlotSchema,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTargetSchema,
     NetworkMetricTarget_TrafficSchema,
     SlotOverridesSchema,
@@ -98,10 +105,7 @@ import {
 import {
     storedCatalogMetricCategoryByResolved,
     storedCatalogMetricReadingKindByResolved,
-    storedCpuMetricKindByResolved,
-    storedDiskMetricKindByResolved,
     storedDiskThroughputDirectionByResolved,
-    storedGpuMetricKindByResolved,
     storedNetworkDirectionByResolved,
     storedSystemPeripheralBindingTransportByResolved,
     storedSystemPeripheralReceiverKindByResolved,
@@ -117,6 +121,10 @@ export type {
     StoredWidgetSettingsPatch,
     WriteStoredWidgetSettingsPatchOptions,
 } from "./widget-settings-patch-types";
+
+type StoredCpuReadingCase = NonNullable<StoredCpuMetricTarget["reading"]["case"]>;
+type StoredDiskReadingCase = NonNullable<StoredDiskMetricTarget["reading"]["case"]>;
+type StoredGpuReadingCase = NonNullable<StoredGpuMetricTarget["reading"]["case"]>;
 
 /** Writes a sparse stored-settings patch without persisting resolved defaults. */
 export function writeStoredWidgetSettingsPatch(
@@ -217,7 +225,12 @@ function applyStackedPatch(
                         metric: create(MetricSelectionSchema, {
                             target: {
                                 case: "cpu",
-                                value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
+                                value: create(CpuMetricTargetSchema, {
+                                    reading: {
+                                        case: "usage",
+                                        value: create(CpuMetricTarget_UsageSchema),
+                                    },
+                                }),
                             },
                         }),
                     }),
@@ -310,7 +323,12 @@ function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]):
         case "cpu":
             return {
                 case: "cpu",
-                value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
+                value: create(CpuMetricTargetSchema, {
+                    reading: {
+                        case: "usage",
+                        value: create(CpuMetricTarget_UsageSchema),
+                    },
+                }),
             };
         case "gpu":
             return {
@@ -320,7 +338,12 @@ function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]):
         case "memory":
             return {
                 case: "memory",
-                value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
+                value: create(MemoryMetricTargetSchema, {
+                    reading: {
+                        case: "usage",
+                        value: create(MemoryMetricTarget_UsageSchema),
+                    },
+                }),
             };
         case "disk":
             return {
@@ -331,8 +354,10 @@ function buildDefaultSingleMetricTarget(domain: ResolvedMetricTarget["domain"]):
             return {
                 case: "network",
                 value: create(NetworkMetricTargetSchema, {
-                    kind: StoredNetworkMetricKind.TRAFFIC,
-                    traffic: create(NetworkMetricTarget_TrafficSchema),
+                    reading: {
+                        case: "traffic",
+                        value: create(NetworkMetricTarget_TrafficSchema),
+                    },
                 }),
             };
         case "catalog":
@@ -497,44 +522,39 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
         case "cpu":
             return {
                 case: "cpu",
-                value: create(CpuMetricTargetSchema, {
-                    kind: storedCpuMetricKindByResolved[patch.kind],
-                }),
+                value: create(CpuMetricTargetSchema, { reading: buildDenseCpuReading(patch.kind) }),
             };
         case "gpu":
             return {
                 case: "gpu",
-                value: create(GpuMetricTargetSchema, {
-                    kind: storedGpuMetricKindByResolved[patch.kind],
-                }),
+                value: create(GpuMetricTargetSchema, { reading: buildDenseGpuReading(patch.kind) }),
             };
         case "memory":
             return {
                 case: "memory",
                 value: create(MemoryMetricTargetSchema, {
-                    kind: StoredMemoryMetricKind.USAGE,
+                    reading: {
+                        case: "usage",
+                        value: create(MemoryMetricTarget_UsageSchema),
+                    },
                 }),
             };
         case "disk":
             return {
                 case: "disk",
-                value: create(DiskMetricTargetSchema, {
-                    kind: storedDiskMetricKindByResolved[patch.kind],
-                    volumeId: patch.volumeId,
-                    throughputDirection: patch.kind === "throughput"
-                        ? storedDiskThroughputDirectionByResolved[patch.throughputDirection ?? "read"]
-                        : undefined,
-                }),
+                value: create(DiskMetricTargetSchema, { reading: buildDenseDiskReading(patch) }),
             };
         case "network":
             return {
                 case: "network",
                 value: create(NetworkMetricTargetSchema, {
-                    kind: StoredNetworkMetricKind.TRAFFIC,
-                    traffic: create(NetworkMetricTarget_TrafficSchema, {
-                        direction: storedNetworkDirectionByResolved[patch.direction],
-                        interfaceId: patch.interfaceId,
-                    }),
+                    reading: {
+                        case: "traffic",
+                        value: create(NetworkMetricTarget_TrafficSchema, {
+                            direction: storedNetworkDirectionByResolved[patch.direction],
+                            interfaceId: patch.interfaceId,
+                        }),
+                    },
                 }),
             };
         case "catalog":
@@ -568,6 +588,59 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
                 value: create(CustomMetricTargetSchema),
             };
     }
+}
+
+function buildDenseCpuReading(kind: StoredCpuReadingCase): StoredCpuMetricTarget["reading"] {
+    switch (kind) {
+        case "usage":
+            return { case: "usage", value: create(CpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return { case: "temperature", value: create(CpuMetricTarget_TemperatureSchema) };
+        case "power":
+            return { case: "power", value: create(CpuMetricTarget_PowerSchema) };
+    }
+
+    return assertNever(kind);
+}
+
+function buildDenseGpuReading(kind: StoredGpuReadingCase): StoredGpuMetricTarget["reading"] {
+    switch (kind) {
+        case "usage":
+            return { case: "usage", value: create(GpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return { case: "temperature", value: create(GpuMetricTarget_TemperatureSchema) };
+        case "vram":
+            return { case: "vram", value: create(GpuMetricTarget_VramSchema) };
+        case "power":
+            return { case: "power", value: create(GpuMetricTarget_PowerSchema) };
+    }
+
+    return assertNever(kind);
+}
+
+function buildDenseDiskReading(
+    patch: Extract<DenseMetricTargetPatch, { readonly domain: "disk" }>,
+): StoredDiskMetricTarget["reading"] {
+    const kind: StoredDiskReadingCase = patch.kind;
+
+    switch (kind) {
+        case "usage":
+            return {
+                case: "usage",
+                value: create(DiskMetricTarget_UsageSchema, {
+                    volumeId: patch.volumeId,
+                }),
+            };
+        case "throughput":
+            return {
+                case: "throughput",
+                value: create(DiskMetricTarget_ThroughputSchema, {
+                    direction: storedDiskThroughputDirectionByResolved[patch.throughputDirection ?? "read"],
+                }),
+            };
+    }
+
+    return assertNever(kind);
 }
 
 function applyPreferencesPatch(
@@ -806,4 +879,8 @@ function requireSystemBatteryTarget(metric: StoredMetricSelection): StoredSystem
 
 function throwPatchTargetMismatch(message: string): never {
     throw new Error(message);
+}
+
+function assertNever(value: never): never {
+    throw new Error(`Unexpected stored metric target reading case: ${JSON.stringify(value)}`);
 }

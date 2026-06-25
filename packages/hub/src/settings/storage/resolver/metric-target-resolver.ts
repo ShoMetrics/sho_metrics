@@ -1,14 +1,11 @@
 import {
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
-    DiskMetricTarget_Kind as StoredDiskMetricKind,
-    GpuMetricTarget_Kind as StoredGpuMetricKind,
-    MemoryMetricTarget_Kind as StoredMemoryMetricKind,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomHttpMetricSource as StoredCustomHttpMetricSource,
     type CustomMetricTarget as StoredCustomMetricTarget,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
+    type MemoryMetricTarget as StoredMemoryMetricTarget,
     type MetricSelection as StoredMetricSelection,
     type MetricSourcePolicy as StoredMetricSourcePolicy,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
@@ -54,7 +51,6 @@ import { readPositiveRuntimeMaximum } from "./display-settings-resolver";
 import {
     resolveOptionalProtoEnum,
     resolveProtoEnum,
-    throwUnexpectedStoredSettingsState,
 } from "./resolver-helpers";
 import {
     catalogMetricCategoryByProto,
@@ -62,7 +58,6 @@ import {
     diskThroughputDirectionByProto,
     diskUsageDisplayModeByProto,
     networkDirectionByProto,
-    networkMetricKindByProto,
     networkTrafficDisplayModeByProto,
     sourceFailureModeByProto,
     systemPeripheralBindingTransportByProto,
@@ -102,7 +97,7 @@ function resolveMetricTarget(
         case "cpu":
             return resolveCpuMetricTarget(storedMetricSelection.target.value);
         case "memory":
-            return resolveMemoryMetricTarget(storedMetricSelection.target.value.kind);
+            return resolveMemoryMetricTarget(storedMetricSelection.target.value);
         case "network":
             return resolveNetworkMetricTarget(storedMetricSelection.target.value, networkDisplay);
         case "disk":
@@ -228,46 +223,60 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 function resolveCpuMetricTarget(
     storedTarget: StoredCpuMetricTarget | undefined,
 ): ResolvedMetricTarget {
-    switch (storedTarget?.kind) {
-        case StoredCpuMetricKind.TEMPERATURE:
+    if (storedTarget === undefined) {
+        return {
+            domain: "cpu",
+            reading: { kind: "usage" },
+        };
+    }
+
+    const { reading } = storedTarget;
+    const readingCase = reading.case;
+
+    switch (readingCase) {
+        case "temperature":
             return {
                 domain: "cpu",
                 reading: {
                     kind: "temperature",
-                    maximumCelsius: storedTarget?.maximumTemperatureCelsius ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
-                    unit: resolveProtoEnum(storedTarget?.temperatureUnit, temperatureUnitByProto, "celsius"),
+                    maximumCelsius: reading.value.maximumTemperatureCelsius
+                        ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
+                    unit: resolveProtoEnum(reading.value.temperatureUnit, temperatureUnitByProto, "celsius"),
                 },
             };
-        case StoredCpuMetricKind.POWER:
+        case "power":
             return {
                 domain: "cpu",
                 reading: {
                     kind: "power",
-                    maximumWatts: storedTarget?.maximumPowerWatts ?? DEFAULT_CPU_POWER_WATTS,
+                    maximumWatts: reading.value.maximumPowerWatts ?? DEFAULT_CPU_POWER_WATTS,
                 },
             };
-        case StoredCpuMetricKind.USAGE:
+        case "usage":
         case undefined:
             return {
                 domain: "cpu",
                 reading: { kind: "usage" },
             };
-        case StoredCpuMetricKind.UNSPECIFIED:
-            return throwUnexpectedStoredSettingsState("Unexpected CPU metric kind after protovalidate.");
     }
+
+    return assertNever(readingCase);
 }
 
-function resolveMemoryMetricTarget(kind: StoredMemoryMetricKind | undefined): ResolvedMetricTarget {
-    switch (kind) {
-        case StoredMemoryMetricKind.USAGE:
+function resolveMemoryMetricTarget(storedTarget: StoredMemoryMetricTarget): ResolvedMetricTarget {
+    const { reading } = storedTarget;
+    const readingCase = reading.case;
+
+    switch (readingCase) {
+        case "usage":
         case undefined:
             return {
                 domain: "memory",
                 reading: { kind: "usage" } satisfies ResolvedMemoryReading,
             };
-        case StoredMemoryMetricKind.UNSPECIFIED:
-            return throwUnexpectedStoredSettingsState("Unexpected memory metric kind after protovalidate.");
     }
+
+    return assertNever(readingCase);
 }
 
 function resolveNetworkMetricTarget(
@@ -284,40 +293,53 @@ function resolveNetworkReading(
     storedTarget: StoredNetworkMetricTarget,
     display: ResolvedNetworkDisplaySettings,
 ): ResolvedNetworkReading {
-    const kind = resolveProtoEnum(storedTarget.kind, networkMetricKindByProto, "traffic");
+    const { reading } = storedTarget;
+    const readingCase = reading.case;
 
-    switch (kind) {
+    switch (readingCase) {
         case "ping":
             return {
                 kind: "ping",
                 // Stored settings may be hand-edited or recovered from stale JSON.
                 // The patch writer stores normalized hosts; the resolver keeps this boundary safe.
                 targetHost: normalizeNetworkPingTargetInput(
-                    storedTarget.ping?.targetHost ?? DEFAULT_NETWORK_PING_TARGET_HOST,
+                    reading.value.targetHost ?? DEFAULT_NETWORK_PING_TARGET_HOST,
                 ).targetHost,
             };
         case "traffic":
             return {
                 kind: "traffic",
-                interfaceId: storedTarget.traffic?.interfaceId,
-                direction: resolveProtoEnum(storedTarget.traffic?.direction, networkDirectionByProto, "both"),
+                interfaceId: reading.value.interfaceId,
+                direction: resolveProtoEnum(reading.value.direction, networkDirectionByProto, "both"),
                 trafficDisplayMode: resolveProtoEnum(
-                    storedTarget.traffic?.trafficDisplayMode,
+                    reading.value.trafficDisplayMode,
                     networkTrafficDisplayModeByProto,
                     "mirrored",
                 ),
                 display,
             };
+        case undefined:
+            return {
+                kind: "traffic",
+                interfaceId: undefined,
+                direction: "both",
+                trafficDisplayMode: "mirrored",
+                display,
+            };
     }
+
+    return assertNever(readingCase);
 }
 
 function resolveDiskMetricTarget(
     storedTarget: StoredDiskMetricTarget,
     display: ResolvedDiskThroughputDisplaySettings,
 ): ResolvedMetricTarget {
+    const usage = storedTarget.reading.case === "usage" ? storedTarget.reading.value : undefined;
+
     return {
         domain: "disk",
-        volumeId: storedTarget.volumeId,
+        volumeId: usage?.volumeId,
         reading: resolveDiskReading(storedTarget, display),
     };
 }
@@ -326,31 +348,36 @@ function resolveDiskReading(
     storedTarget: StoredDiskMetricTarget,
     display: ResolvedDiskThroughputDisplaySettings,
 ): ResolvedDiskReading {
-    switch (storedTarget.kind) {
-        case StoredDiskMetricKind.THROUGHPUT:
+    const { reading } = storedTarget;
+    const readingCase = reading.case;
+
+    switch (readingCase) {
+        case "throughput":
             return {
                 kind: "throughput",
                 direction: resolveProtoEnum(
-                    storedTarget.throughputDirection,
+                    reading.value.direction,
                     diskThroughputDirectionByProto,
                     "both",
                 ),
                 display,
             };
-        case StoredDiskMetricKind.USAGE:
-        case undefined:
+        case "usage":
+        case undefined: {
+            const usage = readingCase === "usage" ? reading.value : undefined;
             return {
                 kind: "usage",
                 displayMode: resolveProtoEnum(
-                    storedTarget.usageDisplayMode,
+                    usage?.displayMode,
                     diskUsageDisplayModeByProto,
                     "percentage",
                 ),
-                barLabel: storedTarget.barLabel ?? "",
+                barLabel: usage?.barLabel ?? "",
             };
-        case StoredDiskMetricKind.UNSPECIFIED:
-            return throwUnexpectedStoredSettingsState("Unexpected disk metric kind after protovalidate.");
+        }
     }
+
+    return assertNever(readingCase);
 }
 
 function resolveGpuMetricTarget(
@@ -368,29 +395,32 @@ function resolveGpuReading(
     storedTarget: StoredGpuMetricTarget,
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedGpuReading {
-    switch (storedTarget.kind) {
-        case StoredGpuMetricKind.TEMPERATURE:
+    const { reading } = storedTarget;
+    const readingCase = reading.case;
+
+    switch (readingCase) {
+        case "temperature":
             return {
                 kind: "temperature",
-                maximumCelsius: storedTarget.maximumTemperatureCelsius ?? DEFAULT_GPU_TEMPERATURE_CELSIUS,
-                unit: resolveProtoEnum(storedTarget.temperatureUnit, temperatureUnitByProto, "celsius"),
+                maximumCelsius: reading.value.maximumTemperatureCelsius ?? DEFAULT_GPU_TEMPERATURE_CELSIUS,
+                unit: resolveProtoEnum(reading.value.temperatureUnit, temperatureUnitByProto, "celsius"),
             };
-        case StoredGpuMetricKind.VRAM:
+        case "vram":
             return { kind: "vram" };
-        case StoredGpuMetricKind.POWER:
+        case "power":
             return {
                 kind: "power",
                 maximumWatts: resolveGpuPowerMaximumWatts(
-                    storedTarget.maximumPowerWatts,
+                    reading.value.maximumPowerWatts,
                     runtime?.runtimeMaximumGpuPowerWatts,
                 ),
             };
-        case StoredGpuMetricKind.USAGE:
+        case "usage":
         case undefined:
             return { kind: "usage" };
-        case StoredGpuMetricKind.UNSPECIFIED:
-            return throwUnexpectedStoredSettingsState("Unexpected GPU metric kind after protovalidate.");
     }
+
+    return assertNever(readingCase);
 }
 
 function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): ResolvedCatalogMetricTarget {

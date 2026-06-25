@@ -1,23 +1,22 @@
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import { create } from "@bufbuild/protobuf";
 import {
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
     CatalogMetricTargetSchema,
     CustomMetricTargetSchema,
+    CpuMetricTarget_UsageSchema,
     CpuMetricTargetSchema,
     DenseMetricSlotSchema,
     DenseMultiMetricWidgetSchema,
-    DiskMetricTarget_Kind as StoredDiskMetricKind,
+    DiskMetricTarget_UsageSchema,
     DiskMetricTargetSchema,
-    GpuMetricTarget_Kind as StoredGpuMetricKind,
+    GpuMetricTarget_UsageSchema,
     GpuMetricTargetSchema,
-    MemoryMetricTarget_Kind as StoredMemoryMetricKind,
+    MemoryMetricTarget_UsageSchema,
     MemoryMetricTargetSchema,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricSourcePolicySchema,
     MetricSelectionSchema,
     MetricSlotSchema,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_TrafficSchema,
     NetworkMetricTargetSchema,
@@ -193,7 +192,12 @@ function buildCpuUsageQuickStartMetric(): QuickStartMetric {
     return {
         target: {
             case: "cpu",
-            value: create(CpuMetricTargetSchema, { kind: StoredCpuMetricKind.USAGE }),
+            value: create(CpuMetricTargetSchema, {
+                reading: {
+                    case: "usage",
+                    value: create(CpuMetricTarget_UsageSchema),
+                },
+            }),
         },
     };
 }
@@ -202,7 +206,12 @@ function buildGpuUsageQuickStartMetric(): QuickStartMetric {
     return {
         target: {
             case: "gpu",
-            value: create(GpuMetricTargetSchema, { kind: StoredGpuMetricKind.USAGE }),
+            value: create(GpuMetricTargetSchema, {
+                reading: {
+                    case: "usage",
+                    value: create(GpuMetricTarget_UsageSchema),
+                },
+            }),
         },
     };
 }
@@ -211,7 +220,12 @@ function buildMemoryUsageQuickStartMetric(): QuickStartMetric {
     return {
         target: {
             case: "memory",
-            value: create(MemoryMetricTargetSchema, { kind: StoredMemoryMetricKind.USAGE }),
+            value: create(MemoryMetricTargetSchema, {
+                reading: {
+                    case: "usage",
+                    value: create(MemoryMetricTarget_UsageSchema),
+                },
+            }),
         },
     };
 }
@@ -220,7 +234,12 @@ function buildDiskUsageQuickStartMetric(): QuickStartMetric {
     return {
         target: {
             case: "disk",
-            value: create(DiskMetricTargetSchema, { kind: StoredDiskMetricKind.USAGE }),
+            value: create(DiskMetricTargetSchema, {
+                reading: {
+                    case: "usage",
+                    value: create(DiskMetricTarget_UsageSchema),
+                },
+            }),
         },
     };
 }
@@ -230,10 +249,12 @@ function buildNetworkTrafficQuickStartMetric(): QuickStartMetric {
         target: {
             case: "network",
             value: create(NetworkMetricTargetSchema, {
-                kind: StoredNetworkMetricKind.TRAFFIC,
-                traffic: create(NetworkMetricTarget_TrafficSchema, {
-                    direction: StoredNetworkDirection.BOTH,
-                }),
+                reading: {
+                    case: "traffic",
+                    value: create(NetworkMetricTarget_TrafficSchema, {
+                        direction: StoredNetworkDirection.BOTH,
+                    }),
+                },
             }),
         },
     };
