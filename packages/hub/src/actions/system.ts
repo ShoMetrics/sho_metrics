@@ -1,26 +1,30 @@
-import { action, PropertyInspectorDidAppearEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import {
+    action,
+    PropertyInspectorDidAppearEvent,
+    WillAppearEvent,
+    WillDisappearEvent,
+} from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import {
-    SYSTEM_BATTERY_DEVICE_DESCRIPTOR,
     type BatteryDeviceDescriptor,
 } from "../runtime/sources/battery/battery-device-descriptor";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
-import { readVendorHidBatteryDeviceDescriptorSnapshot } from "../runtime/sources/battery-hid/vendor-hid-battery-source-client";
-import { vendorHidBatteryRouteRegistry } from "../runtime/sources/battery-hid/vendor-hid-battery-route-registry";
-import { readBluetoothBatteryDeviceDescriptors } from "../runtime/sources/node-system/bluetooth-battery/bluetooth-battery";
-import { bluetoothBatteryRouteRegistry } from "../runtime/sources/node-system/bluetooth-battery/route-registry";
 import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
+import { buildBatteryMetricKeyFromIdentity } from "../runtime/sources/battery/battery-metric-key";
+import { areBatteryPeripheralIdentitiesEquivalentForSelection } from "../runtime/sources/battery/battery-peripheral-identity-comparison";
+import { readBatteryDeviceDescriptorSnapshotForPropertyInspector } from "../runtime/sources/battery/battery-device-descriptor-snapshot";
+import { resolveBatteryDeviceCachePatchForPropertyInspector } from "../runtime/sources/battery/battery-device-cache-patch";
+import { SelectedBatteryRouteRegistrar } from "../runtime/sources/battery/selected-battery-route-registrar";
 import { setMetricView } from "../view-updates/runner";
 import { logger } from "../logging/logger";
-import { monotonicNowMilliseconds } from "../shared/clock";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import type {
-    ResolvedSystemBluetoothPeripheralIdentifier,
+    ResolvedSystemMetricTarget,
     ResolvedSystemPeripheralIdentity,
     ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
-import { readSystemBluetoothPeripheralIdentity, readSystemVendorHidPeripheralIdentity } from "../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../settings/resolved-settings";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     buildSystemViewOptions,
@@ -34,8 +38,7 @@ const SYSTEM_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 30_000;
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.system })
 export class System extends MetricAction {
     protected readonly actionKind = "system";
-    private readonly registeredVendorHidMetricKeysByActionId = new Map<string, ReadonlySet<string>>();
-    private readonly registeredBluetoothMetricKeysByActionId = new Map<string, ReadonlySet<string>>();
+    private readonly selectedBatteryRouteRegistrar = new SelectedBatteryRouteRegistrar();
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
@@ -58,84 +61,11 @@ export class System extends MetricAction {
 
     protected override onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {
         const target = readResolvedMetricTarget(settings, "system");
-        const selectedIdentity = target.reading.peripheralIdentity;
-        const metricKeys = resolveSystemMetricKeys(target);
-        const previousVendorHidMetricKeys = this.registeredVendorHidMetricKeysByActionId.get(event.action.id)
-            ?? new Set<string>();
-        const nextVendorHidMetricKeys = readSystemVendorHidPeripheralIdentity(selectedIdentity) === undefined
-            ? new Set<string>()
-            : new Set(metricKeys);
-        const previousBluetoothMetricKeys = this.registeredBluetoothMetricKeysByActionId.get(event.action.id)
-            ?? new Set<string>();
-        const nextBluetoothMetricKeys = readSystemBluetoothPeripheralIdentity(selectedIdentity) !== undefined
-            ? new Set(metricKeys)
-            : new Set<string>();
-
-        // Project the persisted user-selected peripheral identity into the vendor HID
-        // source's in-memory route registry. This mirrors the custom HTTP definition
-        // registry pattern: the source receives per-metric settings-derived facts
-        // without reading settings or changing the generic source polling contract.
-        for (const metricKey of previousVendorHidMetricKeys) {
-            if (!nextVendorHidMetricKeys.has(metricKey)) {
-                vendorHidBatteryRouteRegistry.unregister(metricKey, event.action.id);
-            }
-        }
-
-        if (selectedIdentity !== undefined) {
-            for (const metricKey of nextVendorHidMetricKeys) {
-                vendorHidBatteryRouteRegistry.register({
-                    metricKey,
-                    identity: selectedIdentity,
-                    ownerId: event.action.id,
-                });
-            }
-        }
-
-        for (const metricKey of previousBluetoothMetricKeys) {
-            if (!nextBluetoothMetricKeys.has(metricKey)) {
-                bluetoothBatteryRouteRegistry.unregister(metricKey, event.action.id);
-            }
-        }
-
-        if (selectedIdentity !== undefined) {
-            for (const metricKey of nextBluetoothMetricKeys) {
-                bluetoothBatteryRouteRegistry.register({
-                    metricKey,
-                    identity: selectedIdentity,
-                    ownerId: event.action.id,
-                });
-            }
-        }
-
-        if (nextVendorHidMetricKeys.size === 0) {
-            this.registeredVendorHidMetricKeysByActionId.delete(event.action.id);
-        } else {
-            this.registeredVendorHidMetricKeysByActionId.set(event.action.id, nextVendorHidMetricKeys);
-        }
-
-        if (nextBluetoothMetricKeys.size === 0) {
-            this.registeredBluetoothMetricKeysByActionId.delete(event.action.id);
-        } else {
-            this.registeredBluetoothMetricKeysByActionId.set(event.action.id, nextBluetoothMetricKeys);
-        }
+        this.selectedBatteryRouteRegistrar.sync(event.action.id, readSelectedSystemPeripheralRoutes(target));
     }
 
     protected override onActionWillDisappear(event: WillDisappearEvent): void {
-        const vendorHidMetricKeys = this.registeredVendorHidMetricKeysByActionId.get(event.action.id);
-        if (vendorHidMetricKeys !== undefined) {
-            for (const metricKey of vendorHidMetricKeys) {
-                vendorHidBatteryRouteRegistry.unregister(metricKey, event.action.id);
-            }
-            this.registeredVendorHidMetricKeysByActionId.delete(event.action.id);
-        }
-
-        const bluetoothMetricKeys = this.registeredBluetoothMetricKeysByActionId.get(event.action.id);
-        if (bluetoothMetricKeys !== undefined) {
-            for (const metricKey of bluetoothMetricKeys) {
-                bluetoothBatteryRouteRegistry.unregister(metricKey, event.action.id);
-            }
-            this.registeredBluetoothMetricKeysByActionId.delete(event.action.id);
-        }
+        this.selectedBatteryRouteRegistrar.clear(event.action.id);
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
@@ -156,23 +86,15 @@ export class System extends MetricAction {
     }
 
     protected async refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
-        const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
         const isVendorHidBatterySupported = shouldEnableVendorHidBatterySupport(this.currentPlatform());
-        const [bluetoothBatteryDevices, vendorBatteryDeviceSnapshot] = await Promise.all([
-            readBluetoothBatteryDeviceDescriptors(),
-            readVendorHidBatteryDeviceDescriptorSnapshot({
-                isExperimentalVendorHidEnabled: isVendorHidBatterySupported
-                    && this.resolveGlobalVendorHidBatteryEnabled(),
-            }),
-        ]);
-        const vendorBatteryDevices = vendorBatteryDeviceSnapshot.descriptors;
-        const availableBatteryDevices = [
-            SYSTEM_BATTERY_DEVICE_DESCRIPTOR,
-            ...bluetoothBatteryDevices,
-            ...vendorBatteryDevices,
-        ];
+        const batteryDeviceSnapshot = await readBatteryDeviceDescriptorSnapshotForPropertyInspector({
+            isExperimentalVendorHidEnabled: isVendorHidBatterySupported
+                && this.resolveGlobalVendorHidBatteryEnabled(),
+        });
+        const availableBatteryDevices = batteryDeviceSnapshot.availableBatteryDevices;
         const target = readResolvedMetricTarget(this.resolveSettings(event), "system");
         const selectedIdentity = target.reading.peripheralIdentity;
+        logBatterySelectionMatchDiagnostic(event.action.id, availableBatteryDevices, selectedIdentity);
 
         log.atInfo()
             .everyMs("system-battery-device-cache-refresh", SYSTEM_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
@@ -180,28 +102,41 @@ export class System extends MetricAction {
                 "systemBatteryDeviceCacheRefresh",
                 `actionId=${event.action.id}`,
                 `deviceCount=${availableBatteryDevices.length}`,
-                `bluetoothDeviceCount=${bluetoothBatteryDevices.length}`,
-                `vendorDeviceCount=${vendorBatteryDevices.length}`,
+                `bluetoothDeviceCount=${batteryDeviceSnapshot.bluetoothBatteryDevices.length}`,
+                `vendorDeviceCount=${batteryDeviceSnapshot.vendorBatteryDevices.length}`,
+                `bluetoothMs=${batteryDeviceSnapshot.bluetoothDurationMilliseconds}`,
+                `vendorMs=${batteryDeviceSnapshot.vendorDurationMilliseconds}`,
+                `cacheState=${batteryDeviceSnapshot.cacheState}`,
                 `descriptorStates=${formatBatteryDescriptorStates(availableBatteryDevices)}`,
                 `selected=${formatBatterySelectionKindForLog(selectedIdentity)}`,
                 `selectedMatched=${selectedIdentity === undefined
                     ? "system"
                     : String(availableBatteryDevices.some(device =>
                         device.identity !== undefined
-                        && arePeripheralIdentitiesEqual(device.identity, selectedIdentity),
+                        && areBatteryPeripheralIdentitiesEquivalentForSelection(device.identity, selectedIdentity),
                     ))}`,
-                `durationMs=${monotonicNowMilliseconds() - startedAtMonotonicMilliseconds}`,
+                `durationMs=${batteryDeviceSnapshot.durationMilliseconds}`,
             ].join(" "));
 
         await this.updateRuntimeCache(event, {
             availableBatteryDevices,
-            batteryDeviceDiscoveryDiagnostics: vendorBatteryDeviceSnapshot.diagnostics,
+            batteryDeviceDiscoveryDiagnostics: batteryDeviceSnapshot.batteryDeviceDiscoveryDiagnostics,
         });
     }
 
     private resolveGlobalVendorHidBatteryEnabled(): boolean {
         return pluginGlobalSettingsStore.getResolved().system.experimentalVendorHidBatteryEnabled;
     }
+}
+
+function readSelectedSystemPeripheralRoutes(target: ResolvedSystemMetricTarget): readonly {
+    readonly metricKey: string;
+    readonly identity: ResolvedSystemPeripheralIdentity;
+}[] {
+    const selectedIdentity = target.reading.peripheralIdentity;
+    return selectedIdentity === undefined
+        ? []
+        : resolveSystemMetricKeys(target).map(metricKey => ({ metricKey, identity: selectedIdentity }));
 }
 
 function formatBatteryDescriptorStates(descriptors: readonly BatteryDeviceDescriptor[]): string {
@@ -216,6 +151,46 @@ function formatBatteryDescriptorStates(descriptors: readonly BatteryDeviceDescri
         .join(",") || "none";
 }
 
+function logBatterySelectionMatchDiagnostic(
+    actionId: string,
+    availableBatteryDevices: readonly BatteryDeviceDescriptor[],
+    selectedIdentity: ResolvedSystemPeripheralIdentity | undefined,
+): void {
+    if (selectedIdentity === undefined) {
+        return;
+    }
+
+    const selectedMetricKey = buildSelectionMetricKeyForDiagnostic(selectedIdentity);
+    const identityMatched = availableBatteryDevices.some(device =>
+        device.identity !== undefined
+        && areBatteryPeripheralIdentitiesEquivalentForSelection(device.identity, selectedIdentity));
+    if (identityMatched) {
+        return;
+    }
+
+    log.atDebug().log(() => [
+        "systemBatterySelectedDeviceMismatch",
+        `actionId=${actionId}`,
+        `selected=${formatBatterySelectionKindForLog(selectedIdentity)}`,
+        `selectedMetricKey=${selectedMetricKey ?? "unknown"}`,
+        `metricKeyMatched=${selectedMetricKey === undefined
+            ? "unknown"
+            : String(availableBatteryDevices.some(device => device.metricKey === selectedMetricKey))}`,
+        `descriptorMetricKeys=${availableBatteryDevices.map(device => device.metricKey).join("|")}`,
+    ].join(" "));
+}
+
+function buildSelectionMetricKeyForDiagnostic(
+    selectedIdentity: ResolvedSystemPeripheralIdentity,
+): string | undefined {
+    switch (selectedIdentity.evidence.kind) {
+        case "vendorHid":
+            return buildBatteryMetricKeyFromIdentity(selectedIdentity);
+        case "bluetooth":
+            return undefined;
+    }
+}
+
 function formatBatterySelectionKindForLog(identity: ResolvedSystemPeripheralIdentity | undefined): string {
     if (identity === undefined) {
         return "system";
@@ -225,86 +200,4 @@ function formatBatterySelectionKindForLog(identity: ResolvedSystemPeripheralIden
     return identity.evidence.kind === "bluetooth"
         ? "bluetooth"
         : `vendorHid:${vendorHidIdentity?.bindingTransport ?? "unknown"}`;
-}
-
-function arePeripheralIdentitiesEqual(
-    left: ResolvedSystemPeripheralIdentity,
-    right: ResolvedSystemPeripheralIdentity,
-): boolean {
-    return arePeripheralIdentityEvidenceEqual(left, right);
-}
-
-function arePeripheralIdentityEvidenceEqual(
-    left: ResolvedSystemPeripheralIdentity,
-    right: ResolvedSystemPeripheralIdentity,
-): boolean {
-    if (left.evidence.kind !== right.evidence.kind) {
-        return false;
-    }
-
-    switch (left.evidence.kind) {
-        case "vendorHid": {
-            const rightEvidence = right.evidence.kind === "vendorHid" ? right.evidence : undefined;
-            return rightEvidence !== undefined
-                && left.evidence.vendorId === rightEvidence.vendorId
-                && left.evidence.productId === rightEvidence.productId
-                && left.evidence.manufacturer === rightEvidence.manufacturer
-                && left.evidence.productName === rightEvidence.productName
-                && left.evidence.serialNumber === rightEvidence.serialNumber
-                && left.evidence.interfaceNumber === rightEvidence.interfaceNumber
-                && left.evidence.usagePage === rightEvidence.usagePage
-                && left.evidence.usageId === rightEvidence.usageId
-                && left.evidence.bindingTransport === rightEvidence.bindingTransport
-                && left.evidence.receiverKind === rightEvidence.receiverKind
-                && left.evidence.vendorUnitId === rightEvidence.vendorUnitId
-                && left.evidence.modelId === rightEvidence.modelId
-                && left.evidence.receiverSlot === rightEvidence.receiverSlot;
-        }
-        case "bluetooth":
-            return areBluetoothIdentifiersEqual(
-                left.evidence.primaryIdentifier,
-                right.evidence.kind === "bluetooth" ? right.evidence.primaryIdentifier : undefined,
-            ) && areBluetoothIdentifiersEqual(
-                left.evidence.fallbackIdentifier,
-                right.evidence.kind === "bluetooth" ? right.evidence.fallbackIdentifier : undefined,
-            );
-    }
-}
-
-function areBluetoothIdentifiersEqual(
-    left: ResolvedSystemBluetoothPeripheralIdentifier | undefined,
-    right: ResolvedSystemBluetoothPeripheralIdentifier | undefined,
-): boolean {
-    return left?.kind === right?.kind && left?.hash === right?.hash;
-}
-
-export function resolveBatteryDeviceCachePatchForPropertyInspector(
-    patch: WidgetRuntimeCachePatch,
-    selectedIdentity: ResolvedSystemPeripheralIdentity | undefined,
-): WidgetRuntimeCachePatch {
-    return shouldSuppressInitialEmptyBatteryDeviceCachePatch(patch, selectedIdentity)
-        ? omitBatteryDeviceListPatch(patch)
-        : patch;
-}
-
-function shouldSuppressInitialEmptyBatteryDeviceCachePatch(
-    patch: WidgetRuntimeCachePatch,
-    selectedIdentity: ResolvedSystemPeripheralIdentity | undefined,
-): boolean {
-    return selectedIdentity !== undefined
-        && "availableBatteryDevices" in patch
-        && (patch.availableBatteryDevices?.length ?? 0) === 0
-        && patch.batteryDeviceDiscoveryDiagnostics === undefined;
-}
-
-function omitBatteryDeviceListPatch(patch: WidgetRuntimeCachePatch): WidgetRuntimeCachePatch {
-    const {
-        availableBatteryDevices,
-        batteryDeviceDiscoveryDiagnostics,
-        ...restPatch
-    } = patch;
-
-    void availableBatteryDevices;
-    void batteryDeviceDiscoveryDiagnostics;
-    return restPatch;
 }

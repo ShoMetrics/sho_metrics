@@ -52,7 +52,7 @@ export function buildLogitechBatteryCandidate(input: {
                 bindingTransport,
                 receiverKind: input.receiverDeviceGroup.receiver.receiverKind,
                 vendorUnitId,
-                modelId: deviceInformation?.modelId,
+                modelId: deviceInformation?.modelId ?? input.slotRoute.modelId,
                 receiverSlot: input.slotRoute.receiverSlot,
             },
         },

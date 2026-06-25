@@ -29,6 +29,8 @@ import {
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
+import { buildBatteryMetricKeyFromIdentity } from "../runtime/sources/battery/battery-metric-key";
+import { vendorHidBatteryRouteRegistry } from "../runtime/sources/battery-hid/vendor-hid-battery-route-registry";
 import { CustomHttpDefinitionRegistry } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildCustomHttpRuntimeIdentity, buildStackedCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
 import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
@@ -36,6 +38,7 @@ import {
     CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
     type CustomHttpSourceEditorResponse,
 } from "../runtime/sources/custom-http/custom-http-source-editor-messages";
+import type { ResolvedSystemPeripheralIdentity } from "../settings/resolved-settings";
 
 test("stacked metric subscribes all slots and schedules default auto rotate", () => {
     const timers = new FakeTimerScheduler();
@@ -216,6 +219,29 @@ test("stacked metric registers and unregisters Custom HTTP slot definitions", ()
     assert.deepEqual(definitionRegistry.list(), []);
 });
 
+test("stacked metric registers and unregisters selected battery routes", () => {
+    const timers = new FakeTimerScheduler();
+    const action = new TestStackedMetric(timers);
+    const streamDeckAction = new FakeStreamDeckAction("stacked-battery-action");
+    const identity = buildVendorHidPeripheralIdentity();
+    const metricKey = buildBatteryMetricKeyFromIdentity(identity);
+    vendorHidBatteryRouteRegistry.clear();
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedWidgetSettings({
+            selectedSystemIdentity: identity,
+        })));
+
+        assert.deepEqual(vendorHidBatteryRouteRegistry.read(metricKey), { metricKey, identity });
+
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+        assert.equal(vendorHidBatteryRouteRegistry.read(metricKey), undefined);
+    } finally {
+        vendorHidBatteryRouteRegistry.clear();
+    }
+});
+
 test("stacked metric handles Custom HTTP PI sample fetch messages", async () => {
     const timers = new FakeTimerScheduler();
     const fetcher = new FakeCustomHttpFetcher({
@@ -316,6 +342,14 @@ class TestStackedMetric extends StackedMetric {
         return Promise.resolve();
     }
 
+    protected override refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push({
+            availableBatteryDevices: [],
+        });
+        return Promise.resolve();
+    }
+
     protected override currentPlatform(): NodeJS.Platform {
         return "win32";
     }
@@ -407,6 +441,7 @@ class FakeStreamDeckAction {
 function buildStackedWidgetSettings(options: {
     readonly autoRotateEnabled?: boolean | undefined;
     readonly thirdSlot?: boolean | undefined;
+    readonly selectedSystemIdentity?: ResolvedSystemPeripheralIdentity | undefined;
 } = {}): unknown {
     const slotIds = ["slot-1", "slot-2", "slot-3"];
     const createSlotId = (): string => slotIds.shift() ?? "unexpected-slot";
@@ -427,6 +462,23 @@ function buildStackedWidgetSettings(options: {
             stacked: {
                 rotation: {
                     autoRotateEnabled: options.autoRotateEnabled,
+                },
+            },
+        });
+    }
+
+    if (options.selectedSystemIdentity !== undefined) {
+        rawSettings = writeStoredWidgetSettingsPatch(rawSettings, {
+            stacked: {
+                updateSlot: {
+                    slotId: "slot-1",
+                    metricDomain: "system",
+                    singleMetric: {
+                        system: {
+                            peripheralIdentity: options.selectedSystemIdentity,
+                            detectedPeripheralDisplayName: "MX Master 4",
+                        },
+                    },
                 },
             },
         });
@@ -546,5 +598,26 @@ function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
         type: "wired",
         isDefault: true,
         speedMegabitsPerSecond: 1000,
+    };
+}
+
+function buildVendorHidPeripheralIdentity(): ResolvedSystemPeripheralIdentity {
+    return {
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+        },
     };
 }

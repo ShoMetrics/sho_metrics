@@ -175,10 +175,12 @@ export class VendorHidBatterySourceClient implements SourceClient {
             );
         }
 
+        const routeDefinitions = this.readRouteDefinitions(requestedMetricKeys);
         const selectedReadResult = this.usesInjectedCandidateDiscovery
             ? undefined
             : await this.readSelectedBatteryDevices(
                 requestedMetricKeys,
+                new Set(routeDefinitions.map(definition => definition.metricKey)),
                 snapshotTimestampMilliseconds,
                 0,
                 startedAtMonotonicMilliseconds,
@@ -187,7 +189,6 @@ export class VendorHidBatterySourceClient implements SourceClient {
             return selectedReadResult;
         }
 
-        const routeDefinitions = this.readRouteDefinitions(requestedMetricKeys);
         if (!this.usesInjectedCandidateDiscovery && routeDefinitions.length === 0) {
             this.scheduleDeferredFullDiscovery();
             logVendorHidPollDiagnostic({
@@ -377,6 +378,7 @@ export class VendorHidBatterySourceClient implements SourceClient {
 
     private async readSelectedBatteryDevices(
         requestedMetricKeys: readonly string[],
+        routeDefinitionMetricKeys: ReadonlySet<string>,
         snapshotTimestampMilliseconds: number,
         nativeLoadDurationMilliseconds: number,
         startedAtMonotonicMilliseconds: number,
@@ -392,6 +394,11 @@ export class VendorHidBatterySourceClient implements SourceClient {
             const unavailableMetrics: MetricUnavailableReport[] = [];
             for (const metricKey of requestedMetricKeys) {
                 const descriptor = this.descriptorByMetricKey.get(metricKey);
+                if (descriptor === undefined && routeDefinitionMetricKeys.has(metricKey)) {
+                    logVendorHidSelectedDescriptorMiss(requestedMetricKeys.length, this.descriptorByMetricKey.size);
+                    return undefined;
+                }
+
                 if (!isReadableBatteryDescriptor(descriptor)) {
                     unavailableMetrics.push(...buildUnavailableReports([metricKey], descriptor));
                     continue;
@@ -955,6 +962,20 @@ function unrefTimerIfAvailable(timer: ReturnType<typeof setTimeout>): void {
     if (typeof timer === "object" && timer !== null && "unref" in timer && typeof timer.unref === "function") {
         timer.unref();
     }
+}
+
+function logVendorHidSelectedDescriptorMiss(
+    requestedMetricCount: number,
+    descriptorCount: number,
+): void {
+    log.atInfo()
+        .everyMs("vendor-hid-selected-descriptor-miss", VENDOR_HID_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "vendorHidSelectedDescriptorMiss",
+            `requestedMetrics=${requestedMetricCount}`,
+            `descriptors=${descriptorCount}`,
+            "fallback=selectedRoute",
+        ].join(" "));
 }
 
 function logVendorHidPollDiagnostic(options: {

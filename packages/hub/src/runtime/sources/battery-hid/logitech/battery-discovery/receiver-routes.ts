@@ -20,6 +20,7 @@ export interface LogitechReceiverDeviceGroup {
 export interface LogitechReceiverSlotRoute {
     readonly receiverSlot: number;
     readonly vendorUnitId?: string;
+    readonly modelId?: string;
     readonly wirelessProductId?: number;
     readonly deviceKind?: string;
 }

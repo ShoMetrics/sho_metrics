@@ -13,6 +13,7 @@ import type {
     BatteryDeviceDescriptor,
     BatteryDeviceDiscoveryDiagnostics,
 } from "../../runtime/sources/battery/battery-device-descriptor";
+import { buildBatteryMetricKeyFromIdentity } from "../../runtime/sources/battery/battery-metric-key";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     MetricIdKind,
@@ -29,7 +30,10 @@ import {
 } from "./CatalogMetricWidgetSettings";
 import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
-import type { ResolvedCatalogMetricTarget } from "../../settings/resolved-settings";
+import type {
+    ResolvedCatalogMetricTarget,
+    ResolvedSystemPeripheralIdentity,
+} from "../../settings/resolved-settings";
 import type { PropertyInspectorPlatform } from "../inspector/platform";
 import {
     writeStoredGlobalSettingsPatch,
@@ -1268,6 +1272,57 @@ test("stacked metric settings render stack, rotation, and one polling control", 
     assert.match(markup, /Key action: press the key to switch\.[\s\S]*Dial action: rotate the dial to switch\./);
 });
 
+test("stacked metric settings use System polling options when any slot is System", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings({
+            preferences: {
+                pollingFrequencySeconds: 60,
+            },
+            stacked: {
+                updateSlot: {
+                    slotId: "slot-1",
+                    metricDomain: "system",
+                },
+            },
+        }),
+    });
+
+    assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+    assert.match(markup, /60s/);
+    assert.match(markup, /This polling frequency is shared by every metric in this key\./);
+    assert.doesNotMatch(markup, /This device is checked infrequently since the support is experimental/);
+});
+
+test("stacked metric settings use vendor HID polling options when any slot selects vendor HID battery", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "stackedMetric",
+        settings: buildStackedWidgetSettings({
+            preferences: {
+                pollingFrequencySeconds: 600,
+            },
+            stacked: {
+                updateSlot: {
+                    slotId: "slot-1",
+                    metricDomain: "system",
+                    singleMetric: {
+                        system: {
+                            peripheralIdentity: batteryDevice.identity,
+                            detectedPeripheralDisplayName: batteryDevice.displayName,
+                        },
+                    },
+                },
+            },
+        }),
+    });
+
+    assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
+    assert.match(markup, /10m/);
+    assert.match(markup, /This polling frequency is shared by every metric in this key\./);
+    assert.match(markup, /This device is checked infrequently since the support is experimental/);
+});
+
 test("stacked metric settings enforce slot count controls", () => {
     const minMarkup = renderWidgetSettings({
         actionKind: "stackedMetric",
@@ -1635,6 +1690,44 @@ test("system widget settings explain unavailable selected battery after refresh 
     assert.match(markup, /The selected device is currently sleeping, or not currently connected/);
 });
 
+test("system widget settings match selected vendor HID devices by metric key", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    assert.equal(batteryDevice.identity?.evidence.kind, "vendorHid");
+    const selectedIdentity: ResolvedSystemPeripheralIdentity = {
+        evidence: {
+            ...batteryDevice.identity.evidence,
+            productName: "Logitech Bolt device slot 2",
+            modelId: undefined,
+            receiverSlot: 9,
+        },
+    };
+
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        globalSettings: buildGlobalSettings({
+            system: {
+                experimentalVendorHidBatteryEnabled: true,
+            },
+        }),
+        settings: buildWidgetSettings("system", {
+            system: {
+                peripheralIdentity: selectedIdentity,
+                detectedPeripheralDisplayName: "Logitech Bolt device slot 2",
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /\[Dongle\] MX Master 4/);
+    assert.doesNotMatch(markup, /Unavailable: \[Dongle\] MX Master 4/);
+    assert.doesNotMatch(markup, /The selected device is currently sleeping, or not currently connected/);
+});
+
 test("system widget settings show hidden battery device diagnostics entry point", () => {
     const markup = renderWidgetSettings({
         actionKind: "system",
@@ -1720,6 +1813,48 @@ test("system widget settings use system polling options for Bluetooth battery de
     assert.match(markup, /\[Bluetooth\] MX Master 3 Bluetooth/);
     assert.match(markup, /60s/);
     assert.doesNotMatch(markup, /This device is checked infrequently since the support is experimental/);
+});
+
+test("system widget settings match selected Bluetooth devices by fallback identifier", () => {
+    const bluetoothDevice = buildBluetoothBatteryDeviceDescriptor({
+        primaryIdentifier: {
+            kind: "bluetoothDeviceAddress",
+            hash: "1".repeat(64),
+        },
+        fallbackIdentifier: undefined,
+    });
+
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            system: {
+                peripheralIdentity: {
+                    evidence: {
+                        kind: "bluetooth",
+                        primaryIdentifier: {
+                            kind: "platformInstanceId",
+                            hash: "2".repeat(64),
+                        },
+                        fallbackIdentifier: {
+                            kind: "bluetoothDeviceAddress",
+                            hash: "1".repeat(64),
+                        },
+                    },
+                },
+                detectedPeripheralDisplayName: bluetoothDevice.displayName,
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [bluetoothDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /\[Bluetooth\] MX Master 3 Bluetooth/);
+    assert.doesNotMatch(markup, /Unavailable: \[Bluetooth\] MX Master 3 Bluetooth/);
+    assert.doesNotMatch(markup, /The selected device is currently sleeping, or not currently connected/);
 });
 
 function renderWidgetSettings(options: {
@@ -1856,36 +1991,47 @@ function buildStackedWidgetSettings(patch?: StoredWidgetSettingsPatch): Inspecto
 }
 
 function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+    const identity: ResolvedSystemPeripheralIdentity = {
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+        },
+    };
+
     return {
         descriptorId: "logitech.bolt.slot-2",
         displayName: "MX Master 4",
-        metricKey: "vendor_hid.battery_percent:logitech.bolt.slot-2",
+        metricKey: buildBatteryMetricKeyFromIdentity(identity),
         transport: "usbReceiver",
         receiverKind: "bolt",
         isExperimental: true,
         supportState: "experimental",
-        identity: {
-            evidence: {
-                kind: "vendorHid",
-                vendorId: 0x046D,
-                productId: 0xC548,
-                manufacturer: "Logitech",
-                productName: "MX Master 4",
-                serialNumber: undefined,
-                interfaceNumber: 2,
-                usagePage: 0xFF00,
-                usageId: undefined,
-                bindingTransport: "usbReceiver",
-                receiverKind: "bolt",
-                vendorUnitId: "unit-2",
-                modelId: "mx-master-4",
-                receiverSlot: 2,
-            },
-        },
+        identity,
     };
 }
 
-function buildBluetoothBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+function buildBluetoothBatteryDeviceDescriptor(options: {
+    readonly primaryIdentifier?: {
+        readonly kind: "platformInstanceId" | "windowsAepAddress" | "bluetoothDeviceAddress";
+        readonly hash: string;
+    } | undefined;
+    readonly fallbackIdentifier?: {
+        readonly kind: "platformInstanceId" | "windowsAepAddress" | "bluetoothDeviceAddress";
+        readonly hash: string;
+    } | undefined;
+} = {}): BatteryDeviceDescriptor {
     return {
         descriptorId: "bluetooth.device",
         displayName: "MX Master 3 Bluetooth",
@@ -1897,11 +2043,11 @@ function buildBluetoothBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
         identity: {
             evidence: {
                 kind: "bluetooth",
-                primaryIdentifier: {
+                primaryIdentifier: options.primaryIdentifier ?? {
                     kind: "platformInstanceId",
                     hash: "0".repeat(64),
                 },
-                fallbackIdentifier: undefined,
+                fallbackIdentifier: options.fallbackIdentifier,
             },
         },
     };

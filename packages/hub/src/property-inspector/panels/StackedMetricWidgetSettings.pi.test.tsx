@@ -4,6 +4,8 @@ import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import type { BatteryDeviceDescriptor } from "../../runtime/sources/battery/battery-device-descriptor";
 import {
     NODE_SYSTEM_SOURCE_ID,
 } from "../../runtime/sources/source-ids";
@@ -14,6 +16,10 @@ import {
     writeStoredWidgetSettingsPatch,
     type StoredWidgetSettingsPatch,
 } from "../../settings/storage/patch/widget-settings-patch";
+import {
+    writeStoredGlobalSettingsPatch,
+    type StoredGlobalSettingsPatch,
+} from "../../settings/storage/global-settings-patch";
 import { StreamDeckClientProvider } from "../stream-deck/stream-deck-client-context";
 import {
     readPropertyInspectorScrollTopForTest,
@@ -74,6 +80,105 @@ test("stacked metric slot editor can select Custom Metric", async () => {
     assert.notEqual(screen.queryByText("Needs setup"), null);
 });
 
+test("stacked metric slot editor can select System and bumps shared polling", async () => {
+    const user = userEvent.setup();
+
+    render(<StackedWidgetSettingsHarness settings={buildStackedWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 1,
+        },
+    })} />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Editing Metric #1" });
+
+    await user.click(screen.getByRole("combobox", { name: /Metric Type/ }));
+    await user.click(screen.getByRole("option", { name: "System" }));
+
+    await screen.findByRole("heading", { name: "Battery" });
+    assert.equal(screen.queryByText("Polling Frequency:"), null);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    await screen.findByRole("heading", { name: "Stack" });
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /60s/);
+});
+
+test("stacked metric slot editor reuses System settings without child polling", async () => {
+    const user = userEvent.setup();
+
+    render(<StackedWidgetSettingsHarness settings={buildStackedWidgetSettings({
+        stacked: {
+            updateSlot: {
+                slotId: "slot-1",
+                metricDomain: "system",
+            },
+        },
+    })} />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+
+    await screen.findByRole("heading", { name: "Battery" });
+    assert.equal(screen.queryByText("Polling Frequency:"), null);
+});
+
+test("stacked metric System slot editor can enable experimental USB device support", async () => {
+    const user = userEvent.setup();
+
+    render(<StackedWidgetSettingsHarness settings={buildStackedWidgetSettings({
+        stacked: {
+            updateSlot: {
+                slotId: "slot-1",
+                metricDomain: "system",
+            },
+        },
+    })} />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Battery" });
+    await user.click(screen.getByRole("checkbox", { name: "Enable experimental support" }));
+
+    assert.equal((screen.getByRole("checkbox", { name: "Enable experimental support" }) as HTMLInputElement).checked, true);
+    const reopenNote = screen.getByText("Reopen this panel to refresh the USB device list.");
+    assert.equal(reopenNote.tagName, "STRONG");
+});
+
+test("stacked metric System slot editor bumps shared polling when selecting vendor HID battery", async () => {
+    const user = userEvent.setup();
+    const batteryDevice = buildBatteryDeviceDescriptor();
+
+    render(<StackedWidgetSettingsHarness
+        settings={buildStackedWidgetSettings({
+            preferences: {
+                pollingFrequencySeconds: 1,
+            },
+            stacked: {
+                updateSlot: {
+                    slotId: "slot-1",
+                    metricDomain: "system",
+                },
+            },
+        })}
+        globalSettings={writeStoredGlobalSettingsPatch(undefined, {
+            system: {
+                experimentalVendorHidBatteryEnabled: true,
+            },
+        })}
+        runtimeCache={{
+            availableBatteryDevices: [batteryDevice],
+        }}
+    />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Battery" });
+    await user.click(screen.getByRole("combobox", { name: /Battery/ }));
+    await user.click(screen.getByRole("option", { name: "[Dongle] MX Master 4" }));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    await screen.findByRole("heading", { name: "Stack" });
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10m/);
+});
+
 test("stacked custom metric source editing hides the slot editor chrome", async () => {
     const user = userEvent.setup();
 
@@ -128,10 +233,15 @@ test("stacked custom metric request warning uses the shared stacked polling rate
 
 function StackedWidgetSettingsHarness({
     settings: initialSettings,
+    globalSettings: initialGlobalSettings,
+    runtimeCache,
 }: {
     readonly settings?: InspectorTestSettings | undefined;
+    readonly globalSettings?: InspectorTestSettings | undefined;
+    readonly runtimeCache?: WidgetRuntimeCachePatch | undefined;
 }): React.JSX.Element {
     const [settings, setSettings] = useState<InspectorTestSettings>(() => initialSettings ?? buildStackedWidgetSettings());
+    const [globalSettings, setGlobalSettings] = useState<InspectorTestSettings>(() => initialGlobalSettings ?? {});
     const [client] = useState(() => new TestPropertyInspectorClient({
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.stackedMetric,
     }));
@@ -143,6 +253,7 @@ function StackedWidgetSettingsHarness({
                     actionKind: "stackedMetric",
                     isWindows: true,
                     settings,
+                    globalSettings,
                     runtimeCache: {
                         displayedMetricReadTrace: {
                             metricKey: "cpu.usage_percent",
@@ -156,6 +267,7 @@ function StackedWidgetSettingsHarness({
                                 freshness: "fresh",
                             },
                         },
+                        ...runtimeCache,
                     },
                 })}
                 isGlobalViewOverrideEnabled={false}
@@ -165,6 +277,12 @@ function StackedWidgetSettingsHarness({
                 colorCompensationProfile={DEFAULT_COLOR_COMPENSATION_PROFILE}
                 onSettingsPatch={(patch) => {
                     setSettings((currentSettings: InspectorTestSettings) => writeStoredWidgetSettingsPatch(
+                        currentSettings,
+                        patch,
+                    ));
+                }}
+                onGlobalSettingsPatch={(patch: StoredGlobalSettingsPatch) => {
+                    setGlobalSettings((currentSettings: InspectorTestSettings) => writeStoredGlobalSettingsPatch(
                         currentSettings,
                         patch,
                     ));
@@ -192,4 +310,34 @@ function createStackedSlotIdForTest(): () => string {
     const slotIds = ["slot-1", "slot-2", "slot-3"];
 
     return () => slotIds.shift() ?? "unexpected-slot";
+}
+
+function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+    return {
+        descriptorId: "logitech.bolt.slot-2",
+        displayName: "MX Master 4",
+        metricKey: "vendor_hid.battery_percent:logitech.bolt.slot-2",
+        transport: "usbReceiver",
+        receiverKind: "bolt",
+        isExperimental: true,
+        supportState: "experimental",
+        identity: {
+            evidence: {
+                kind: "vendorHid",
+                vendorId: 0x046D,
+                productId: 0xC548,
+                manufacturer: "Logitech",
+                productName: "MX Master 4",
+                serialNumber: undefined,
+                interfaceNumber: 2,
+                usagePage: 0xFF00,
+                usageId: undefined,
+                bindingTransport: "usbReceiver",
+                receiverKind: "bolt",
+                vendorUnitId: "unit-2",
+                modelId: "mx-master-4",
+                receiverSlot: 2,
+            },
+        },
+    };
 }

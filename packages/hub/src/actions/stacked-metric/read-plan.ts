@@ -38,6 +38,7 @@ import {
 } from "../disk/metric-subscriptions";
 import { resolveNetworkMetricSubscriptionKeys } from "../network/metric-subscriptions";
 import { resolveCustomHttpMetricDefinition } from "../custom-metric/runtime-source-definition";
+import { resolveSystemMetricKeys } from "../system/view-builder";
 
 export type StackedMetricSlotReadState =
     | StackedMetricConfiguredSlotReadState
@@ -206,6 +207,8 @@ function resolveStackedMetricKeys(
                 selectedView,
                 reading: target.reading,
             }));
+        case "system":
+            return buildStackedMetricKeys(resolveSystemMetricKeys(target));
         case "catalog":
             return buildStackedMetricKeys([target.metricId]);
         case "customMetric": {

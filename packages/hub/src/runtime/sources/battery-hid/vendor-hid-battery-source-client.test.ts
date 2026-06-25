@@ -271,17 +271,32 @@ test("vendor HID battery source keeps selected reads cheap when another requeste
     assert.equal(selectedResult.unavailableMetrics[0]?.reason, "noSourceReading");
 });
 
-test("vendor HID battery source reports selected read failures without re-running full discovery", async () => {
+test("vendor HID battery source retries the selected route when cached descriptors miss the requested metric", async () => {
     const firstCandidate = buildTestCandidate({ batteryPercent: 87 });
-    const mismatchedCandidate = buildTestCandidate({
+    const unrelatedIdentity = buildTestIdentity({
+        vendorUnitId: "other-unit",
+        modelId: "other-device",
+    });
+    const unrelatedMetricKey = buildBatteryMetricKeyFromIdentity(unrelatedIdentity);
+    const unrelatedCandidate = buildTestCandidate({
         batteryPercent: 42,
-        identity: buildTestIdentity({
-            vendorUnitId: "other-unit",
-        }),
+        identity: unrelatedIdentity,
     });
     let devicesCalls = 0;
     let discoverCalls = 0;
     let selectedRouteReadCalls = 0;
+    let selectedReadCalls = 0;
+    const routeRegistry = new VendorHidBatteryRouteRegistry();
+    routeRegistry.register({
+        metricKey: unrelatedMetricKey,
+        identity: unrelatedIdentity,
+        ownerId: "test-action",
+    });
+    routeRegistry.register({
+        metricKey: buildTestMetricKey(),
+        identity: testIdentity,
+        ownerId: "test-action",
+    });
     const nativeHidModule = {
         ...fakeNativeHidModule,
         devices: () => {
@@ -301,24 +316,30 @@ test("vendor HID battery source reports selected read failures without re-runnin
                 },
                 readBatteryDeviceFromIdentity: (metricKey) => {
                     selectedRouteReadCalls += 1;
-                    return Promise.resolve(metricKey === buildTestMetricKey() ? firstCandidate : undefined);
+                    if (metricKey === buildTestMetricKey()) {
+                        return Promise.resolve(firstCandidate);
+                    }
+                    return Promise.resolve(metricKey === unrelatedMetricKey ? unrelatedCandidate : undefined);
                 },
-                readBatteryDevice: () => Promise.resolve(mismatchedCandidate),
+                readBatteryDevice: () => {
+                    selectedReadCalls += 1;
+                    return Promise.resolve(undefined);
+                },
             },
         }],
-        routeRegistry: buildTestRouteRegistry(),
+        routeRegistry,
         wallClockNow: () => 2345,
     });
 
-    await client.readSnapshot([buildTestMetricKey()]);
+    await client.readSnapshot([unrelatedMetricKey]);
     const selectedResult = await client.readSnapshot([buildTestMetricKey()]);
 
-    assert.equal(devicesCalls, 1);
+    assert.equal(devicesCalls, 2);
     assert.equal(discoverCalls, 0);
-    assert.equal(selectedRouteReadCalls, 1);
-    assert.equal(readScalarMetricValue(selectedResult.snapshot.metrics[buildTestMetricKey()]), undefined);
-    assert.equal(selectedResult.unavailableMetrics[0]?.metricId, buildTestMetricKey());
-    assert.equal(selectedResult.unavailableMetrics[0]?.reason, "noSourceReading");
+    assert.equal(selectedRouteReadCalls, 2);
+    assert.equal(selectedReadCalls, 0);
+    assert.equal(readScalarMetricValue(selectedResult.snapshot.metrics[buildTestMetricKey()]), 87);
+    assert.deepEqual(selectedResult.unavailableMetrics, []);
 });
 
 test("vendor HID battery source omits scalar when native HID is unavailable", async () => {

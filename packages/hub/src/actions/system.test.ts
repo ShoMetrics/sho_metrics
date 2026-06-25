@@ -23,7 +23,7 @@ import {
 import type { WidgetData } from "../view-rendering/widget-data";
 import {
     resolveBatteryDeviceCachePatchForPropertyInspector,
-} from "./system";
+} from "../runtime/sources/battery/battery-device-cache-patch";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 
 test("System action subscribes to the selected battery metric", () => {

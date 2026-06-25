@@ -1,17 +1,15 @@
 import type { ResolvedSystemPeripheralIdentity } from "../../../settings/resolved-settings";
+import { OwnedBatteryRouteRegistry } from "../battery/owned-battery-route-registry";
 
+/** Runtime route definition for a selected vendor HID battery metric. */
 export interface VendorHidBatteryRouteDefinition {
     readonly metricKey: string;
     readonly identity: ResolvedSystemPeripheralIdentity;
 }
 
+/** Adds one visible action owner for a selected vendor HID battery route. */
 export interface VendorHidBatteryRouteRegistration extends VendorHidBatteryRouteDefinition {
     readonly ownerId: string;
-}
-
-interface VendorHidBatteryRouteEntry {
-    readonly definition: VendorHidBatteryRouteDefinition;
-    readonly ownerIds: Set<string>;
 }
 
 /**
@@ -22,42 +20,28 @@ interface VendorHidBatteryRouteEntry {
  * read without parsing metric keys or reaching back into settings.
  */
 export class VendorHidBatteryRouteRegistry {
-    private readonly entriesByMetricKey = new Map<string, VendorHidBatteryRouteEntry>();
+    private readonly routeRegistry = new OwnedBatteryRouteRegistry<VendorHidBatteryRouteDefinition>();
 
     register(registration: VendorHidBatteryRouteRegistration): void {
-        const existingEntry = this.entriesByMetricKey.get(registration.metricKey);
-        if (existingEntry !== undefined) {
-            existingEntry.ownerIds.add(registration.ownerId);
-            return;
-        }
-
-        this.entriesByMetricKey.set(registration.metricKey, {
+        this.routeRegistry.register({
             definition: {
                 metricKey: registration.metricKey,
                 identity: registration.identity,
             },
-            ownerIds: new Set([registration.ownerId]),
+            ownerId: registration.ownerId,
         });
     }
 
     read(metricKey: string): VendorHidBatteryRouteDefinition | undefined {
-        return this.entriesByMetricKey.get(metricKey)?.definition;
+        return this.routeRegistry.read(metricKey);
     }
 
     unregister(metricKey: string, ownerId: string): void {
-        const existingEntry = this.entriesByMetricKey.get(metricKey);
-        if (existingEntry === undefined) {
-            return;
-        }
-
-        existingEntry.ownerIds.delete(ownerId);
-        if (existingEntry.ownerIds.size === 0) {
-            this.entriesByMetricKey.delete(metricKey);
-        }
+        this.routeRegistry.unregister(metricKey, ownerId);
     }
 
     clear(): void {
-        this.entriesByMetricKey.clear();
+        this.routeRegistry.clear();
     }
 }
 
