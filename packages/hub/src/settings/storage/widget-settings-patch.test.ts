@@ -4,13 +4,9 @@ import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
     CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
-    DiskMetricTarget_Kind as StoredDiskMetricKind,
-    GpuMetricTarget_Kind as StoredGpuMetricKind,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
     SystemPeripheralReceiverKind as StoredSystemPeripheralReceiverKind,
@@ -331,7 +327,7 @@ test("widget patch updates GPU reading within the GPU action domain", () => {
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "gpu");
     if (target?.case === "gpu") {
-        assert.equal(target.value.kind, StoredGpuMetricKind.POWER);
+        assert.equal(target.value.reading.case, "power");
     }
 });
 
@@ -367,9 +363,8 @@ test("widget patch switches network traffic to ping and writes target host", () 
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
-        assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
-        assert.equal(target.value.ping?.targetHost, "example.com");
-        assert.equal(target.value.traffic, undefined);
+        assert.equal(target.value.reading.case, "ping");
+        assert.equal(target.value.reading.value?.targetHost, "example.com");
     }
 });
 
@@ -395,10 +390,9 @@ test("widget patch switches network ping to traffic and writes traffic settings"
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
-        assert.equal(target.value.kind, StoredNetworkMetricKind.TRAFFIC);
-        assert.equal(target.value.traffic?.direction, StoredNetworkDirection.DOWNLOAD);
-        assert.equal(target.value.traffic?.interfaceId, "Ethernet");
-        assert.equal(target.value.ping, undefined);
+        assert.equal(target.value.reading.case, "traffic");
+        assert.equal(target.value.reading.value?.direction, StoredNetworkDirection.DOWNLOAD);
+        assert.equal(target.value.reading.value?.interfaceId, "Ethernet");
     }
 });
 
@@ -444,8 +438,8 @@ test("widget patch does not write traffic display overrides while stored network
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
-        assert.equal(target.value.kind, StoredNetworkMetricKind.PING);
-        assert.equal(target.value.ping?.targetHost, "example.com");
+        assert.equal(target.value.reading.case, "ping");
+        assert.equal(target.value.reading.value?.targetHost, "example.com");
     }
     assert.equal(readSingleMetricSlot(nextSettings)?.overrides?.network, undefined);
 });
@@ -464,9 +458,9 @@ test("widget patch updates CPU reading within the CPU action domain", () => {
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "cpu");
     if (target?.case === "cpu") {
-        assert.equal(target.value.kind, StoredCpuMetricKind.TEMPERATURE);
-        assert.equal(target.value.temperatureUnit, StoredTemperatureUnit.FAHRENHEIT);
-        assert.equal(target.value.maximumTemperatureCelsius, 95);
+        assert.equal(target.value.reading.case, "temperature");
+        assert.equal(target.value.reading.value?.temperatureUnit, StoredTemperatureUnit.FAHRENHEIT);
+        assert.equal(target.value.reading.value?.maximumTemperatureCelsius, 95);
     }
 });
 
@@ -484,7 +478,7 @@ test("widget patch writes sparse CPU target changes without resolved defaults", 
             slot: {
                 metric: {
                     cpu: {
-                        kind: "KIND_TEMPERATURE",
+                        temperature: {},
                     },
                 },
             },
@@ -492,7 +486,7 @@ test("widget patch writes sparse CPU target changes without resolved defaults", 
     });
 });
 
-test("widget patch preserves disk volume id when switching to throughput", () => {
+test("widget patch keeps disk volume id on the usage reading only", () => {
     const diskSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
         {
@@ -511,8 +505,7 @@ test("widget patch preserves disk volume id when switching to throughput", () =>
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "disk");
     if (target?.case === "disk") {
-        assert.equal(target.value.kind, StoredDiskMetricKind.THROUGHPUT);
-        assert.equal(target.value.volumeId, "E:\\");
+        assert.equal(target.value.reading.case, "throughput");
     }
 });
 
@@ -529,8 +522,8 @@ test("widget patch writes optional CPU power maximum", () => {
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "cpu");
     if (target?.case === "cpu") {
-        assert.equal(target.value.kind, StoredCpuMetricKind.POWER);
-        assert.equal(target.value.maximumPowerWatts, 180);
+        assert.equal(target.value.reading.case, "power");
+        assert.equal(target.value.reading.value?.maximumPowerWatts, 180);
     }
 });
 
@@ -803,7 +796,8 @@ test("widget patch updates dense metric slot target by slot id", () => {
     assert.equal(widget.value.slots[1]?.slot?.metric?.target.case, "network");
     const networkTarget = widget.value.slots[1]?.slot?.metric?.target;
     if (networkTarget?.case === "network") {
-        assert.equal(networkTarget.value.traffic?.interfaceId, "Ethernet");
+        assert.equal(networkTarget.value.reading.case, "traffic");
+        assert.equal(networkTarget.value.reading.value?.interfaceId, "Ethernet");
     }
     assert.equal(widget.value.slots[1]?.customLabel, undefined);
     assert.equal(widget.value.slots[1]?.customMaximumValue, undefined);
@@ -924,7 +918,8 @@ test("widget patch preserves dense custom label and maximum when target patch om
     const target = widget.value.slots[1]?.slot?.metric?.target;
     assert.equal(target?.case, "network");
     if (target?.case === "network") {
-        assert.equal(target.value.traffic?.interfaceId, "Ethernet");
+        assert.equal(target.value.reading.case, "traffic");
+        assert.equal(target.value.reading.value?.interfaceId, "Ethernet");
     }
 });
 
@@ -954,8 +949,8 @@ test("widget patch writes dense disk usage volume by slot id", () => {
     const target = widget.value.slots[1]?.slot?.metric?.target;
     assert.equal(target?.case, "disk");
     if (target?.case === "disk") {
-        assert.equal(target.value.kind, StoredDiskMetricKind.USAGE);
-        assert.equal(target.value.volumeId, "E:\\");
+        assert.equal(target.value.reading.case, "usage");
+        assert.equal(target.value.reading.value?.volumeId, "E:\\");
     }
 });
 
@@ -1057,7 +1052,7 @@ test("widget patch adds stacked metric slots with storage-owned ids", () => {
     assert.equal(widget.slots[2]?.slotId, "slot-3");
     assert.equal(widget.slots[2]?.item.case, "singleMetric");
     assert.equal(widget.slots[2]?.item.value.slot?.metric?.target.case, "cpu");
-    assert.equal(widget.slots[2]?.item.value.slot?.metric?.target.value.kind, StoredCpuMetricKind.USAGE);
+    assert.equal(widget.slots[2]?.item.value.slot?.metric?.target.value.reading.case, "usage");
 
     const resolvedSettings = resolveStoredWidgetSettings({
         storedWidgetSettings: readStoredWidgetSettings(nextSettings).settings,

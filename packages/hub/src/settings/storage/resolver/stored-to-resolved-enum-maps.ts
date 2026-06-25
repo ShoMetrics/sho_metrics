@@ -8,15 +8,14 @@ import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
     CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
-    DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
-    DiskMetricTarget_UsageDisplayMode as StoredDiskUsageDisplayMode,
+    DiskMetricTarget_Throughput_Direction as StoredDiskThroughputDirection,
+    DiskMetricTarget_Usage_DisplayMode as StoredDiskUsageDisplayMode,
     LineAppearanceSettings_GridLineType as StoredGridLineType,
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
     MetricView as StoredMetricView,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     ScaleMode as StoredScaleMode,
@@ -41,7 +40,6 @@ import type {
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
-    ResolvedNetworkReading,
     ScaleMode,
     SourceFailureMode,
     SystemPeripheralBindingTransport,
@@ -146,12 +144,6 @@ export const networkDirectionByProto = {
     [StoredNetworkDirection.DOWNLOAD]: "download",
     [StoredNetworkDirection.UPLOAD]: "upload",
 } satisfies Record<StoredNetworkDirection, NetworkDirection | undefined>;
-
-export const networkMetricKindByProto = {
-    [StoredNetworkMetricKind.UNSPECIFIED]: undefined,
-    [StoredNetworkMetricKind.TRAFFIC]: "traffic",
-    [StoredNetworkMetricKind.PING]: "ping",
-} satisfies Record<StoredNetworkMetricKind, ResolvedNetworkReading["kind"] | undefined>;
 
 export const networkTrafficDisplayModeByProto = {
     [StoredNetworkTrafficDisplayMode.UNSPECIFIED]: undefined,

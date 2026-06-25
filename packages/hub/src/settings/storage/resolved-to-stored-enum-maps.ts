@@ -9,14 +9,10 @@ import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
     CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
-    DiskMetricTarget_Kind as StoredDiskMetricKind,
-    DiskMetricTarget_ThroughputDirection as StoredDiskThroughputDirection,
-    DiskMetricTarget_UsageDisplayMode as StoredDiskUsageDisplayMode,
-    GpuMetricTarget_Kind as StoredGpuMetricKind,
+    DiskMetricTarget_Throughput_Direction as StoredDiskThroughputDirection,
+    DiskMetricTarget_Usage_DisplayMode as StoredDiskUsageDisplayMode,
     MetricTheme as StoredMetricTheme,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
     TerminalPalettePreset as StoredTerminalPalettePreset,
@@ -38,13 +34,10 @@ import type {
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
-    ResolvedCpuReading,
-    ResolvedGpuReading,
     GridLineType,
     GridLineVisibility,
     MetricTheme,
     NetworkDirection,
-    ResolvedNetworkReading,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
     TerminalPalettePreset,
@@ -124,11 +117,6 @@ export const storedNetworkDirectionByResolved = {
     upload: StoredNetworkDirection.UPLOAD,
 } satisfies Record<NetworkDirection, StoredNetworkDirection>;
 
-export const storedNetworkMetricKindByResolved = {
-    traffic: StoredNetworkMetricKind.TRAFFIC,
-    ping: StoredNetworkMetricKind.PING,
-} satisfies Record<ResolvedNetworkReading["kind"], StoredNetworkMetricKind>;
-
 export const storedNetworkTrafficDisplayModeByResolved = {
     mirrored: StoredNetworkTrafficDisplayMode.MIRRORED,
     overlay: StoredNetworkTrafficDisplayMode.OVERLAY,
@@ -166,11 +154,6 @@ export const storedCatalogMetricReadingKindByResolved = {
     other: StoredCatalogMetricReadingKind.OTHER,
 } satisfies Record<CatalogMetricReadingKind, StoredCatalogMetricReadingKind>;
 
-export const storedDiskMetricKindByResolved = {
-    usage: StoredDiskMetricKind.USAGE,
-    throughput: StoredDiskMetricKind.THROUGHPUT,
-} satisfies Record<"usage" | "throughput", StoredDiskMetricKind>;
-
 export const storedDiskThroughputDirectionByResolved = {
     both: StoredDiskThroughputDirection.BOTH,
     read: StoredDiskThroughputDirection.READ,
@@ -181,19 +164,6 @@ export const storedDiskUsageDisplayModeByResolved = {
     percentage: StoredDiskUsageDisplayMode.PERCENTAGE,
     space: StoredDiskUsageDisplayMode.SPACE,
 } satisfies Record<DiskUsageDisplayMode, StoredDiskUsageDisplayMode>;
-
-export const storedCpuMetricKindByResolved = {
-    usage: StoredCpuMetricKind.USAGE,
-    temperature: StoredCpuMetricKind.TEMPERATURE,
-    power: StoredCpuMetricKind.POWER,
-} satisfies Record<ResolvedCpuReading["kind"], StoredCpuMetricKind>;
-
-export const storedGpuMetricKindByResolved = {
-    usage: StoredGpuMetricKind.USAGE,
-    temperature: StoredGpuMetricKind.TEMPERATURE,
-    vram: StoredGpuMetricKind.VRAM,
-    power: StoredGpuMetricKind.POWER,
-} satisfies Record<ResolvedGpuReading["kind"], StoredGpuMetricKind>;
 
 export const storedTemperatureUnitByResolved = {
     celsius: StoredTemperatureUnit.CELSIUS,

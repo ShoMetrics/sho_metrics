@@ -1159,7 +1159,7 @@ test("dense multi metric built-in max inputs use readable units", () => {
         actionKind: "denseMultiMetric",
         settings: buildDenseWidgetSettings([
             { slotId: "slot-1", slot: { metric: { cpu: {} } }, customMaximumValue: 90 },
-            { slotId: "slot-2", slot: { metric: { gpu: { kind: "KIND_TEMPERATURE" } } }, customMaximumValue: 95 },
+            { slotId: "slot-2", slot: { metric: { gpu: { temperature: {} } } }, customMaximumValue: 95 },
             { slotId: "slot-3", slot: { metric: { memory: {} } } },
         ]),
     });
@@ -1180,8 +1180,9 @@ test("dense multi metric throughput max inputs convert raw byte rates to readabl
                 slot: {
                     metric: {
                         disk: {
-                            kind: "KIND_THROUGHPUT",
-                            throughputDirection: "THROUGHPUT_DIRECTION_READ",
+                            throughput: {
+                                direction: "DIRECTION_READ",
+                            },
                         },
                     },
                 },

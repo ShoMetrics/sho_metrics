@@ -137,9 +137,10 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         cpu: {
-                            kind: "KIND_TEMPERATURE",
-                            maximumTemperatureCelsius: 95,
-                            temperatureUnit: "TEMPERATURE_UNIT_FAHRENHEIT",
+                            temperature: {
+                                maximumTemperatureCelsius: 95,
+                                temperatureUnit: "TEMPERATURE_UNIT_FAHRENHEIT",
+                            },
                         },
                     },
                 },
@@ -170,8 +171,9 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         cpu: {
-                            kind: "KIND_POWER",
-                            maximumPowerWatts: 180,
+                            power: {
+                                maximumPowerWatts: 180,
+                            },
                         },
                     },
                 },
@@ -202,7 +204,7 @@ describe("stored settings proto resolver", () => {
                     slot: {
                         metric: {
                             cpu: {
-                                kind: "KIND_TEMPERATURE",
+                                temperature: {},
                             },
                         },
                     },
@@ -218,7 +220,7 @@ describe("stored settings proto resolver", () => {
                     slot: {
                         metric: {
                             cpu: {
-                                kind: "KIND_POWER",
+                                power: {},
                             },
                         },
                     },
@@ -253,7 +255,7 @@ describe("stored settings proto resolver", () => {
                     slot: {
                         metric: {
                             cpu: {
-                                kind: "KIND_TEMPERATURE",
+                                temperature: {},
                             },
                         },
                     },
@@ -269,7 +271,7 @@ describe("stored settings proto resolver", () => {
                     slot: {
                         metric: {
                             cpu: {
-                                kind: "KIND_POWER",
+                                power: {},
                             },
                         },
                     },
@@ -999,8 +1001,9 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         disk: {
-                            kind: "KIND_THROUGHPUT",
-                            throughputDirection: "THROUGHPUT_DIRECTION_READ",
+                            throughput: {
+                                direction: "DIRECTION_READ",
+                            },
                         },
                     },
                     overrides: {
@@ -1029,7 +1032,7 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         gpu: {
-                            kind: "KIND_POWER",
+                            power: {},
                         },
                     },
                 },
@@ -1055,7 +1058,7 @@ describe("stored settings proto resolver", () => {
                 slot: {
                     metric: {
                         disk: {
-                            kind: "KIND_THROUGHPUT",
+                            throughput: {},
                         },
                     },
                 },

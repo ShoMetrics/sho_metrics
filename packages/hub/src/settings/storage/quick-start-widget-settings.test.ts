@@ -2,12 +2,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 
 import {
-    CpuMetricTarget_Kind as StoredCpuMetricKind,
-    DiskMetricTarget_Kind as StoredDiskMetricKind,
-    GpuMetricTarget_Kind as StoredGpuMetricKind,
-    MemoryMetricTarget_Kind as StoredMemoryMetricKind,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     type StoredWidgetSettings,
 } from "../../generated/proto/shometrics/v1/settings_pb";
@@ -43,7 +38,7 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "cpu") {
                         assert.fail(`Expected CPU target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.kind, StoredCpuMetricKind.USAGE);
+                    assert.equal(target.value.reading.case, "usage");
                 },
             },
             {
@@ -53,7 +48,7 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "gpu") {
                         assert.fail(`Expected GPU target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.kind, StoredGpuMetricKind.USAGE);
+                    assert.equal(target.value.reading.case, "usage");
                 },
             },
             {
@@ -63,7 +58,7 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "memory") {
                         assert.fail(`Expected memory target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.kind, StoredMemoryMetricKind.USAGE);
+                    assert.equal(target.value.reading.case, "usage");
                 },
             },
             {
@@ -73,7 +68,7 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "disk") {
                         assert.fail(`Expected disk target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.kind, StoredDiskMetricKind.USAGE);
+                    assert.equal(target.value.reading.case, "usage");
                 },
             },
             {
@@ -83,8 +78,8 @@ describe("quick-start stored widget settings", () => {
                     if (target?.case !== "network") {
                         assert.fail(`Expected network target, received ${String(target?.case)}`);
                     }
-                    assert.equal(target.value.kind, StoredNetworkMetricKind.TRAFFIC);
-                    assert.equal(target.value.traffic?.direction, StoredNetworkDirection.BOTH);
+                    assert.equal(target.value.reading.case, "traffic");
+                    assert.equal(target.value.reading.value?.direction, StoredNetworkDirection.BOTH);
                     if (settings.widget.case !== "singleMetric") {
                         assert.fail(`Expected singleMetric widget, received ${String(settings.widget.case)}`);
                     }

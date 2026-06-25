@@ -4,10 +4,18 @@ import {
     CustomHttpRequestAuthSchema,
     CustomHttpRequestSettingsSchema,
     CustomMetricIconSettingsSchema,
+    CpuMetricTarget_PowerSchema,
+    CpuMetricTarget_TemperatureSchema,
+    CpuMetricTarget_UsageSchema,
     DiskThroughputDisplaySettingsSchema,
+    DiskMetricTarget_ThroughputSchema,
+    DiskMetricTarget_UsageSchema,
+    GpuMetricTarget_PowerSchema,
+    GpuMetricTarget_TemperatureSchema,
+    GpuMetricTarget_UsageSchema,
+    GpuMetricTarget_VramSchema,
     MetricSourcePolicySchema,
     NetworkDisplaySettingsSchema,
-    NetworkMetricTarget_Kind as StoredNetworkMetricKind,
     NetworkMetricTarget_PingSchema,
     NetworkMetricTarget_TrafficSchema,
     SingleCustomHttpRequestSchema,
@@ -18,19 +26,23 @@ import {
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MetricSelection as StoredMetricSelection,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
+    type NetworkMetricTarget_Ping as StoredNetworkPingTarget,
+    type NetworkMetricTarget_Traffic as StoredNetworkTrafficTarget,
+    type CpuMetricTarget_Power as StoredCpuPowerTarget,
+    type CpuMetricTarget_Temperature as StoredCpuTemperatureTarget,
+    type DiskMetricTarget_Throughput as StoredDiskThroughputTarget,
+    type DiskMetricTarget_Usage as StoredDiskUsageTarget,
+    type GpuMetricTarget_Power as StoredGpuPowerTarget,
+    type GpuMetricTarget_Temperature as StoredGpuTemperatureTarget,
     type SlotOverrides as StoredSlotOverrides,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import { normalizeNetworkPingTargetInput } from "../../network-ping-target";
 import {
     storedCatalogMetricCategoryByResolved,
     storedCatalogMetricReadingKindByResolved,
-    storedCpuMetricKindByResolved,
-    storedDiskMetricKindByResolved,
     storedDiskThroughputDirectionByResolved,
     storedDiskUsageDisplayModeByResolved,
-    storedGpuMetricKindByResolved,
     storedNetworkDirectionByResolved,
-    storedNetworkMetricKindByResolved,
     storedNetworkTrafficDisplayModeByResolved,
     storedNetworkUnitBaseByResolved,
     storedScaleModeByResolved,
@@ -38,6 +50,11 @@ import {
     storedTemperatureUnitByResolved,
 } from "../resolved-to-stored-enum-maps";
 import type { StoredWidgetSettingsPatch } from "./widget-settings-patch-types";
+
+type StoredCpuReadingCase = NonNullable<StoredCpuMetricTarget["reading"]["case"]>;
+type StoredDiskReadingCase = NonNullable<StoredDiskMetricTarget["reading"]["case"]>;
+type StoredGpuReadingCase = NonNullable<StoredGpuMetricTarget["reading"]["case"]>;
+type StoredNetworkReadingCase = NonNullable<StoredNetworkMetricTarget["reading"]["case"]>;
 
 export function applySourcePatch(
     metric: StoredMetricSelection,
@@ -133,14 +150,7 @@ export function applyNetworkPatch(
     patch: NonNullable<StoredWidgetSettingsPatch["network"]>,
 ): void {
     if (patch.kind !== undefined) {
-        target.kind = storedNetworkMetricKindByResolved[patch.kind];
-        if (patch.kind === "traffic") {
-            target.traffic ??= create(NetworkMetricTarget_TrafficSchema);
-            target.ping = undefined;
-        } else {
-            target.ping ??= create(NetworkMetricTarget_PingSchema);
-            target.traffic = undefined;
-        }
+        target.reading = buildNetworkReadingPatch(patch.kind);
     }
 
     if (patch.direction !== undefined) {
@@ -157,12 +167,11 @@ export function applyNetworkPatch(
     }
 
     if (patch.pingTargetHost !== undefined) {
-        target.kind = StoredNetworkMetricKind.PING;
-        const ping = target.ping ??= create(NetworkMetricTarget_PingSchema);
+        const ping = ensureNetworkPingTarget(target);
         ping.targetHost = normalizeNetworkPingTargetInput(patch.pingTargetHost).targetHost;
     }
 
-    if (target.kind === StoredNetworkMetricKind.PING || !hasNetworkDisplayPatch(patch)) {
+    if (target.reading.case === "ping" || !hasNetworkDisplayPatch(patch)) {
         return;
     }
 
@@ -188,16 +197,21 @@ export function applyDiskPatch(
     patch: NonNullable<StoredWidgetSettingsPatch["disk"]>,
 ): void {
     if (patch.kind !== undefined) {
-        target.kind = storedDiskMetricKindByResolved[patch.kind];
+        target.reading = buildDiskReadingPatch(patch.kind);
     }
-    applyDefinedValue(target, "volumeId", patch.volumeId);
+    if (patch.volumeId !== undefined) {
+        ensureDiskUsageTarget(target).volumeId = patch.volumeId;
+    }
     if (patch.throughputDirection !== undefined) {
-        target.throughputDirection = storedDiskThroughputDirectionByResolved[patch.throughputDirection];
+        ensureDiskThroughputTarget(target).direction =
+            storedDiskThroughputDirectionByResolved[patch.throughputDirection];
     }
     if (patch.usageDisplayMode !== undefined) {
-        target.usageDisplayMode = storedDiskUsageDisplayModeByResolved[patch.usageDisplayMode];
+        ensureDiskUsageTarget(target).displayMode = storedDiskUsageDisplayModeByResolved[patch.usageDisplayMode];
     }
-    applyDefinedValue(target, "barLabel", patch.barLabel);
+    if (patch.barLabel !== undefined) {
+        ensureDiskUsageTarget(target).barLabel = patch.barLabel;
+    }
 
     const display = overrides.diskThroughput ??= create(DiskThroughputDisplaySettingsSchema);
 
@@ -216,15 +230,19 @@ export function applyCpuPatch(
     target: StoredCpuMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["cpu"]>,
 ): void {
+    // PI controls send coherent per-reading patches. If another caller mixes
+    // fields from multiple reading arms in one patch, the later arm write wins.
     if (patch.kind !== undefined) {
-        target.kind = storedCpuMetricKindByResolved[patch.kind];
+        target.reading = buildCpuReadingPatch(patch.kind);
     }
     if (patch.temperatureUnit !== undefined) {
-        target.temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
+        ensureCpuTemperatureTarget(target).temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
     }
-    applyDefinedValue(target, "maximumTemperatureCelsius", patch.maximumTemperatureCelsius);
+    if (patch.maximumTemperatureCelsius !== undefined) {
+        ensureCpuTemperatureTarget(target).maximumTemperatureCelsius = patch.maximumTemperatureCelsius;
+    }
     if ("maximumPowerWatts" in patch) {
-        target.maximumPowerWatts = patch.maximumPowerWatts;
+        ensureCpuPowerTarget(target).maximumPowerWatts = patch.maximumPowerWatts;
     }
 }
 
@@ -232,15 +250,19 @@ export function applyGpuPatch(
     target: StoredGpuMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["gpu"]>,
 ): void {
+    // PI controls send coherent per-reading patches. If another caller mixes
+    // fields from multiple reading arms in one patch, the later arm write wins.
     if (patch.kind !== undefined) {
-        target.kind = storedGpuMetricKindByResolved[patch.kind];
+        target.reading = buildGpuReadingPatch(patch.kind);
     }
     if (patch.temperatureUnit !== undefined) {
-        target.temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
+        ensureGpuTemperatureTarget(target).temperatureUnit = storedTemperatureUnitByResolved[patch.temperatureUnit];
     }
-    applyDefinedValue(target, "maximumTemperatureCelsius", patch.maximumTemperatureCelsius);
+    if (patch.maximumTemperatureCelsius !== undefined) {
+        ensureGpuTemperatureTarget(target).maximumTemperatureCelsius = patch.maximumTemperatureCelsius;
+    }
     if ("maximumPowerWatts" in patch) {
-        target.maximumPowerWatts = patch.maximumPowerWatts;
+        ensureGpuPowerTarget(target).maximumPowerWatts = patch.maximumPowerWatts;
     }
 }
 
@@ -277,13 +299,148 @@ export function applyCatalogPatch(
 
 function ensureNetworkTrafficTarget(
     target: StoredNetworkMetricTarget,
-): NonNullable<StoredNetworkMetricTarget["traffic"]> {
-    if (target.kind !== StoredNetworkMetricKind.TRAFFIC) {
-        target.kind = StoredNetworkMetricKind.TRAFFIC;
-        target.ping = undefined;
+): StoredNetworkTrafficTarget {
+    if (target.reading.case === "traffic") {
+        return target.reading.value;
     }
 
-    return target.traffic ??= create(NetworkMetricTarget_TrafficSchema);
+    const value = create(NetworkMetricTarget_TrafficSchema);
+    target.reading = { case: "traffic", value };
+    return value;
+}
+
+function ensureNetworkPingTarget(
+    target: StoredNetworkMetricTarget,
+): StoredNetworkPingTarget {
+    if (target.reading.case === "ping") {
+        return target.reading.value;
+    }
+
+    const value = create(NetworkMetricTarget_PingSchema);
+    target.reading = { case: "ping", value };
+    return value;
+}
+
+function buildNetworkReadingPatch(kind: StoredNetworkReadingCase): StoredNetworkMetricTarget["reading"] {
+    switch (kind) {
+        case "traffic":
+            return { case: "traffic", value: create(NetworkMetricTarget_TrafficSchema) };
+        case "ping":
+            return { case: "ping", value: create(NetworkMetricTarget_PingSchema) };
+    }
+
+    return assertNever(kind);
+}
+
+function buildCpuReadingPatch(kind: StoredCpuReadingCase): StoredCpuMetricTarget["reading"] {
+    switch (kind) {
+        case "usage":
+            return { case: "usage", value: create(CpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return { case: "temperature", value: create(CpuMetricTarget_TemperatureSchema) };
+        case "power":
+            return { case: "power", value: create(CpuMetricTarget_PowerSchema) };
+    }
+
+    return assertNever(kind);
+}
+
+function ensureCpuTemperatureTarget(
+    target: StoredCpuMetricTarget,
+): StoredCpuTemperatureTarget {
+    if (target.reading.case === "temperature") {
+        return target.reading.value;
+    }
+
+    const value = create(CpuMetricTarget_TemperatureSchema);
+    target.reading = { case: "temperature", value };
+    return value;
+}
+
+function ensureCpuPowerTarget(
+    target: StoredCpuMetricTarget,
+): StoredCpuPowerTarget {
+    if (target.reading.case === "power") {
+        return target.reading.value;
+    }
+
+    const value = create(CpuMetricTarget_PowerSchema);
+    target.reading = { case: "power", value };
+    return value;
+}
+
+function buildGpuReadingPatch(kind: StoredGpuReadingCase): StoredGpuMetricTarget["reading"] {
+    switch (kind) {
+        case "usage":
+            return { case: "usage", value: create(GpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return { case: "temperature", value: create(GpuMetricTarget_TemperatureSchema) };
+        case "vram":
+            return { case: "vram", value: create(GpuMetricTarget_VramSchema) };
+        case "power":
+            return { case: "power", value: create(GpuMetricTarget_PowerSchema) };
+    }
+
+    return assertNever(kind);
+}
+
+function ensureGpuTemperatureTarget(
+    target: StoredGpuMetricTarget,
+): StoredGpuTemperatureTarget {
+    if (target.reading.case === "temperature") {
+        return target.reading.value;
+    }
+
+    const value = create(GpuMetricTarget_TemperatureSchema);
+    target.reading = { case: "temperature", value };
+    return value;
+}
+
+function ensureGpuPowerTarget(
+    target: StoredGpuMetricTarget,
+): StoredGpuPowerTarget {
+    if (target.reading.case === "power") {
+        return target.reading.value;
+    }
+
+    const value = create(GpuMetricTarget_PowerSchema);
+    target.reading = { case: "power", value };
+    return value;
+}
+
+function ensureDiskUsageTarget(
+    target: StoredDiskMetricTarget,
+): StoredDiskUsageTarget {
+    if (target.reading.case === "usage") {
+        return target.reading.value;
+    }
+
+    const value = create(DiskMetricTarget_UsageSchema);
+    target.reading = { case: "usage", value };
+    return value;
+}
+
+function ensureDiskThroughputTarget(
+    target: StoredDiskMetricTarget,
+): StoredDiskThroughputTarget {
+    if (target.reading.case === "throughput") {
+        return target.reading.value;
+    }
+
+    const value = create(DiskMetricTarget_ThroughputSchema);
+    target.reading = { case: "throughput", value };
+    return value;
+}
+
+function buildDiskReadingPatch(kind: StoredDiskReadingCase): StoredDiskMetricTarget["reading"] {
+    switch (kind) {
+        case "usage":
+            return { case: "usage", value: create(DiskMetricTarget_UsageSchema) };
+        case "throughput":
+            return { case: "throughput", value: create(DiskMetricTarget_ThroughputSchema) };
+    }
+
+    return assertNever(kind);
 }
 
 function hasNetworkDisplayPatch(patch: NonNullable<StoredWidgetSettingsPatch["network"]>): boolean {
@@ -293,12 +450,6 @@ function hasNetworkDisplayPatch(patch: NonNullable<StoredWidgetSettingsPatch["ne
         || patch.unitBase !== undefined;
 }
 
-function applyDefinedValue<TObject extends object, TKey extends keyof TObject>(
-    object: TObject,
-    key: TKey,
-    value: TObject[TKey] | undefined,
-): void {
-    if (value !== undefined) {
-        object[key] = value;
-    }
+function assertNever(value: never): never {
+    throw new Error(`Unexpected stored metric target reading case: ${JSON.stringify(value)}`);
 }
