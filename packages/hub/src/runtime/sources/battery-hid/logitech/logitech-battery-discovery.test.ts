@@ -18,7 +18,11 @@ import {
 import { LogitechBatteryReader } from "./battery-discovery/logitech-battery-discovery";
 import { SOLAAR_LOGITECH_KNOWN_LIGHTSPEED_RECEIVER_ROUTES } from "./solaar-derived/solaar-logitech-receiver-routes";
 import type { BatteryDeviceDiscoveryCandidate } from "../../battery/battery-device-discovery";
-import type { ResolvedSystemVendorHidPeripheralIdentity } from "../../../../settings/resolved-settings";
+import { buildBatteryMetricKeyFromIdentity } from "../../battery/battery-metric-key";
+import type {
+    ResolvedSystemPeripheralIdentity,
+    ResolvedSystemVendorHidPeripheralIdentity,
+} from "../../../../settings/resolved-settings";
 
 const LOGITECH_DIRECT_CLASSIC_LONG_USAGE = 0x0002;
 
@@ -97,6 +101,33 @@ test("Logitech discovery leaves direct HID++ paths to OS or future wired support
     assert.deepEqual(await discoverer.discoverBatteryDevices(nativeModule.devices()), []);
 });
 
+test("Logitech cold selected read falls back to selected model when DeviceInformation is missing", async () => {
+    const selectedIdentity = buildSelectedBoltPeripheralIdentity({
+        modelId: "logitech:1a83-1a85-0000:ext-01",
+        receiverSlot: 2,
+    });
+    const metricKey = buildBatteryMetricKeyFromIdentity(selectedIdentity);
+    const nativeModule = new FakeNativeHidModule(
+        [buildBoltReceiverDeviceInfo()],
+        writeBytes => responseReportsForBatteryRead(writeBytes, 2, {
+            deviceInformation: false,
+            deviceTypeAndNameFeatureIndex: 0x00,
+            marketingName: undefined,
+        }),
+    );
+    const discoverer = new LogitechBatteryReader(nativeModule);
+
+    const candidate = await discoverer.readBatteryDeviceFromIdentity(
+        metricKey,
+        selectedIdentity,
+        nativeModule.devices(),
+    );
+
+    assert.notEqual(candidate, undefined);
+    assert.equal(candidate?.batteryPercent, 64);
+    assert.equal(buildBatteryMetricKeyFromIdentity(candidate.identity), metricKey);
+});
+
 function readVendorHidIdentity(
     candidate: BatteryDeviceDiscoveryCandidate,
 ): ResolvedSystemVendorHidPeripheralIdentity {
@@ -148,6 +179,30 @@ function buildDirectHidppLongDeviceInfo(): NativeHidDeviceInfo {
         interface: 2,
         usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
         usage: LOGITECH_DIRECT_CLASSIC_LONG_USAGE,
+    };
+}
+
+function buildSelectedBoltPeripheralIdentity(input: {
+    readonly modelId: string;
+    readonly receiverSlot: number;
+}): ResolvedSystemPeripheralIdentity {
+    return {
+        evidence: {
+            kind: "vendorHid",
+            vendorId: LOGITECH_HIDPP_VENDOR_ID,
+            productId: LOGITECH_BOLT_RECEIVER_PRODUCT_ID,
+            manufacturer: "Logitech",
+            productName: "MX Master 3S",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: LOGITECH_HIDPP_CLASSIC_USAGE_PAGE,
+            usageId: LOGITECH_HIDPP_SHORT_USAGE,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: undefined,
+            modelId: input.modelId,
+            receiverSlot: input.receiverSlot,
+        },
     };
 }
 
@@ -225,6 +280,7 @@ function responseReportsForBatteryRead(
     options: {
         readonly deviceTypeAndNameFeatureIndex: number;
         readonly marketingName: string | undefined;
+        readonly deviceInformation?: boolean;
     },
 ): readonly (readonly number[])[] {
     const receiverSlot = writeBytes[1];
@@ -250,7 +306,7 @@ function responseReportsForBatteryRead(
         return [buildFeatureResponse(writeBytes, [0x40, 0x04, 0x00])];
     }
 
-    if (writeBytes[2] === 0x03 && writeBytes[3] === 0x01) {
+    if (options.deviceInformation !== false && writeBytes[2] === 0x03 && writeBytes[3] === 0x01) {
         return [buildFeatureResponse(writeBytes, [
             0x02,
             0x12, 0x34, 0x56, 0x78,

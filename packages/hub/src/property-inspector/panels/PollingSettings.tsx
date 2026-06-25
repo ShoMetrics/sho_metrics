@@ -30,9 +30,19 @@ export function PollingSettings({
             />
             {note !== undefined && (
                 <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">{note}</p>
+                    <p className="section-note">{renderNoteText(note)}</p>
                 </InspectorItem>
             )}
         </SettingsSection>
     );
+}
+
+function renderNoteText(note: string): React.ReactNode {
+    const lines = note.split("\n");
+    return lines.map((line, index) => (
+        <span key={index}>
+            {index === 0 ? undefined : <br />}
+            {line}
+        </span>
+    ));
 }

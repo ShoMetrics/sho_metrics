@@ -5,11 +5,14 @@ import {
     CPU_USAGE_METRIC_KEY,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
 } from "../../runtime/metric-keys";
+import { buildBatteryMetricKeyFromIdentity } from "../../runtime/sources/battery/battery-metric-key";
 import { resolveStoredWidgetSettings } from "../../settings/storage/resolver";
 import { readStoredWidgetSettings } from "../../settings/storage/codec";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
+import type { ResolvedSystemPeripheralIdentity } from "../../settings/resolved-settings";
 import {
     buildStackedMetricReadPlan,
     listStackedMetricReadPlanKeys,
@@ -135,6 +138,64 @@ test("stacked read plan subscribes Custom HTTP and built-in slots together", () 
     assert.equal(readStackedDisplayedMetricKey(resolution, "memory-slot"), RAM_USED_METRIC_KEY);
 });
 
+test("stacked read plan subscribes System battery slots", () => {
+    const widget = resolveStackedWidget(writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+            createSlotId: createSequentialSlotIdGenerator(["system-slot", "memory-slot"]),
+        }).rawSettings,
+        {
+            stacked: {
+                updateSlot: {
+                    slotId: "system-slot",
+                    metricDomain: "system",
+                },
+            },
+        },
+    ));
+
+    const resolution = buildStackedMetricReadPlan({ widget });
+
+    assert.deepEqual(listStackedMetricReadPlanKeys(resolution), [
+        RAM_TOTAL_METRIC_KEY,
+        RAM_USED_METRIC_KEY,
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+    ].sort());
+    assert.equal(readStackedDisplayedMetricKey(resolution, "system-slot"), SYSTEM_BATTERY_PERCENT_METRIC_KEY);
+});
+
+test("stacked read plan subscribes selected System peripheral battery slots", () => {
+    const identity = buildVendorHidPeripheralIdentity();
+    const metricKey = buildBatteryMetricKeyFromIdentity(identity);
+    const widget = resolveStackedWidget(writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "stackedMetric", {
+            createSlotId: createSequentialSlotIdGenerator(["system-slot", "memory-slot"]),
+        }).rawSettings,
+        {
+            stacked: {
+                updateSlot: {
+                    slotId: "system-slot",
+                    metricDomain: "system",
+                    singleMetric: {
+                        system: {
+                            peripheralIdentity: identity,
+                            detectedPeripheralDisplayName: "MX Master 4",
+                        },
+                    },
+                },
+            },
+        },
+    ));
+
+    const resolution = buildStackedMetricReadPlan({ widget });
+
+    assert.deepEqual(listStackedMetricReadPlanKeys(resolution), [
+        RAM_TOTAL_METRIC_KEY,
+        RAM_USED_METRIC_KEY,
+        metricKey,
+    ].sort());
+    assert.equal(readStackedDisplayedMetricKey(resolution, "system-slot"), metricKey);
+});
+
 function resolveStackedWidget(rawSettings: unknown) {
     const resolvedSettings = resolveStoredWidgetSettings({
         storedWidgetSettings: readStoredWidgetSettings(rawSettings).settings,
@@ -171,4 +232,25 @@ function buildStackedCustomHttpWidgetSettings(url: string): unknown {
 function createSequentialSlotIdGenerator(slotIds: readonly string[]): () => string {
     const remainingSlotIds = [...slotIds];
     return () => remainingSlotIds.shift() ?? "unexpected-slot";
+}
+
+function buildVendorHidPeripheralIdentity(): ResolvedSystemPeripheralIdentity {
+    return {
+        evidence: {
+            kind: "vendorHid",
+            vendorId: 0x046D,
+            productId: 0xC548,
+            manufacturer: "Logitech",
+            productName: "MX Master 4",
+            serialNumber: undefined,
+            interfaceNumber: 2,
+            usagePage: 0xFF00,
+            usageId: undefined,
+            bindingTransport: "usbReceiver",
+            receiverKind: "bolt",
+            vendorUnitId: "unit-2",
+            modelId: "mx-master-4",
+            receiverSlot: 2,
+        },
+    };
 }

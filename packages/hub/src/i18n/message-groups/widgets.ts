@@ -1134,6 +1134,11 @@ export const stackedMessages = {
         zh_CN: "高级传感器",
         ja: "高度なセンサー",
     },
+    systemMetricChoice: {
+        en: "System & Battery",
+        zh_CN: "系统与电池",
+        ja: "システムとバッテリー",
+    },
     customMetricChoice: {
         en: "Custom Metric",
         zh_CN: "自定义指标",

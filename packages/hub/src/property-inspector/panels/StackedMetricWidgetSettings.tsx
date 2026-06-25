@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { InspectorItem } from "../components/InspectorItem";
-import { multiMetricMessages, stackedMessages } from "../../i18n/message-groups/widgets";
+import { multiMetricMessages, stackedMessages, systemMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import type {
     ResolvedMetricTarget,
     ResolvedStackedMetricSlot,
     ResolvedStackedMetricWidget,
 } from "../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../settings/resolved-settings";
 import {
     STACKED_METRIC_MAX_SLOT_COUNT,
     STACKED_METRIC_MIN_SLOT_COUNT,
@@ -22,6 +23,10 @@ import type { VisibilityContext } from "../inspector/types";
 import { PollingSettings } from "./PollingSettings";
 import { SettingsSection } from "./SettingsSection";
 import { SingleMetricWidgetSettings } from "./SingleMetricWidgetSettings";
+import {
+    resolveBatteryPollingFrequencyOptionsForMinimum,
+    resolveMinimumBatteryPollingFrequencySeconds,
+} from "./battery-polling-options";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 type StackedSlotMetricDomain = ResolvedMetricTarget["domain"];
@@ -32,6 +37,7 @@ const stackedSlotMetricDomainOptionList = [
     { value: "memory", label: "Memory" },
     { value: "disk", label: "Disk" },
     { value: "network", label: "Network" },
+    { value: "system", label: "System & Battery" },
     { value: "catalog", label: "Catalog" },
     { value: "customMetric", label: "Custom Metric" },
 ] as const satisfies readonly SelectOption<StackedSlotMetricDomain>[];
@@ -99,7 +105,11 @@ export function StackedMetricWidgetSettings(props: WidgetSettingsPanelProps & {
                 widget={widget}
                 onSettingsPatch={props.onSettingsPatch}
             />
-            <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
+            <PollingSettings
+                {...props}
+                optionList={resolveStackedPollingFrequencyOptions(widget)}
+                note={resolveStackedPollingNote(widget, t)}
+            />
         </>
     );
 }
@@ -252,6 +262,7 @@ function StackedSelectedSlotSettings({
     themeDisabled,
     transparentSurfaceDisabled,
     colorDisabled,
+    onGlobalSettingsPatch,
     onCustomHttpCredentialUpsert,
     onCustomHttpCredentialDelete,
 }: WidgetSettingsPanelProps & {
@@ -286,6 +297,7 @@ function StackedSelectedSlotSettings({
                         value={slot.widget.slot.metric.target.domain}
                         optionList={localizeStackedSlotMetricDomainOptions(t)}
                         onValueChange={(metricDomain) => onSettingsPatch({
+                            ...buildStackedPollingPatchForMetricDomain(metricDomain, context),
                             stacked: {
                                 updateSlot: {
                                     slotId: slot.slotId,
@@ -302,6 +314,7 @@ function StackedSelectedSlotSettings({
                 onSettingsPatch={(singleMetric) => onSettingsPatch(wrapStackedSlotSingleMetricPatch(
                     slot.slotId,
                     singleMetric,
+                    context,
                 ))}
                 viewDisabled={viewDisabled}
                 themeDisabled={themeDisabled}
@@ -309,6 +322,7 @@ function StackedSelectedSlotSettings({
                 colorDisabled={colorDisabled}
                 showPolling={false}
                 customHttpConsumerSlug={buildStackedCustomHttpConsumerSlug(slot.slotId)}
+                onGlobalSettingsPatch={onGlobalSettingsPatch}
                 onCustomHttpCredentialUpsert={onCustomHttpCredentialUpsert}
                 onCustomHttpCredentialDelete={onCustomHttpCredentialDelete}
                 onWidgetChromeSuppressionChange={setIsChildDrillInOpen}
@@ -324,6 +338,8 @@ function localizeStackedSlotMetricDomainOptions(
         switch (option.value) {
             case "catalog":
                 return { ...option, label: t(stackedMessages.catalogMetricChoice) };
+            case "system":
+                return { ...option, label: t(stackedMessages.systemMetricChoice) };
             case "customMetric":
                 return { ...option, label: t(stackedMessages.customMetricChoice) };
             default:
@@ -348,11 +364,80 @@ function buildStackedSlotVisibilityContext(
     };
 }
 
+function resolveStackedPollingFrequencyOptions(
+    widget: ResolvedStackedMetricWidget,
+): readonly SelectOption<number>[] | undefined {
+    return resolveBatteryPollingFrequencyOptionsForMinimum(resolveStackedMinimumPollingFrequencySeconds(widget));
+}
+
+function resolveStackedPollingNote(
+    widget: ResolvedStackedMetricWidget,
+    t: ReturnType<typeof useI18n>["t"],
+): string {
+    const sharedPollingNote = t(multiMetricMessages.sharedPollingNote);
+    return hasVendorHidBatterySlot(widget)
+        ? `${sharedPollingNote}\n${t(systemMessages.infrequentPollingNote)}`
+        : sharedPollingNote;
+}
+
+function resolveStackedMinimumPollingFrequencySeconds(widget: ResolvedStackedMetricWidget): number {
+    return Math.max(
+        1,
+        ...widget.slots
+            .map(slot => resolveSlotMinimumPollingFrequencySeconds(slot.widget.slot.metric.target)),
+    );
+}
+
+function resolveSlotMinimumPollingFrequencySeconds(target: ResolvedMetricTarget): number {
+    return target.domain === "system"
+        ? resolveMinimumBatteryPollingFrequencySeconds(target.reading.peripheralIdentity)
+        : 1;
+}
+
+function hasVendorHidBatterySlot(widget: ResolvedStackedMetricWidget): boolean {
+    return widget.slots.some(slot => {
+        const target = slot.widget.slot.metric.target;
+        return target.domain === "system"
+            && readSystemVendorHidPeripheralIdentity(target.reading.peripheralIdentity) !== undefined;
+    });
+}
+
+function buildStackedPollingPatchForMetricDomain(
+    metricDomain: ResolvedMetricTarget["domain"],
+    context: WidgetSettingsPanelProps["context"],
+): Pick<StoredWidgetSettingsPatch, "preferences"> {
+    return buildMinimumPollingPatch(
+        metricDomain === "system" ? resolveMinimumBatteryPollingFrequencySeconds(undefined) : 1,
+        context,
+    );
+}
+
+function buildMinimumPollingPatch(
+    minimumPollingFrequencySeconds: number,
+    context: WidgetSettingsPanelProps["context"],
+): Pick<StoredWidgetSettingsPatch, "preferences"> {
+    // Stacked has one polling interval for all slots. We only raise it when a
+    // newly selected slot needs a slower floor; removing that slot leaves the
+    // user's current polling choice alone.
+    return context.resolved.preferences.pollingFrequencySeconds < minimumPollingFrequencySeconds
+        ? { preferences: { pollingFrequencySeconds: minimumPollingFrequencySeconds } }
+        : {};
+}
+
 function wrapStackedSlotSingleMetricPatch(
     slotId: string,
     singleMetric: SingleMetricWidgetSettingsPatch,
+    context: WidgetSettingsPanelProps["context"],
 ): StoredWidgetSettingsPatch {
+    const peripheralIdentity = singleMetric.system?.peripheralIdentity;
+    const minimumPollingFrequencySeconds = peripheralIdentity === undefined
+        ? undefined
+        : resolveMinimumBatteryPollingFrequencySeconds(peripheralIdentity);
+
     return {
+        ...(minimumPollingFrequencySeconds === undefined
+            ? {}
+            : buildMinimumPollingPatch(minimumPollingFrequencySeconds, context)),
         stacked: {
             updateSlot: {
                 slotId,
@@ -375,7 +460,7 @@ function resolveStackedSlotSummary(target: ResolvedMetricTarget, t: ReturnType<t
         case "network":
             return "Network";
         case "system":
-            return "System";
+            return t(stackedMessages.systemMetricChoice);
         case "catalog":
             return t(stackedMessages.catalogMetricChoice);
         case "customMetric":

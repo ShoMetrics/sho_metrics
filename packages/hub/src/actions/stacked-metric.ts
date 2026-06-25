@@ -19,6 +19,13 @@ import {
 } from "../shared/stream-deck-actions";
 import { setMetricView } from "../view-updates/runner";
 import type { MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
+import type { BatteryDeviceDescriptor } from "../runtime/sources/battery/battery-device-descriptor";
+import { areBatteryPeripheralIdentitiesEquivalentForSelection } from "../runtime/sources/battery/battery-peripheral-identity-comparison";
+import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
+import { readBatteryDeviceDescriptorSnapshotForPropertyInspector } from "../runtime/sources/battery/battery-device-descriptor-snapshot";
+import { resolveBatteryDeviceCachePatchForPropertyInspector } from "../runtime/sources/battery/battery-device-cache-patch";
+import { SelectedBatteryRouteRegistrar } from "../runtime/sources/battery/selected-battery-route-registrar";
 import {
     buildStackedMetricReadPlan,
     listStackedMetricReadPlanKeys,
@@ -43,11 +50,16 @@ import {
 } from "./custom-metric/runtime-source-definition";
 import type { ResolvedWidgetSettings } from "../settings/resolved-settings";
 import {
+    type ResolvedSystemPeripheralIdentity,
+} from "../settings/resolved-settings";
+import {
     CustomHttpActionConnector,
     type CustomHttpActionConnectorDependencies,
 } from "./custom-metric/custom-http-action-connector";
+import { resolveSystemMetricKeys } from "./system/view-builder";
 
 const INDICATOR_VISIBLE_MILLISECONDS = 1000;
+const STACKED_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 30_000;
 const log = logger.for("Action:StackedMetric");
 
 interface StackedMetricActionState {
@@ -79,6 +91,7 @@ export class StackedMetric extends MetricAction {
 
     private readonly states = new Map<string, StackedMetricActionState>();
     private readonly customHttpConnector: CustomHttpActionConnector;
+    private readonly selectedBatteryRouteRegistrar = new SelectedBatteryRouteRegistrar();
 
     constructor(
         private readonly timerScheduler: StackedMetricTimerScheduler = defaultTimerScheduler,
@@ -139,10 +152,12 @@ export class StackedMetric extends MetricAction {
             event.action.id,
             resolveStackedCustomHttpMetricDefinitions(widget, event.action.id),
         );
+        this.selectedBatteryRouteRegistrar.sync(event.action.id, readSelectedSystemPeripheralRoutes(widget));
     }
 
     protected override onActionWillDisappear(event: WillDisappearEvent): void {
         this.customHttpConnector.clearAction(event.action.id);
+        this.selectedBatteryRouteRegistrar.clear(event.action.id);
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
@@ -171,6 +186,9 @@ export class StackedMetric extends MetricAction {
             .catch(error => {
                 log.warn(() => `Failed to refresh stacked metric network interface runtime cache: ${String(error)}`);
             });
+        this.refreshBatteryDevicesForPropertyInspector(event).catch(error => {
+            log.warn(() => `Failed to refresh stacked metric battery device runtime cache: ${String(error)}`);
+        });
     }
 
     protected refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
@@ -187,6 +205,42 @@ export class StackedMetric extends MetricAction {
             platform: this.currentPlatform(),
             updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
         });
+    }
+
+    protected override sendRuntimeCachePatchToPropertyInspector(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
+        const selectedIdentity = readFirstSelectedSystemPeripheralIdentity(
+            requireResolvedStackedMetricWidget(this.resolveSettings(event)),
+        );
+
+        return super.sendRuntimeCachePatchToPropertyInspector(
+            event,
+            resolveBatteryDeviceCachePatchForPropertyInspector(patch, selectedIdentity),
+        );
+    }
+
+    protected async refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        const isVendorHidBatterySupported = shouldEnableVendorHidBatterySupport(this.currentPlatform());
+        const batteryDeviceSnapshot = await readBatteryDeviceDescriptorSnapshotForPropertyInspector({
+            isExperimentalVendorHidEnabled: isVendorHidBatterySupported
+                && this.resolveGlobalVendorHidBatteryEnabled(),
+        });
+        const availableBatteryDevices = batteryDeviceSnapshot.availableBatteryDevices;
+        const selectedRoutes = readSelectedSystemPeripheralRoutes(
+            requireResolvedStackedMetricWidget(this.resolveSettings(event)),
+        );
+        logStackedBatteryDeviceCacheRefresh(event.action.id, availableBatteryDevices, selectedRoutes);
+
+        await this.updateRuntimeCache(event, {
+            availableBatteryDevices,
+            batteryDeviceDiscoveryDiagnostics: batteryDeviceSnapshot.batteryDeviceDiscoveryDiagnostics,
+        });
+    }
+
+    private resolveGlobalVendorHidBatteryEnabled(): boolean {
+        return pluginGlobalSettingsStore.getResolved().system.experimentalVendorHidBatteryEnabled;
     }
 
     protected override onMetricsUpdate(event: WillAppearEvent): void {
@@ -373,6 +427,76 @@ function buildStackedMetricIndicator(
         currentIndex: Math.max(1, widget.slots.findIndex(slot => slot.slotId === activeSlot.slotId) + 1),
         totalCount: widget.slots.length,
     };
+}
+
+function readSelectedSystemPeripheralRoutes(widget: ResolvedStackedMetricWidget): readonly {
+    readonly metricKey: string;
+    readonly identity: ResolvedSystemPeripheralIdentity;
+}[] {
+    const routes: {
+        readonly metricKey: string;
+        readonly identity: ResolvedSystemPeripheralIdentity;
+    }[] = [];
+
+    for (const slot of widget.slots) {
+        const target = slot.widget.slot.metric.target;
+        if (target.domain !== "system" || target.reading.peripheralIdentity === undefined) {
+            continue;
+        }
+
+        for (const metricKey of resolveSystemMetricKeys(target)) {
+            routes.push({ metricKey, identity: target.reading.peripheralIdentity });
+        }
+    }
+
+    return routes;
+}
+
+function logStackedBatteryDeviceCacheRefresh(
+    actionId: string,
+    availableBatteryDevices: readonly BatteryDeviceDescriptor[],
+    selectedRoutes: readonly {
+        readonly metricKey: string;
+        readonly identity: ResolvedSystemPeripheralIdentity;
+    }[],
+): void {
+    if (selectedRoutes.length === 0) {
+        return;
+    }
+
+    const identityMatchCount = selectedRoutes.filter(route =>
+        availableBatteryDevices.some(device =>
+            device.identity !== undefined
+            && areBatteryPeripheralIdentitiesEquivalentForSelection(device.identity, route.identity),
+        )).length;
+    const metricKeyMatchCount = selectedRoutes.filter(route =>
+        availableBatteryDevices.some(device => device.metricKey === route.metricKey)).length;
+
+    log.atDebug()
+        .everyMs("stacked-battery-device-cache-refresh", STACKED_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "stackedBatteryDeviceCacheRefresh",
+            `actionId=${actionId}`,
+            `deviceCount=${availableBatteryDevices.length}`,
+            `selectedRouteCount=${selectedRoutes.length}`,
+            `identityMatchCount=${identityMatchCount}`,
+            `metricKeyMatchCount=${metricKeyMatchCount}`,
+            `selectedMetricKeys=${selectedRoutes.map(route => route.metricKey).join("|")}`,
+            `descriptorMetricKeys=${availableBatteryDevices.map(device => device.metricKey).join("|")}`,
+        ].join(" "));
+}
+
+function readFirstSelectedSystemPeripheralIdentity(
+    widget: ResolvedStackedMetricWidget,
+): ResolvedSystemPeripheralIdentity | undefined {
+    for (const slot of widget.slots) {
+        const target = slot.widget.slot.metric.target;
+        if (target.domain === "system" && target.reading.peripheralIdentity !== undefined) {
+            return target.reading.peripheralIdentity;
+        }
+    }
+
+    return undefined;
 }
 
 function resolveStackedCustomHttpMetricDefinitions(

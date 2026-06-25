@@ -36,6 +36,7 @@ import {
 } from "./receiver-routes";
 
 const LOGITECH_DISCOVERY_DEBUG_LOG_INTERVAL_MILLISECONDS = 60_000;
+const LOGITECH_SELECTED_READ_DEBUG_LOG_INTERVAL_MILLISECONDS = 30_000;
 const LOGITECH_RECEIVERS: readonly LogitechReceiverDescriptor[] = [
     ...LOGITECH_OPENLOGI_RECEIVERS,
     ...LOGITECH_LIGHTSPEED_RECEIVERS,
@@ -137,11 +138,19 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
     readBatteryDevice(metricKey: string): Promise<BatteryDeviceDiscoveryCandidate | undefined> {
         const binding = this.bindingByMetricKey.get(metricKey);
         if (binding === undefined) {
+            logLogitechSelectedReadOutcome("warmBinding", "missingBinding", {
+                receiverKind: "unknown",
+            });
             return Promise.resolve(undefined);
         }
 
         const transport = this.openReceiverDeviceGroup(binding.receiverDeviceGroup);
         if (transport === undefined) {
+            logLogitechSelectedReadOutcome("warmBinding", "openFailed", {
+                receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                productId: binding.receiverDeviceGroup.receiver.productId,
+                receiverSlot: binding.slotRoute.receiverSlot,
+            });
             return Promise.resolve(undefined);
         }
 
@@ -152,12 +161,24 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 binding.batteryFeature,
             );
             if (battery.state !== "battery") {
+                logLogitechSelectedReadOutcome("warmBinding", `battery:${battery.state}`, {
+                    receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                    productId: binding.receiverDeviceGroup.receiver.productId,
+                    receiverSlot: binding.slotRoute.receiverSlot,
+                    detail: battery.state === "noData" ? battery.reason : undefined,
+                });
                 return Promise.resolve(undefined);
             }
             const liveDeviceInformation = binding.deviceInformation === undefined
                 ? undefined
                 : session.readDeviceInformation(binding.slotRoute.receiverSlot);
             if (binding.deviceInformation !== undefined && liveDeviceInformation?.state !== "deviceInformation") {
+                logLogitechSelectedReadOutcome("warmBinding", "deviceInfoMissing", {
+                    receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                    productId: binding.receiverDeviceGroup.receiver.productId,
+                    receiverSlot: binding.slotRoute.receiverSlot,
+                    detail: liveDeviceInformation?.state,
+                });
                 return Promise.resolve(undefined);
             }
             if (
@@ -165,6 +186,13 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 liveDeviceInformation?.state === "deviceInformation" &&
                 !matchesBoundLogitechDeviceInformation(liveDeviceInformation.deviceInformation, binding.deviceInformation)
             ) {
+                logLogitechSelectedReadOutcome("warmBinding", "deviceInfoMismatch", {
+                    receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                    productId: binding.receiverDeviceGroup.receiver.productId,
+                    receiverSlot: binding.slotRoute.receiverSlot,
+                    hasLiveUnitId: liveDeviceInformation.deviceInformation.unitId !== undefined,
+                    hasLiveModelId: liveDeviceInformation.deviceInformation.modelId !== undefined,
+                });
                 return Promise.resolve(undefined);
             }
 
@@ -186,13 +214,36 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 liveDeviceInformation?.state === "deviceInformation" &&
                 hasLogitechDeviceIdentity(liveDeviceInformation.deviceInformation)
             ) {
-                return Promise.resolve(buildBatteryMetricKeyFromIdentity(candidate.identity) === metricKey ? candidate : undefined);
+                if (buildBatteryMetricKeyFromIdentity(candidate.identity) !== metricKey) {
+                    logLogitechSelectedReadOutcome("warmBinding", "metricKeyMismatch", {
+                        receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                        productId: binding.receiverDeviceGroup.receiver.productId,
+                        receiverSlot: binding.slotRoute.receiverSlot,
+                        hasLiveUnitId: liveDeviceInformation.deviceInformation.unitId !== undefined,
+                        hasLiveModelId: liveDeviceInformation.deviceInformation.modelId !== undefined,
+                    });
+                    return Promise.resolve(undefined);
+                }
+
+                logLogitechSelectedReadOutcome("warmBinding", "success", {
+                    receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                    productId: binding.receiverDeviceGroup.receiver.productId,
+                    receiverSlot: binding.slotRoute.receiverSlot,
+                    hasLiveUnitId: liveDeviceInformation.deviceInformation.unitId !== undefined,
+                    hasLiveModelId: liveDeviceInformation.deviceInformation.modelId !== undefined,
+                });
+                return Promise.resolve(candidate);
             }
 
             // Some Logitech paths can read battery without exposing live DeviceInformation. In that case the direct
             // read is guarded by the cached receiver path/slot plus HID++ battery parsing, not by a fresh unit-id
             // comparison. Returning the candidate keeps the selected read cheap while allowing the source client to
             // fall back to discovery if the route stops opening or stops returning a valid battery report.
+            logLogitechSelectedReadOutcome("warmBinding", "successRouteOnly", {
+                receiverKind: binding.receiverDeviceGroup.receiver.receiverKind,
+                productId: binding.receiverDeviceGroup.receiver.productId,
+                receiverSlot: binding.slotRoute.receiverSlot,
+            });
             return Promise.resolve(candidate);
         } finally {
             transport.close();
@@ -210,6 +261,11 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
             !hasSelectedLogitechReceiverSlot(vendorHidIdentity) ||
             !isSupportedLogitechReceiverKind(vendorHidIdentity.receiverKind)
         ) {
+            logLogitechSelectedReadOutcome("coldIdentity", "unsupportedIdentity", {
+                receiverKind: vendorHidIdentity?.receiverKind ?? "unknown",
+                hasVendorIdentity: vendorHidIdentity !== undefined,
+                hasReceiverSlot: vendorHidIdentity === undefined ? false : hasSelectedLogitechReceiverSlot(vendorHidIdentity),
+            });
             return Promise.resolve(undefined);
         }
 
@@ -219,6 +275,13 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 (vendorHidIdentity.productId === undefined
                     || receiverDeviceGroup.receiver.productId === vendorHidIdentity.productId),
             );
+        if (receiverDeviceGroups.length === 0) {
+            logLogitechSelectedReadOutcome("coldIdentity", "receiverGroupMissing", {
+                receiverKind: vendorHidIdentity.receiverKind,
+                productId: vendorHidIdentity.productId,
+                receiverSlot: vendorHidIdentity.receiverSlot,
+            });
+        }
         for (const receiverDeviceGroup of receiverDeviceGroups) {
             const candidate = this.readBatteryDeviceFromReceiverGroup(metricKey, vendorHidIdentity, receiverDeviceGroup);
             if (candidate !== undefined) {
@@ -236,6 +299,11 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
     ): BatteryDeviceDiscoveryCandidate | undefined {
         const transport = this.openReceiverDeviceGroup(receiverDeviceGroup);
         if (transport === undefined) {
+            logLogitechSelectedReadOutcome("coldIdentity", "openFailed", {
+                receiverKind: receiverDeviceGroup.receiver.receiverKind,
+                productId: receiverDeviceGroup.receiver.productId,
+                receiverSlot: identity.receiverSlot,
+            });
             return undefined;
         }
 
@@ -244,10 +312,23 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
             const session = new LogitechHidppSession(transport);
             const battery = session.readBatteryWithDeviceInformation(slotRoute.receiverSlot);
             if (battery.state !== "battery" || battery.feature === undefined) {
+                logLogitechSelectedReadOutcome("coldIdentity", battery.state === "battery" ? "featureMissing" : `battery:${battery.state}`, {
+                    receiverKind: receiverDeviceGroup.receiver.receiverKind,
+                    productId: receiverDeviceGroup.receiver.productId,
+                    receiverSlot: identity.receiverSlot,
+                    detail: battery.state === "noData" ? battery.reason : undefined,
+                });
                 return undefined;
             }
 
             if (!matchesSelectedLogitechDeviceInformation(identity, battery.deviceInformation)) {
+                logLogitechSelectedReadOutcome("coldIdentity", "deviceInfoMismatch", {
+                    receiverKind: receiverDeviceGroup.receiver.receiverKind,
+                    productId: receiverDeviceGroup.receiver.productId,
+                    receiverSlot: identity.receiverSlot,
+                    hasLiveUnitId: battery.deviceInformation?.unitId !== undefined,
+                    hasLiveModelId: battery.deviceInformation?.modelId !== undefined,
+                });
                 return undefined;
             }
 
@@ -257,10 +338,30 @@ export class LogitechBatteryReader implements VendorHidBatteryReader {
                 battery,
             });
             if (buildBatteryMetricKeyFromIdentity(candidate.identity) !== metricKey) {
+                logLogitechSelectedReadOutcome("coldIdentity", "metricKeyMismatch", {
+                    receiverKind: receiverDeviceGroup.receiver.receiverKind,
+                    productId: receiverDeviceGroup.receiver.productId,
+                    receiverSlot: identity.receiverSlot,
+                    hasLiveUnitId: battery.deviceInformation?.unitId !== undefined,
+                    hasLiveModelId: battery.deviceInformation?.modelId !== undefined,
+                });
                 return undefined;
             }
 
             this.storeBinding(metricKey, receiverDeviceGroup, slotRoute, battery, battery.feature);
+            logLogitechSelectedReadOutcome(
+                "coldIdentity",
+                battery.deviceInformation === undefined || !hasLogitechDeviceIdentity(battery.deviceInformation)
+                    ? "successRouteOnly"
+                    : "success",
+                {
+                    receiverKind: receiverDeviceGroup.receiver.receiverKind,
+                    productId: receiverDeviceGroup.receiver.productId,
+                    receiverSlot: identity.receiverSlot,
+                    hasLiveUnitId: battery.deviceInformation?.unitId !== undefined,
+                    hasLiveModelId: battery.deviceInformation?.modelId !== undefined,
+                },
+            );
             return candidate;
         } finally {
             transport.close();
@@ -329,6 +430,7 @@ function buildSelectedLogitechSlotRoute(
     return {
         receiverSlot: identity.receiverSlot,
         vendorUnitId: identity.vendorUnitId,
+        modelId: identity.modelId,
         deviceKind: undefined,
         wirelessProductId: undefined,
     };
@@ -347,7 +449,12 @@ function matchesSelectedLogitechDeviceInformation(
     }
 
     if (liveDeviceInformation === undefined) {
-        return false;
+        // DeviceInformation carries the strongest Logitech unit/model proof, but
+        // some selected reads can return battery while the identity request times
+        // out. Treat absence as route-only trust rather than no-data. The narrow
+        // risk is a same-model device re-paired into the same receiver slot while
+        // DeviceInformation is unavailable; successful live mismatches still fail.
+        return true;
     }
 
     return (identity.vendorUnitId === undefined || liveDeviceInformation.unitId === identity.vendorUnitId)
@@ -445,6 +552,44 @@ function logLogitechReceiverOpenFailure(receiverDeviceGroup: LogitechReceiverDev
             `productId=${formatHex(receiverDeviceGroup.receiver.productId)}`,
             `groupId=${receiverDeviceGroup.groupId}`,
             `hidCollections=${receiverDeviceGroup.deviceInfoList.length}`,
+        ].join(" "));
+}
+
+function logLogitechSelectedReadOutcome(
+    mode: "warmBinding" | "coldIdentity",
+    outcome: string,
+    options: {
+        readonly receiverKind: string;
+        readonly productId?: number;
+        readonly receiverSlot?: number;
+        readonly hasVendorIdentity?: boolean;
+        readonly hasReceiverSlot?: boolean;
+        readonly hasLiveUnitId?: boolean;
+        readonly hasLiveModelId?: boolean;
+        readonly detail?: string;
+    },
+): void {
+    if (outcome === "success") {
+        return;
+    }
+
+    log.atInfo()
+        .everyMs(
+            `logitech-selected-read:${mode}:${outcome}`,
+            LOGITECH_SELECTED_READ_DEBUG_LOG_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "logitechHidppSelectedRead",
+            `mode=${mode}`,
+            `outcome=${outcome}`,
+            `receiverKind=${options.receiverKind}`,
+            `productId=${options.productId === undefined ? "unknown" : formatHex(options.productId)}`,
+            `receiverSlot=${options.receiverSlot ?? "unknown"}`,
+            `hasVendorIdentity=${options.hasVendorIdentity ?? "unknown"}`,
+            `hasReceiverSlot=${options.hasReceiverSlot ?? "unknown"}`,
+            `hasLiveUnitId=${options.hasLiveUnitId ?? "unknown"}`,
+            `hasLiveModelId=${options.hasLiveModelId ?? "unknown"}`,
+            `detail=${options.detail ?? "none"}`,
         ].join(" "));
 }
 

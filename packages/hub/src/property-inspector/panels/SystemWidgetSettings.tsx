@@ -6,11 +6,11 @@ import {
     type BatteryDeviceDiscoveryDiagnostics,
     type BatteryDeviceHiddenCandidateDiagnostic,
 } from "../../runtime/sources/battery/battery-device-descriptor";
+import { areBatteryPeripheralIdentitiesEquivalentForSelection } from "../../runtime/sources/battery/battery-peripheral-identity-comparison";
 import { systemMessages } from "../../i18n/message-groups/widgets";
 import { type I18n, useI18n } from "../../i18n/react";
 import type {
     ResolvedSystemMetricTarget,
-    ResolvedSystemPeripheralIdentity,
 } from "../../settings/resolved-settings";
 import { readSystemVendorHidPeripheralIdentity } from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
@@ -23,25 +23,7 @@ import { PollingSettings } from "./PollingSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
 import { shouldEnableVendorHidBatterySupport } from "../../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
-
-// Vendor-HID peripheral battery reads are intentionally low-frequency because
-// experimental devices can share queues with manufacturer software.
-const PERIPHERAL_POLLING_FREQUENCY_OPTIONS = [
-    { value: 600, label: "10m" },
-    { value: 1200, label: "20m" },
-    { value: 1800, label: "30m" },
-    { value: 3600, label: "60m" },
-] as const satisfies readonly SelectOption<number>[];
-
-const SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS = [
-    { value: 60, label: "60s" },
-    { value: 180, label: "3m" },
-    { value: 300, label: "5m" },
-    { value: 600, label: "10m" },
-    { value: 1200, label: "20m" },
-    { value: 1800, label: "30m" },
-    { value: 3600, label: "60m" },
-] as const satisfies readonly SelectOption<number>[];
+import { resolveBatteryPollingFrequencyOptions } from "./battery-polling-options";
 
 export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
     readonly target: ResolvedSystemMetricTarget;
@@ -163,15 +145,15 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                                 />
                                 <span>{t(systemMessages.experimentalVendorHidBatteryCheckboxLabel)}</span>
                             </label>
-                            <p className="section-note">
-                                {t(systemMessages.experimentalVendorHidBatteryNote)}
-                            </p>
                             {didEnableVendorHidBatteryInThisInspectorSession
                                 && props.context.globalSettings.system.experimentalVendorHidBatteryEnabled && (
                                 <p className="section-note">
-                                    {t(systemMessages.experimentalVendorHidBatteryReopenPanelNote)}
+                                    <strong>{t(systemMessages.experimentalVendorHidBatteryReopenPanelNote)}</strong>
                                 </p>
                             )}
+                            <p className="section-note">
+                                {t(systemMessages.experimentalVendorHidBatteryNote)}
+                            </p>
                         </div>
                     </InspectorItem>
                 )}
@@ -179,13 +161,13 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
             <AppearanceSettings {...props} />
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
-            <PollingSettings
-                {...props}
-                optionList={isVendorHidPeripheralSelected
-                    ? PERIPHERAL_POLLING_FREQUENCY_OPTIONS
-                    : SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS}
-                note={isVendorHidPeripheralSelected ? t(systemMessages.infrequentPollingNote) : undefined}
-            />
+            {props.showPolling !== false && (
+                <PollingSettings
+                    {...props}
+                    optionList={resolveBatteryPollingFrequencyOptions(props.target.reading.peripheralIdentity)}
+                    note={isVendorHidPeripheralSelected ? t(systemMessages.infrequentPollingNote) : undefined}
+                />
+            )}
         </>
     );
 }
@@ -211,7 +193,7 @@ function resolveSelectedBatteryDescriptorId(
     const selectedIdentity = target.reading.peripheralIdentity;
     return descriptors.find(descriptor =>
         descriptor.identity !== undefined
-        && arePeripheralIdentitiesEqual(descriptor.identity, selectedIdentity),
+        && areBatteryPeripheralIdentitiesEquivalentForSelection(descriptor.identity, selectedIdentity),
     )?.descriptorId ?? "selected-peripheral";
 }
 
@@ -307,13 +289,6 @@ function formatBatteryDeviceOptionLabel(
     }
 
     return `[${formatBatteryTransportLabel(descriptor)}] ${descriptor.displayName}`;
-}
-
-function arePeripheralIdentitiesEqual(
-    left: ResolvedSystemPeripheralIdentity,
-    right: ResolvedSystemPeripheralIdentity,
-): boolean {
-    return JSON.stringify(left.evidence) === JSON.stringify(right.evidence);
 }
 
 function formatBatteryTransportLabel(input: Pick<BatteryDeviceDescriptor, "transport">): string {
