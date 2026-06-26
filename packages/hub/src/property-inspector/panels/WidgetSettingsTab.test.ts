@@ -1717,6 +1717,86 @@ test("system widget settings show touch strip label display cap", () => {
     assert.doesNotMatch(markup, /Displayed as up to 12 characters in this view/);
 });
 
+test("system widget settings lower label display cap for Pixel Window", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            appearance: {
+                view: { selectedView: "bar" },
+                theme: { selectedTheme: "pixel-window" },
+            },
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+                customLabel: "MX Master 4",
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Displayed as up to 10 characters in this view/);
+    assert.doesNotMatch(markup, /Displayed as up to 12 characters in this view/);
+});
+
+test("system widget settings show measured Pixel Window full-ring label cap", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            appearance: {
+                theme: { selectedTheme: "pixel-window" },
+            },
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+                customLabel: "123456",
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Displayed as up to 4 characters in this view/);
+    assert.doesNotMatch(markup, /Displayed as up to 5 characters in this view/);
+});
+
+test("system widget settings show measured Pixel Window gauge label cap", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        settings: buildWidgetSettings("system", {
+            appearance: {
+                view: { circleVariant: "gauge" },
+                theme: { selectedTheme: "pixel-window" },
+            },
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+                customLabel: "123456",
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Displayed as up to 5 characters in this view/);
+    assert.doesNotMatch(markup, /Displayed as up to 6 characters in this view/);
+});
+
 test("system widget settings keep selected battery snapshot while descriptors refresh", () => {
     const batteryDevice = buildBatteryDeviceDescriptor();
     const markup = renderWidgetSettings({

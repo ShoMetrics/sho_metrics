@@ -1,4 +1,4 @@
-import type { MetricView } from "./resolved-settings";
+import type { MetricTheme, MetricView, ResolvedAppearanceViewSettings } from "./resolved-settings";
 
 export type MetricCustomLabelKeyShape = "square" | "touchStrip";
 
@@ -33,10 +33,20 @@ export function resolveMetricCustomLabelKeyShape(options: {
  * clipping because font metrics and theme effects live in the rendering layer.
  */
 export function resolveMetricCustomLabelDisplayMaximumCharacters(options: {
-    readonly selectedView: MetricView;
+    readonly viewSettings: ResolvedAppearanceViewSettings;
+    readonly keyShape: MetricCustomLabelKeyShape;
+    readonly selectedTheme: MetricTheme;
+}): number {
+    return options.selectedTheme === "pixel-window"
+        ? resolvePixelWindowMetricCustomLabelDisplayMaximumCharacters(options)
+        : resolveBaseMetricCustomLabelDisplayMaximumCharacters(options);
+}
+
+function resolveBaseMetricCustomLabelDisplayMaximumCharacters(options: {
+    readonly viewSettings: Pick<ResolvedAppearanceViewSettings, "selectedView">;
     readonly keyShape: MetricCustomLabelKeyShape;
 }): number {
-    switch (options.selectedView) {
+    switch (options.viewSettings.selectedView) {
         case "bar":
             return options.keyShape === "touchStrip" ? 24 : 12;
         case "text":
@@ -45,7 +55,29 @@ export function resolveMetricCustomLabelDisplayMaximumCharacters(options: {
         case "line":
             return options.keyShape === "touchStrip" ? 16 : 8;
         default:
-            return assertNever(options.selectedView);
+            return assertNever(options.viewSettings.selectedView);
+    }
+}
+
+function resolvePixelWindowMetricCustomLabelDisplayMaximumCharacters(options: {
+    readonly viewSettings: ResolvedAppearanceViewSettings;
+    readonly keyShape: MetricCustomLabelKeyShape;
+}): number {
+    switch (options.viewSettings.selectedView) {
+        case "circle":
+            return options.viewSettings.circleVariant === "full-ring" ? 4 : 5;
+        case "text":
+            if (options.viewSettings.textVariant === "title-card") {
+                return 8;
+            }
+
+            return options.keyShape === "touchStrip" ? 9 : 8;
+        case "bar":
+            return options.keyShape === "touchStrip" ? 18 : 10;
+        case "line":
+            return 5;
+        default:
+            return assertNever(options.viewSettings.selectedView);
     }
 }
 

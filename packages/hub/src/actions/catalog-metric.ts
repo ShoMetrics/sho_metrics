@@ -153,11 +153,13 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     const sourceLabel = options.target.customLabel
         ?? options.target.detectedLabel
         ?? CATALOG_NO_SELECTION_LABEL;
-    const selectedView = widget.slot.appearance.view.selectedView;
+    const viewSettings = widget.slot.appearance.view;
+    const selectedView = viewSettings.selectedView;
     const label = limitMetricCustomLabelCharacters(
         sourceLabel,
         resolveMetricCustomLabelDisplayMaximumCharacters({
-            selectedView,
+            viewSettings,
+            selectedTheme: widget.slot.appearance.theme.selectedTheme,
             keyShape: resolveMetricCustomLabelKeyShape({
                 selectedView,
                 isTouchStrip: options.event.action.isDial(),

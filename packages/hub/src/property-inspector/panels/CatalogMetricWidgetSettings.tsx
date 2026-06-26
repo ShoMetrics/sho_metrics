@@ -202,10 +202,12 @@ function CatalogMetricLabelScaleSettings({
         target.detectedCategory,
     );
     const widget = requireResolvedSingleMetricWidget(context.resolved);
+    const viewSettings = widget.slot.appearance.view;
     const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
-        selectedView: widget.slot.appearance.view.selectedView,
+        viewSettings,
+        selectedTheme: widget.slot.appearance.theme.selectedTheme,
         keyShape: resolveMetricCustomLabelKeyShape({
-            selectedView: widget.slot.appearance.view.selectedView,
+            selectedView: viewSettings.selectedView,
             isTouchStrip: context.isTouchStrip,
         }),
     });
