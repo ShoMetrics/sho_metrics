@@ -201,9 +201,9 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                     }),
                 }}
                 icon={{
-                    iconId: props.target.reading.iconId,
-                    onIconIdChange: (iconId) => props.onSettingsPatch({
-                        system: { iconId },
+                    iconId: props.target.reading.customIconId,
+                    onIconIdChange: (customIconId) => props.onSettingsPatch({
+                        system: { customIconId },
                     }),
                 }}
             />

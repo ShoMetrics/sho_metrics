@@ -3,6 +3,13 @@ import {
 } from "react";
 import { customMetricMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
+import {
+    METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+    normalizeMetricCustomLabelInput,
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
+} from "../../settings/metric-custom-label-policy";
+import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { InspectorItem } from "../components/InspectorItem";
 import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -19,6 +26,16 @@ import type {
 export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProps): React.JSX.Element {
     const { t } = useI18n();
     const [isEditingSource, setIsEditingSource] = useState(false);
+    const widget = requireResolvedSingleMetricWidget(props.context.resolved);
+    const viewSettings = widget.slot.appearance.view;
+    const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+        viewSettings,
+        selectedTheme: widget.slot.appearance.theme.selectedTheme,
+        keyShape: resolveMetricCustomLabelKeyShape({
+            selectedView: viewSettings.selectedView,
+            isTouchStrip: props.context.isTouchStrip,
+        }),
+    });
 
     if (isEditingSource) {
         return (
@@ -51,10 +68,18 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
             </SettingsSection>
             {props.target.configuration.state === "configured" && (
                 <MetricCustomizationSettings
+                    label={{
+                        value: props.target.customLabel,
+                        inputMaximumCharacters: METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+                        displayMaximumCharacters: displayMaximumLabelCharacters,
+                        onValueChange: (customLabel) => props.onSettingsPatch({
+                            customMetric: { customLabel: normalizeMetricCustomLabelInput(customLabel) },
+                        }),
+                    }}
                     icon={{
-                        iconId: props.target.iconId,
-                        onIconIdChange: (iconId) => props.onSettingsPatch({
-                            customMetric: { iconId },
+                        iconId: props.target.customIconId,
+                        onIconIdChange: (customIconId) => props.onSettingsPatch({
+                            customMetric: { customIconId },
                         }),
                     }}
                 />

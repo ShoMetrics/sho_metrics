@@ -28,9 +28,9 @@ export function resolveMetricCustomLabelKeyShape(options: {
 /**
  * Resolves the rendered label cap for the current view.
  *
- * This shared policy only decides how many user-entered characters are allowed
- * to participate in a view. The SVG primitives still own pixel fitting and final
- * clipping because font metrics and theme effects live in the rendering layer.
+ * This shared policy decides how many label characters may participate in a
+ * view. It applies to stored custom labels and source-provided display labels;
+ * neither path gets an unlimited-length exemption before hitting SVG fitting.
  */
 export function resolveMetricCustomLabelDisplayMaximumCharacters(options: {
     readonly viewSettings: ResolvedAppearanceViewSettings;

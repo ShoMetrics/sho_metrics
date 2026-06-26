@@ -1099,7 +1099,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.peripheralIdentity, undefined);
         assert.equal(target.reading.detectedPeripheralDisplayName, undefined);
         assert.equal(target.reading.customLabel, undefined);
-        assert.equal(target.reading.iconId, undefined);
+        assert.equal(target.reading.customIconId, undefined);
         assert.equal(settings.preferences.pollingFrequencySeconds, 60);
     });
 
@@ -1216,7 +1216,7 @@ describe("stored settings proto resolver", () => {
                                     },
                                     detectedPeripheralDisplayName: " MX Master 4 ",
                                     customLabel: " Mouse ",
-                                    icon: {
+                                    customIcon: {
                                         id: " cloud-sun ",
                                     },
                                 },
@@ -1249,7 +1249,7 @@ describe("stored settings proto resolver", () => {
         });
         assert.equal(target.reading.detectedPeripheralDisplayName, "MX Master 4");
         assert.equal(target.reading.customLabel, "Mouse");
-        assert.equal(target.reading.iconId, "cloud-sun");
+        assert.equal(target.reading.customIconId, "cloud-sun");
     });
 
     it("drops insufficient System peripheral identity instead of keeping a partial identity", () => {
@@ -1587,7 +1587,7 @@ describe("stored settings proto resolver", () => {
                     slot: {
                         metric: {
                             custom: {
-                                icon: {
+                                customIcon: {
                                     id: " cloud-sun ",
                                 },
                             },
@@ -1600,7 +1600,7 @@ describe("stored settings proto resolver", () => {
 
         assert.equal(target.domain, "customMetric");
         if (target.domain === "customMetric") {
-            assert.equal(target.iconId, "cloud-sun");
+            assert.equal(target.customIconId, "cloud-sun");
             assert.deepEqual(target.configuration, { state: "unconfigured" });
         }
     });

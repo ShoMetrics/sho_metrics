@@ -17,6 +17,7 @@ import {
     getDefaultMetricIconFragment,
 } from "../../widgets/icons/metric-icons";
 import {
+    limitMetricCustomLabelCharacters,
     resolveMetricCustomLabelDisplayMaximumCharacters,
     resolveMetricCustomLabelKeyShape,
 } from "../../settings/metric-custom-label-policy";
@@ -47,7 +48,7 @@ export function buildCustomMetricViewOptions(options: {
     // only use the stored icon. Configured state overrides the center icon
     // after reading the source's suggested icon from widget data.
     const baseIcons = buildCustomMetricViewIcons({
-        storedIconId: options.target.iconId,
+        storedIconId: options.target.customIconId,
         suggestedIconId: undefined,
     });
     const baseOptions = {
@@ -86,18 +87,29 @@ export function buildCustomMetricViewOptions(options: {
             }
 
             const viewSettings = widget.slot.appearance.view;
+            const selectedView = viewSettings.selectedView;
+            const labelMaximumCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+                viewSettings,
+                selectedTheme: widget.slot.appearance.theme.selectedTheme,
+                keyShape: resolveMetricCustomLabelKeyShape({
+                    selectedView,
+                    isTouchStrip: options.event.action.isDial(),
+                }),
+            });
+            const customLabel = options.target.customLabel === undefined
+                ? undefined
+                : limitMetricCustomLabelCharacters(options.target.customLabel, labelMaximumCharacters);
             const widgetDataResult = readCustomHttpWidgetData({
                 metrics: options.metrics,
                 metricKey: identity.metricKey,
-                labelMaximumCharacters: resolveMetricCustomLabelDisplayMaximumCharacters({
-                    viewSettings,
-                    selectedTheme: widget.slot.appearance.theme.selectedTheme,
-                    keyShape: resolveMetricCustomLabelKeyShape({
-                        selectedView: viewSettings.selectedView,
-                        isTouchStrip: options.event.action.isDial(),
-                    }),
-                }),
+                labelMaximumCharacters,
+                displayOverrides: selectedView === "bar" || customLabel === undefined
+                    ? undefined
+                    : { label: customLabel },
             });
+            const widgetData = selectedView === "bar" && customLabel !== undefined
+                ? { ...widgetDataResult.widgetData, secondaryDisplayValue: customLabel }
+                : widgetDataResult.widgetData;
 
             return {
                 ...baseOptions,
@@ -105,11 +117,11 @@ export function buildCustomMetricViewOptions(options: {
                 // current metric sample, so the configured state replaces the
                 // base center icon instead of reusing `baseIcons`.
                 centerIconFragment: buildCustomMetricViewIcons({
-                    storedIconId: options.target.iconId,
+                    storedIconId: options.target.customIconId,
                     suggestedIconId: widgetDataResult.suggestedLucideIconId,
                 }).centerIconFragment,
                 metricKey: identity.metricKey,
-                widgetData: widgetDataResult.widgetData,
+                widgetData,
             };
         }
     }

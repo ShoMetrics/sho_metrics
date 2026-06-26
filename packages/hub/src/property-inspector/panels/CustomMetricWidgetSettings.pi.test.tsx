@@ -567,7 +567,7 @@ test("custom metric icon picker shows the stored icon label", () => {
         url: "https://api.example.com/weather",
         userIntent: "Display temperature",
         jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
-        iconId: "tv",
+        customIconId: "tv",
     })} />);
 
     assert.equal(

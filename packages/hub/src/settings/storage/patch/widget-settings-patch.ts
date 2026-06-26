@@ -670,10 +670,10 @@ function applySystemPatch(
         target.customLabel = patch.customLabel;
     }
 
-    if ("iconId" in patch) {
-        target.icon = patch.iconId === undefined
+    if ("customIconId" in patch) {
+        target.customIcon = patch.customIconId === undefined
             ? undefined
-            : create(MetricIconSettingsSchema, { id: patch.iconId });
+            : create(MetricIconSettingsSchema, { id: patch.customIconId });
     }
 }
 

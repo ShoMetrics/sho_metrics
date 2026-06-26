@@ -79,7 +79,7 @@ export function buildSystemViewOptions(options: {
             titleCardCaptionText: TITLE_CARD_BATTERY_CAPTION_TEXT,
         },
         ...defaultIcons,
-        centerIconFragment: getMetricIconFragment(options.target.reading.iconId)
+        centerIconFragment: getMetricIconFragment(options.target.reading.customIconId)
             ?? defaultIcons.centerIconFragment,
     };
 }

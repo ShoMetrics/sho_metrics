@@ -920,7 +920,7 @@ test("catalog metric settings render label and scale controls after theme", () =
         },
     });
 
-    assert.match(markup, /class="section-title"[^>]*>Label, Icon &amp; Scale</);
+    assert.match(markup, /class="section-title"[^>]*>Metric Identity</);
     assert.match(markup, /Label:/);
     assert.match(markup, /placeholder="Detected label"/);
     assert.match(markup, /value="Board"/);
@@ -930,8 +930,8 @@ test("catalog metric settings render label and scale controls after theme", () =
     assert.match(markup, /Max \(W\):/);
     assert.match(markup, /value="450"/);
     assert.match(markup, /Custom label and scale reset when you choose a different metric/);
-    assertTextOrder(markup, "Theme:", "Label, Icon &amp; Scale");
-    assertTextOrder(markup, "Label, Icon &amp; Scale", "Trend Line Smoothing");
+    assertTextOrder(markup, "Theme:", "Metric Identity");
+    assertTextOrder(markup, "Metric Identity", "Trend Line Smoothing");
 });
 
 test("catalog metric settings prefill detected labels when no custom label is set", () => {
@@ -2084,6 +2084,7 @@ function buildResolvedCatalogTarget(
         detectedReadingKind: "unspecified",
         customLabel: undefined,
         customMaximumValue: undefined,
+        customIconId: undefined,
         ...overrides,
     };
 }

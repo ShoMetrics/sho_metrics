@@ -244,7 +244,7 @@ export type ResolvedSystemReading =
         readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
         readonly detectedPeripheralDisplayName: string | undefined;
         readonly customLabel: string | undefined;
-        readonly iconId: string | undefined;
+        readonly customIconId: string | undefined;
     };
 
 export interface ResolvedSystemPeripheralIdentity {
@@ -319,12 +319,14 @@ export interface ResolvedCatalogMetricTarget {
     readonly detectedReadingKind: CatalogMetricReadingKind;
     readonly customLabel: string | undefined;
     readonly customMaximumValue: number | undefined;
+    readonly customIconId: string | undefined;
 }
 
 export interface ResolvedCustomMetricTarget {
     readonly domain: "customMetric";
     readonly configuration: ResolvedCustomMetricConfiguration;
-    readonly iconId: string | undefined;
+    readonly customLabel: string | undefined;
+    readonly customIconId: string | undefined;
 }
 
 export type ResolvedCustomMetricConfiguration =
