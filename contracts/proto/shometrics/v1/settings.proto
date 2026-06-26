@@ -354,7 +354,7 @@ message SystemBatteryMetricTarget {
   // User-selected icon id owned by ShoMetrics' icon registry. This uses the
   // same provider-neutral shape as custom metrics so future icon sources can be
   // added without forking icon settings by metric domain.
-  optional MetricIconSettings icon = 4;
+  optional MetricIconSettings custom_icon = 4;
 }
 
 message SystemPeripheralIdentity {
@@ -469,6 +469,10 @@ message CatalogMetricTarget {
     gt: 0
     lte: 1000000000000000
   }];
+
+  // User-selected icon id owned by ShoMetrics' icon registry. Absence means the
+  // renderer uses the metric category or view-specific default icon.
+  optional MetricIconSettings custom_icon = 8;
 }
 
 message CustomMetricTarget {
@@ -479,7 +483,11 @@ message CustomMetricTarget {
   // User-selected icon id owned by ShoMetrics' icon registry. V1 resolves this
   // through the built-in Lucide registry, but the stored id is intentionally
   // provider-neutral so future icon sources can extend the schema explicitly.
-  optional MetricIconSettings icon = 2;
+  optional MetricIconSettings custom_icon = 2;
+
+  // User-owned label override. Absence means use the Custom HTTP output label
+  // hint, then the resolver-owned Custom HTTP default.
+  optional string custom_label = 3 [(buf.validate.field).string.max_len = 128];
 }
 
 message CustomHttpMetricSource {

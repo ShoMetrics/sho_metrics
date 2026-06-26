@@ -323,7 +323,7 @@ test("System PI cache publish keeps completed empty battery device refreshes", (
 function buildSystemTarget(
     peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined,
     customLabel: string | undefined = undefined,
-    iconId: string | undefined = undefined,
+    customIconId: string | undefined = undefined,
 ): ResolvedSystemMetricTarget {
     return {
         domain: "system",
@@ -334,7 +334,7 @@ function buildSystemTarget(
                 ? undefined
                 : "MX Master 4",
             customLabel,
-            iconId,
+            customIconId,
         },
     };
 }

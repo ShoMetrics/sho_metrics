@@ -137,6 +137,7 @@ function buildCatalogPreviewInput(): MetricPreviewInput {
             detectedReadingKind: "temperature",
             customLabel: undefined,
             customMaximumValue: undefined,
+            customIconId: undefined,
         },
     };
 }

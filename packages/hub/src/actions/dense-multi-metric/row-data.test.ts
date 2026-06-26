@@ -374,13 +374,15 @@ function buildCatalogTarget(metricId: string): ResolvedMetricTarget {
         detectedReadingKind: "power",
         customLabel: undefined,
         customMaximumValue: undefined,
+        customIconId: undefined,
     };
 }
 
 function buildCustomMetricTarget(url: string, jqTransform: string): ResolvedMetricTarget {
     return {
         domain: "customMetric",
-        iconId: undefined,
+        customLabel: undefined,
+        customIconId: undefined,
         configuration: {
             state: "configured",
             source: {

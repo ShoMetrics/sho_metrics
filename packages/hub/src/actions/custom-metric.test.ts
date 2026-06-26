@@ -273,6 +273,66 @@ test("Custom Metric view uses source display hints for label, unit, and maximum"
     });
 });
 
+test("Custom Metric view uses custom label before source display hint label", () => {
+    const rawSettings = buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/data",
+        userIntent: "show CPU",
+        jqTransform: ".",
+        customLabel: "Server Room",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+    const viewOptions = buildCustomMetricViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-label-render-action"), rawSettings),
+        settings,
+        target: readCustomMetricTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 42,
+            sampleTimestampMilliseconds: 1234,
+            displayHint: {
+                label: "CPU",
+                unit: MetricUnit.PERCENT,
+                maximum: 84,
+            },
+        }),
+    });
+
+    assert.equal(viewOptions.widgetData.label, "Server Room");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, undefined);
+});
+
+test("Custom Metric bar view keeps source label as title and moves custom label below the bar", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(buildCustomMetricWidgetSettings({
+        url: "https://api.example.com/data",
+        userIntent: "show CPU",
+        jqTransform: ".",
+        customLabel: "Server Room",
+    }), {
+        appearance: {
+            view: { selectedView: "bar" },
+        },
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
+
+    const viewOptions = buildCustomMetricViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("custom-bar-label-render-action"), rawSettings),
+        settings,
+        target: readCustomMetricTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 42,
+            sampleTimestampMilliseconds: 1234,
+            displayHint: {
+                label: "CPU",
+                unit: MetricUnit.PERCENT,
+                maximum: 84,
+            },
+        }),
+    });
+
+    assert.equal(viewOptions.widgetData.label, "CPU");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "Server Room");
+});
+
 test("Custom Metric view uses source suggested icon when no manual icon is selected", () => {
     const rawSettings = buildCustomMetricWidgetSettings({
         url: "https://api.example.com/data",
@@ -304,7 +364,7 @@ test("Custom Metric view uses manual icon before source suggested icon", () => {
         url: "https://api.example.com/data",
         userIntent: "show temperature",
         jqTransform: ".",
-        iconId: "cloud-sun",
+        customIconId: "cloud-sun",
     });
     const settings = resolveInitialActionSettings(rawSettings, "customMetric").resolvedSettings;
 
@@ -1138,7 +1198,8 @@ function buildCustomMetricWidgetSettings(patch: {
     readonly url?: string;
     readonly userIntent?: string;
     readonly jqTransform?: string;
-    readonly iconId?: string;
+    readonly customLabel?: string;
+    readonly customIconId?: string;
     readonly timeoutSeconds?: number;
     readonly retryCount?: number;
 } = {}): unknown {

@@ -34,6 +34,7 @@ import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
+import { getMetricIconFragment } from "../widgets/icons/metric-icons";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 
 test("catalog metric without selected metric does not register collection", () => {
@@ -277,6 +278,31 @@ test("catalog metric selected view uses catalog metadata icons", () => {
     assert.doesNotMatch(viewOptions.centerIconFragment, /question/iu);
 });
 
+test("catalog metric selected view uses custom icon before catalog metadata icons", () => {
+    const rawSettings = buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/package", {
+        detectedLabel: "CPU Package",
+        detectedUnit: MetricUnit.CELSIUS,
+        detectedCategory: "cpu",
+        detectedReadingKind: "temperature",
+        customIconId: "cloud-sun",
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-custom-icon-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 72,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getMetricIconFragment("cloud-sun"));
+    assert.deepEqual(viewOptions.statusIcon, getMetricStatusIcon("temperature"));
+});
+
 test("catalog metric selected circle value view limits long labels", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/package", {
@@ -344,6 +370,92 @@ test("catalog metric selected view uses custom label and custom maximum", () => 
     ]);
     assert.equal(viewOptions.widgetData.progress, 0.5);
     assert.equal(viewOptions.widgetData.label, "Board");
+});
+
+test("catalog metric bar view keeps category as title and moves custom label below the bar", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(buildCatalogWidgetSettings("source.sensor:/gpu/0/power", {
+        detectedLabel: "GPU Board Power",
+        detectedUnit: MetricUnit.WATTS,
+        detectedCategory: "gpu",
+        detectedReadingKind: "power",
+        customLabel: "Board",
+        customMaximumValue: 600,
+    }), {
+        appearance: {
+            view: { selectedView: "bar" },
+        },
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-bar-custom-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 300,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.label, "GPU");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "Board");
+});
+
+test("catalog metric bar view uses category title and detected label below the bar by default", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/core-average", {
+        detectedLabel: "Core Average",
+        detectedUnit: MetricUnit.CELSIUS,
+        detectedCategory: "cpu",
+        detectedReadingKind: "temperature",
+    }), {
+        appearance: {
+            view: { selectedView: "bar" },
+        },
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-bar-detected-label-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 51,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.label, "CPU");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "Core Average");
+});
+
+test("catalog metric bar view limits detected label below the bar", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(buildCatalogWidgetSettings("source.sensor:/network/0/load/utilization", {
+        detectedLabel: "Network Utilization (Ethernet)",
+        detectedUnit: MetricUnit.PERCENT,
+        detectedCategory: "network",
+        detectedReadingKind: "usage",
+    }), {
+        appearance: {
+            view: { selectedView: "bar" },
+        },
+    });
+    const settings = resolveInitialActionSettings(rawSettings, "catalog").resolvedSettings;
+
+    const viewOptions = buildCatalogMetricSelectedViewOptions({
+        event: buildWillAppearEvent(new FakeStreamDeckAction("catalog-render-bar-limited-detected-label-action"), rawSettings),
+        settings,
+        target: readCatalogTarget(settings),
+        metrics: new CapturingMetricStoreReader({
+            current: 0,
+            sampleTimestampMilliseconds: wallClockNowMilliseconds(),
+        }),
+        helperStatus: { state: "available" },
+    });
+
+    assert.equal(viewOptions.widgetData.label, "Network");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "Network Util");
 });
 
 test("catalog metric selected view leaves key copy generic when helper is available without data", () => {
@@ -675,6 +787,7 @@ function buildCatalogWidgetSettings(
         readonly detectedReadingKind?: CatalogMetricReadingKind;
         readonly customLabel?: string;
         readonly customMaximumValue?: number;
+        readonly customIconId?: string;
     } = {},
 ): unknown {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(undefined, "catalog").rawSettings;
@@ -692,6 +805,7 @@ function buildCatalogWidgetSettings(
             detectedReadingKind: options.detectedReadingKind,
             customLabel: options.customLabel,
             customMaximumValue: options.customMaximumValue,
+            customIconId: options.customIconId,
         },
     });
 }

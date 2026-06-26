@@ -136,7 +136,7 @@ function resolveSystemBatteryMetricTarget(
             peripheralIdentity: resolveSystemPeripheralIdentity(storedTarget?.peripheralIdentity),
             detectedPeripheralDisplayName: normalizeOptionalText(storedTarget?.detectedPeripheralDisplayName),
             customLabel: normalizeOptionalText(storedTarget?.customLabel),
-            iconId: normalizeOptionalText(storedTarget?.icon?.id),
+            customIconId: normalizeOptionalText(storedTarget?.customIcon?.id),
         },
     };
 }
@@ -443,20 +443,23 @@ function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): Re
         ),
         customLabel: storedTarget.customLabel,
         customMaximumValue: storedTarget.customMaximumValue,
+        customIconId: normalizeOptionalText(storedTarget.customIcon?.id),
     };
 }
 
 function resolveCustomMetricTarget(storedTarget: StoredCustomMetricTarget): ResolvedCustomMetricTarget {
-    const iconId = storedTarget.icon?.id?.trim() || undefined;
+    const customIconId = normalizeOptionalText(storedTarget.customIcon?.id);
+    const customLabel = normalizeOptionalText(storedTarget.customLabel);
     switch (storedTarget.source.case) {
         case undefined:
             return {
                 domain: "customMetric",
-                iconId,
+                customLabel,
+                customIconId,
                 configuration: { state: "unconfigured" },
             };
         case "http":
-            return resolveCustomHttpMetricSource(storedTarget.source.value, iconId);
+            return resolveCustomHttpMetricSource(storedTarget.source.value, customLabel, customIconId);
     }
 
     return assertNever(storedTarget.source);
@@ -464,13 +467,15 @@ function resolveCustomMetricTarget(storedTarget: StoredCustomMetricTarget): Reso
 
 function resolveCustomHttpMetricSource(
     storedHttpSource: StoredCustomHttpMetricSource,
-    iconId: string | undefined,
+    customLabel: string | undefined,
+    customIconId: string | undefined,
 ): ResolvedCustomMetricTarget {
     const request = readSingleCustomHttpRequest(storedHttpSource);
     if (request === undefined) {
         return {
             domain: "customMetric",
-            iconId,
+            customLabel,
+            customIconId,
             configuration: { state: "unconfigured" },
         };
     }
@@ -486,7 +491,8 @@ function resolveCustomHttpMetricSource(
     if (invalidReason !== undefined) {
         return {
             domain: "customMetric",
-            iconId,
+            customLabel,
+            customIconId,
             configuration: {
                 state: "invalid",
                 reason: invalidReason,
@@ -497,7 +503,8 @@ function resolveCustomHttpMetricSource(
 
     return {
         domain: "customMetric",
-        iconId,
+        customLabel,
+        customIconId,
         configuration: {
             state: "configured",
             source,

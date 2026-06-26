@@ -72,14 +72,18 @@ export function applyCustomMetricPatch(
     target: StoredCustomMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["customMetric"]>,
 ): void {
-    if ("iconId" in patch) {
-        if (patch.iconId === undefined) {
-            target.icon = undefined;
+    if ("customIconId" in patch) {
+        if (patch.customIconId === undefined) {
+            target.customIcon = undefined;
         } else {
-            target.icon = create(MetricIconSettingsSchema, {
-                id: patch.iconId,
+            target.customIcon = create(MetricIconSettingsSchema, {
+                id: patch.customIconId,
             });
         }
+    }
+
+    if ("customLabel" in patch) {
+        target.customLabel = patch.customLabel;
     }
 
     const hasHttpPatch = "url" in patch
@@ -294,6 +298,11 @@ export function applyCatalogPatch(
     }
     if ("customMaximumValue" in patch) {
         target.customMaximumValue = patch.customMaximumValue;
+    }
+    if ("customIconId" in patch) {
+        target.customIcon = patch.customIconId === undefined
+            ? undefined
+            : create(MetricIconSettingsSchema, { id: patch.customIconId });
     }
 }
 

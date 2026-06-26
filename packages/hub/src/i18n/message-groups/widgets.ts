@@ -379,9 +379,9 @@ export const catalogMessages = {
 
 export const metricCustomizationMessages = {
     section: {
-        en: "Label, Icon & Scale",
-        zh_CN: "标签、图标与范围",
-        ja: "ラベル、アイコン、スケール",
+        en: "Metric Identity",
+        zh_CN: "指标标识",
+        ja: "メトリック識別",
     },
     labelLabel: {
         en: "Label",

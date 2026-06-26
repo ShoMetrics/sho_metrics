@@ -1,5 +1,4 @@
 import { normalizeKnownMetricUnit } from "../../metrics/metric-unit-format";
-import { cpuMessages, gpuMessages } from "../../i18n/message-groups/widgets";
 import { optionMessages } from "../../i18n/message-groups/options";
 import type { I18n } from "../../i18n/react";
 import type { CatalogMetricCategory, CatalogMetricReadingKind } from "../../settings/resolved-settings";
@@ -569,9 +568,8 @@ function readTypeLabel(typeId: CatalogMetricTypeId, i18n: I18n | undefined): str
 
     switch (typeId) {
         case "cpu":
-            return i18n.t(cpuMessages.cpuMetricLabel);
         case "gpu":
-            return i18n.t(gpuMessages.gpuMetricLabel);
+            return TYPE_LABEL_BY_ID[typeId];
         case "memory":
             return i18n.t(optionMessages.memoryOption);
         case "disk":

@@ -280,14 +280,14 @@ test("widget patch updates Custom Metric icon without creating an HTTP source", 
 
     const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
         customMetric: {
-            iconId: "cloud-sun",
+            customIconId: "cloud-sun",
         },
     });
 
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "custom");
     if (target?.case === "custom") {
-        assert.equal(target.value.icon?.id, "cloud-sun");
+        assert.equal(target.value.customIcon?.id, "cloud-sun");
         assert.equal(target.value.source.case, undefined);
     }
 });
@@ -297,21 +297,21 @@ test("widget patch clears Custom Metric icon", () => {
         resolveQuickStartStoredWidgetSettings(undefined, "customMetric").rawSettings,
         {
             customMetric: {
-                iconId: "cloud-sun",
+                customIconId: "cloud-sun",
             },
         },
     );
 
     const nextSettings = writeStoredWidgetSettingsPatch(customMetricSettings, {
         customMetric: {
-            iconId: undefined,
+            customIconId: undefined,
         },
     });
 
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
     assert.equal(target?.case, "custom");
     if (target?.case === "custom") {
-        assert.equal(target.value.icon, undefined);
+        assert.equal(target.value.customIcon, undefined);
     }
 });
 
@@ -857,7 +857,7 @@ test("widget patch writes selected System peripheral battery identity", () => {
                 },
                 detectedPeripheralDisplayName: "MX Master 4",
                 customLabel: "Mouse",
-                iconId: "cloud-sun",
+                customIconId: "cloud-sun",
             },
         },
     );
@@ -884,7 +884,7 @@ test("widget patch writes selected System peripheral battery identity", () => {
         assert.equal(vendorHidIdentity?.receiverSlot, 2);
         assert.equal(target.value.reading.value.detectedPeripheralDisplayName, "MX Master 4");
         assert.equal(target.value.reading.value.customLabel, "Mouse");
-        assert.equal(target.value.reading.value.icon?.id, "cloud-sun");
+        assert.equal(target.value.reading.value.customIcon?.id, "cloud-sun");
     }
 });
 
@@ -893,14 +893,14 @@ test("widget patch clears System battery icon", () => {
         resolveQuickStartStoredWidgetSettings(undefined, "system").rawSettings,
         {
             system: {
-                iconId: "cloud-sun",
+                customIconId: "cloud-sun",
             },
         },
     );
 
     const nextSettings = writeStoredWidgetSettingsPatch(settingsWithIcon, {
         system: {
-            iconId: undefined,
+            customIconId: undefined,
         },
     });
     const target = readSingleMetricSlot(nextSettings)?.metric?.target;
@@ -908,7 +908,7 @@ test("widget patch clears System battery icon", () => {
     assert.equal(target?.case, "system");
     if (target?.case === "system") {
         assert.equal(target.value.reading.case, "battery");
-        assert.equal(target.value.reading.value.icon, undefined);
+        assert.equal(target.value.reading.value.customIcon, undefined);
     }
 });
 

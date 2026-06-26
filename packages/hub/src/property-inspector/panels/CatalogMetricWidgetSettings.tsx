@@ -232,6 +232,12 @@ function CatalogMetricLabelScaleSettings({
                     </button>
                 ),
             }}
+            icon={{
+                iconId: target.customIconId,
+                onIconIdChange: (customIconId) => onSettingsPatch({
+                    catalog: { customIconId },
+                }),
+            }}
             scale={{
                 scaleMode,
                 onScaleModeChange: (nextScaleMode) => onSettingsPatch(buildCatalogMetricScaleModePatch(

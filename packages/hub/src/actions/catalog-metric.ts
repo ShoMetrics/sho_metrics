@@ -31,11 +31,21 @@ import {
     resolveMetricCustomLabelDisplayMaximumCharacters,
     resolveMetricCustomLabelKeyShape,
 } from "../settings/metric-custom-label-policy";
+import { getMetricIconFragment } from "../widgets/icons/metric-icons";
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS = 5_000;
 const CATALOG_NO_SELECTION_RENDER_KEY = "catalog.unselected";
 const CATALOG_NO_SELECTION_LABEL = "METRIC";
+const CATALOG_BAR_LABEL_BY_CATEGORY = {
+    cpu: "CPU",
+    gpu: "GPU",
+    memory: "Memory",
+    disk: "Disk",
+    network: "Network",
+    other: "Metric",
+    unspecified: "Metric",
+} as const satisfies Record<ResolvedCatalogMetricTarget["detectedCategory"], string>;
 export const CATALOG_INSTALL_HELPER_NOTICE_TEXT = HELPER_INSTALL_NOTICE_TEXT;
 export const CATALOG_CHOOSE_METRIC_NOTICE_TEXT = "Choose metric";
 
@@ -150,21 +160,28 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     // Rendering must be self-contained after selection. The descriptor catalog
     // may be unavailable later, so use stored detected hints plus user overrides.
     const unit = formatMetricUnit(options.target.detectedUnit);
-    const sourceLabel = options.target.customLabel
-        ?? options.target.detectedLabel
-        ?? CATALOG_NO_SELECTION_LABEL;
+    const defaultLabel = options.target.detectedLabel ?? CATALOG_NO_SELECTION_LABEL;
     const viewSettings = widget.slot.appearance.view;
     const selectedView = viewSettings.selectedView;
-    const label = limitMetricCustomLabelCharacters(
-        sourceLabel,
-        resolveMetricCustomLabelDisplayMaximumCharacters({
-            viewSettings,
-            selectedTheme: widget.slot.appearance.theme.selectedTheme,
-            keyShape: resolveMetricCustomLabelKeyShape({
-                selectedView,
-                isTouchStrip: options.event.action.isDial(),
-            }),
+    const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+        viewSettings,
+        selectedTheme: widget.slot.appearance.theme.selectedTheme,
+        keyShape: resolveMetricCustomLabelKeyShape({
+            selectedView,
+            isTouchStrip: options.event.action.isDial(),
         }),
+    });
+    const customLabel = options.target.customLabel === undefined
+        ? undefined
+        : limitMetricCustomLabelCharacters(options.target.customLabel, displayMaximumLabelCharacters);
+    // Stored detected labels come from source descriptors, not PI input. They
+    // still share the same render cap so source freedom cannot bypass fitting.
+    const secondaryLabel = customLabel
+        ?? limitMetricCustomLabelCharacters(defaultLabel, displayMaximumLabelCharacters)
+        ?? CATALOG_NO_SELECTION_LABEL;
+    const label = limitMetricCustomLabelCharacters(
+        selectedView === "bar" ? CATALOG_BAR_LABEL_BY_CATEGORY[options.target.detectedCategory] : customLabel ?? defaultLabel,
+        displayMaximumLabelCharacters,
     ) ?? CATALOG_NO_SELECTION_LABEL;
     const maxValue = options.target.customMaximumValue
         ?? resolveCatalogMetricDefaultMaximumValue(
@@ -173,7 +190,7 @@ export function buildCatalogMetricSelectedViewOptions(options: {
             options.target.detectedReadingKind,
         );
 
-    const widgetData = readHelperBackedWidgetData({
+    const baseWidgetData = readHelperBackedWidgetData({
         metrics: options.metrics,
         metricKey: options.target.metricId,
         label,
@@ -188,6 +205,9 @@ export function buildCatalogMetricSelectedViewOptions(options: {
             category: options.target.detectedCategory,
         }),
     });
+    const widgetData = selectedView === "bar"
+        ? { ...baseWidgetData, secondaryDisplayValue: secondaryLabel }
+        : baseWidgetData;
     const noticeText = resolveHelperRequiredInstallNoticeText({
         helperStatus: options.helperStatus,
         widgetData,
@@ -205,10 +225,15 @@ export function buildCatalogMetricSelectedViewOptions(options: {
 }
 
 function buildCatalogMetricViewIcons(target: ResolvedCatalogMetricTarget): ReturnType<typeof buildMetricViewIcons> {
-    return buildMetricViewIcons({
+    const fallbackIcons = buildMetricViewIcons({
         hardware: target.detectedCategory,
         status: metricStatusIconForCatalogReadingKind(target.detectedReadingKind),
     });
+
+    return {
+        ...fallbackIcons,
+        centerIconFragment: getMetricIconFragment(target.customIconId) ?? fallbackIcons.centerIconFragment,
+    };
 }
 
 function buildNoSelectionWidgetData(): WidgetData {

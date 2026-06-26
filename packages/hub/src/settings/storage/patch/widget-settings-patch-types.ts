@@ -71,6 +71,7 @@ export interface StoredWidgetSettingsPatch {
         readonly detectedReadingKind: CatalogMetricReadingKind | undefined;
         readonly customLabel: string | undefined;
         readonly customMaximumValue: number | undefined;
+        readonly customIconId: string | undefined;
     }>;
     readonly customMetric?: Partial<{
         readonly url: string | undefined;
@@ -80,13 +81,14 @@ export interface StoredWidgetSettingsPatch {
         readonly retryCount: number | undefined;
         readonly credentialId: string | undefined;
         readonly allowPublicHttpCredentials: boolean | undefined;
-        readonly iconId: string | undefined;
+        readonly customLabel: string | undefined;
+        readonly customIconId: string | undefined;
     }>;
     readonly system?: Partial<{
         readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
         readonly detectedPeripheralDisplayName: string | undefined;
         readonly customLabel: string | undefined;
-        readonly iconId: string | undefined;
+        readonly customIconId: string | undefined;
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;
     readonly stacked?: StackedWidgetSettingsPatch | undefined;
