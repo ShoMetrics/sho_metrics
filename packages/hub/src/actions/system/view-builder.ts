@@ -35,9 +35,11 @@ export function buildSystemViewOptions(options: {
 }): SingleMetricViewOptions {
     const widget = requireResolvedSingleMetricWidget(options.settings);
     const metricKey = resolveSystemMetricKey(options.target);
-    const selectedView = widget.slot.appearance.view.selectedView;
+    const viewSettings = widget.slot.appearance.view;
+    const selectedView = viewSettings.selectedView;
     const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
-        selectedView,
+        viewSettings,
+        selectedTheme: widget.slot.appearance.theme.selectedTheme,
         keyShape: resolveMetricCustomLabelKeyShape({
             selectedView,
             isTouchStrip: options.event.action.isDial(),
@@ -47,8 +49,8 @@ export function buildSystemViewOptions(options: {
         customLabel: options.target.reading.customLabel,
         selectedPeripheralDisplayName: options.target.reading.detectedPeripheralDisplayName,
         selectedView,
-        circleVariant: widget.slot.appearance.view.circleVariant,
-        textVariant: widget.slot.appearance.view.textVariant,
+        circleVariant: viewSettings.circleVariant,
+        textVariant: viewSettings.textVariant,
         maximumCharacters: displayMaximumLabelCharacters,
     });
     const secondaryBatteryLabel = resolveSystemBatterySecondaryLabel({

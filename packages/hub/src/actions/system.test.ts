@@ -11,6 +11,8 @@ import {
     buildBatteryMetricKeyFromIdentity,
 } from "../runtime/sources/battery/battery-metric-key";
 import type {
+    CircleViewVariant,
+    MetricTheme,
     MetricView,
     ResolvedSystemMetricTarget,
     ResolvedSystemPeripheralIdentity,
@@ -188,6 +190,33 @@ test("System battery circle view caps long stored custom labels for display", ()
     assert.equal(read.calls[0]?.label, "12345678");
 });
 
+test("System battery full-ring circle view caps Pixel Window custom labels to the measured safe length", () => {
+    const read = buildMetricReader();
+    buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withSelectedTheme(resolveInitialActionSettings(undefined, "system").resolvedSettings, "pixel-window"),
+        target: buildSystemTarget(undefined, "123456"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "1234");
+});
+
+test("System battery gauge circle view keeps the measured Pixel Window label headroom", () => {
+    const read = buildMetricReader();
+    buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withCircleVariant(
+            withSelectedTheme(resolveInitialActionSettings(undefined, "system").resolvedSettings, "pixel-window"),
+            "gauge",
+        ),
+        target: buildSystemTarget(undefined, "123456"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "12345");
+});
+
 test("System battery bar view defaults to the readable title label", () => {
     const read = buildMetricReader();
     buildSystemViewOptions({
@@ -212,6 +241,21 @@ test("System battery bar view renders custom label as secondary text", () => {
     assert.equal(read.calls[0]?.label, "Battery");
     assert.equal(viewOptions.widgetData.barLabel, "Battery");
     assert.equal(viewOptions.widgetData.secondaryDisplayValue, "MX Mouse");
+});
+
+test("System battery bar view caps Pixel Window custom labels conservatively", () => {
+    const read = buildMetricReader();
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withSelectedTheme(
+            withSelectedView(resolveInitialActionSettings(undefined, "system").resolvedSettings, "bar"),
+            "pixel-window",
+        ),
+        target: buildSystemTarget(undefined, "123456789012"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "1234567890");
 });
 
 test("System battery bar view renders selected peripheral name as secondary text", () => {
@@ -314,6 +358,58 @@ function withSelectedView(
                     view: {
                         ...settings.widget.slot.appearance.view,
                         selectedView,
+                    },
+                },
+            },
+        },
+    };
+}
+
+function withSelectedTheme(
+    settings: ResolvedWidgetSettings,
+    selectedTheme: MetricTheme,
+): ResolvedWidgetSettings {
+    if (settings.widget.widgetKind !== "singleMetric") {
+        throw new Error("System action tests expect single metric settings.");
+    }
+
+    return {
+        ...settings,
+        widget: {
+            ...settings.widget,
+            slot: {
+                ...settings.widget.slot,
+                appearance: {
+                    ...settings.widget.slot.appearance,
+                    theme: {
+                        ...settings.widget.slot.appearance.theme,
+                        selectedTheme,
+                    },
+                },
+            },
+        },
+    };
+}
+
+function withCircleVariant(
+    settings: ResolvedWidgetSettings,
+    circleVariant: CircleViewVariant,
+): ResolvedWidgetSettings {
+    if (settings.widget.widgetKind !== "singleMetric") {
+        throw new Error("System action tests expect single metric settings.");
+    }
+
+    return {
+        ...settings,
+        widget: {
+            ...settings.widget,
+            slot: {
+                ...settings.widget.slot,
+                appearance: {
+                    ...settings.widget.slot.appearance,
+                    view: {
+                        ...settings.widget.slot.appearance.view,
+                        circleVariant,
                     },
                 },
             },

@@ -85,13 +85,15 @@ export function buildCustomMetricViewOptions(options: {
                 throw new Error("Configured Custom Metric rendering could not resolve a Custom HTTP identity.");
             }
 
+            const viewSettings = widget.slot.appearance.view;
             const widgetDataResult = readCustomHttpWidgetData({
                 metrics: options.metrics,
                 metricKey: identity.metricKey,
                 labelMaximumCharacters: resolveMetricCustomLabelDisplayMaximumCharacters({
-                    selectedView: widget.slot.appearance.view.selectedView,
+                    viewSettings,
+                    selectedTheme: widget.slot.appearance.theme.selectedTheme,
                     keyShape: resolveMetricCustomLabelKeyShape({
-                        selectedView: widget.slot.appearance.view.selectedView,
+                        selectedView: viewSettings.selectedView,
                         isTouchStrip: options.event.action.isDial(),
                     }),
                 }),
