@@ -317,6 +317,10 @@ message GpuMetricTarget {
   }
 }
 
+message MetricIconSettings {
+  optional string id = 1 [(buf.validate.field).string.max_len = 128];
+}
+
 message SystemMetricTarget {
   // V1 System supports battery percentage only. Add future System readings as
   // new oneof arms when they are implemented; do not use a kind enum.
@@ -335,6 +339,22 @@ message SystemBatteryMetricTarget {
   // Display hint captured at selection time. The resolver may show this for a
   // stale/offline binding, but runtime discovery owns current display names.
   optional string detected_peripheral_display_name = 2 [(buf.validate.field).string.max_len = 256];
+
+  // User-owned battery label. Absence means the resolver uses the view-specific
+  // default, such as "BATT" for compact circle/text views or "Battery" for
+  // wider title views. When a peripheral is selected for the first time, Hub may
+  // initialize this from the detected device name; later runtime discovery must
+  // not rewrite it if the device-reported name changes.
+  //
+  // Renderer-facing character limits are intentionally not encoded here. The UI
+  // and renderer own the current per-view fitting policy so changing an 8-char
+  // display cap to 5, 6, or 9 chars does not require a settings-schema change.
+  optional string custom_label = 3 [(buf.validate.field).string.max_len = 128];
+
+  // User-selected icon id owned by ShoMetrics' icon registry. This uses the
+  // same provider-neutral shape as custom metrics so future icon sources can be
+  // added without forking icon settings by metric domain.
+  optional MetricIconSettings icon = 4;
 }
 
 message SystemPeripheralIdentity {
@@ -459,11 +479,7 @@ message CustomMetricTarget {
   // User-selected icon id owned by ShoMetrics' icon registry. V1 resolves this
   // through the built-in Lucide registry, but the stored id is intentionally
   // provider-neutral so future icon sources can extend the schema explicitly.
-  optional CustomMetricIconSettings icon = 2;
-}
-
-message CustomMetricIconSettings {
-  optional string id = 1 [(buf.validate.field).string.max_len = 128];
+  optional MetricIconSettings icon = 2;
 }
 
 message CustomHttpMetricSource {

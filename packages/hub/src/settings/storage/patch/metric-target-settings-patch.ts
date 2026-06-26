@@ -3,7 +3,6 @@ import {
     CustomHttpMetricSourceSchema,
     CustomHttpRequestAuthSchema,
     CustomHttpRequestSettingsSchema,
-    CustomMetricIconSettingsSchema,
     CpuMetricTarget_PowerSchema,
     CpuMetricTarget_TemperatureSchema,
     CpuMetricTarget_UsageSchema,
@@ -14,6 +13,7 @@ import {
     GpuMetricTarget_TemperatureSchema,
     GpuMetricTarget_UsageSchema,
     GpuMetricTarget_VramSchema,
+    MetricIconSettingsSchema,
     MetricSourcePolicySchema,
     NetworkDisplaySettingsSchema,
     NetworkMetricTarget_PingSchema,
@@ -76,7 +76,7 @@ export function applyCustomMetricPatch(
         if (patch.iconId === undefined) {
             target.icon = undefined;
         } else {
-            target.icon = create(CustomMetricIconSettingsSchema, {
+            target.icon = create(MetricIconSettingsSchema, {
                 id: patch.iconId,
             });
         }

@@ -1,12 +1,8 @@
 import { InspectorItem } from "../components/InspectorItem";
 import { catalogMessages, helperMessages } from "../../i18n/message-groups/widgets";
 import { commonMessages } from "../../i18n/message-groups/shell";
-import { optionMessages } from "../../i18n/message-groups/options";
-import { localizeOptionList } from "../../i18n/options";
 import { useI18n, type I18n } from "../../i18n/react";
-import { NumberSetting } from "../controls/NumberSetting";
 import { SelectSetting } from "../controls/SelectSetting";
-import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";
 import {
     buildCatalogMetricOptions,
@@ -23,7 +19,16 @@ import {
     writeCatalogMetricMaximumInputValue,
 } from "../../metrics/catalog-metric-scale";
 import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
-import type { ResolvedCatalogMetricTarget, ScaleMode } from "../../settings/resolved-settings";
+import {
+    requireResolvedSingleMetricWidget,
+    type ResolvedCatalogMetricTarget,
+    type ScaleMode,
+} from "../../settings/resolved-settings";
+import {
+    METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+    normalizeMetricCustomLabelInput,
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+} from "../../settings/metric-custom-label-policy";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -31,7 +36,7 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
-import { scaleModeOptionList } from "./setting-options";
+import { MetricCustomizationSettings } from "./MetricCustomizationSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 
 type CatalogMetricWidgetSettingsProps = WidgetSettingsPanelProps & {
@@ -183,6 +188,7 @@ function resolveCatalogMetricDescriptorStatusText(
 }
 
 function CatalogMetricLabelScaleSettings({
+    context,
     target,
     onSettingsPatch,
 }: CatalogMetricWidgetSettingsProps): React.JSX.Element {
@@ -194,15 +200,22 @@ function CatalogMetricLabelScaleSettings({
         target.detectedUnit,
         target.detectedCategory,
     );
+    const widget = requireResolvedSingleMetricWidget(context.resolved);
+    const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+        selectedView: widget.slot.appearance.view.selectedView,
+        keyShape: "square",
+    });
 
     return (
-        <SettingsSection title={t(catalogMessages.labelScaleSection)}>
-            <TextSetting
-                label={t(catalogMessages.labelLabel)}
-                value={target.customLabel ?? ""}
-                placeholder={target.detectedLabel ?? t(catalogMessages.detectedLabelPlaceholder)}
-                onValueChange={(customLabel) => onSettingsPatch(buildCatalogMetricCustomLabelPatch(customLabel))}
-                actionButton={(
+        <MetricCustomizationSettings
+            label={{
+                value: target.customLabel,
+                prefillValue: target.detectedLabel,
+                placeholder: t(catalogMessages.detectedLabelPlaceholder),
+                inputMaximumCharacters: METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+                displayMaximumCharacters: displayMaximumLabelCharacters,
+                onValueChange: (customLabel) => onSettingsPatch(buildCatalogMetricCustomLabelPatch(customLabel)),
+                actionButton: (
                     <button
                         className="inline-action-button"
                         type="button"
@@ -211,22 +224,18 @@ function CatalogMetricLabelScaleSettings({
                     >
                         {t(catalogMessages.useDetectedButton)}
                     </button>
-                )}
-            />
-            <SelectSetting<ScaleMode>
-                label={t(commonMessages.scaleLabel)}
-                value={scaleMode}
-                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
-                onValueChange={(nextScaleMode) => onSettingsPatch(buildCatalogMetricScaleModePatch(
+                ),
+            }}
+            scale={{
+                scaleMode,
+                onScaleModeChange: (nextScaleMode) => onSettingsPatch(buildCatalogMetricScaleModePatch(
                     target,
                     nextScaleMode,
-                ))}
-            />
-            {scaleMode === "custom" && (
-                <NumberSetting
-                    label={resolveCatalogMetricMaximumInputLabel(target.detectedUnit, target.detectedCategory)}
-                    value={customMaximumInputValue}
-                    onValueChange={(maximumInputValue) => onSettingsPatch({
+                )),
+                maximumInput: {
+                    label: resolveCatalogMetricMaximumInputLabel(target.detectedUnit, target.detectedCategory),
+                    value: customMaximumInputValue,
+                    onValueChange: (maximumInputValue) => onSettingsPatch({
                         catalog: {
                             customMaximumValue: writeCatalogMetricMaximumInputValue(
                                 maximumInputValue,
@@ -234,23 +243,22 @@ function CatalogMetricLabelScaleSettings({
                                 target.detectedCategory,
                             ),
                         },
-                    })}
-                    minimum={0.001}
-                    maximum={resolveCatalogMetricMaximumInputMaximum(target.detectedUnit, target.detectedCategory)}
-                    step={resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory)}
-                    optional
-                />
-            )}
-            <InspectorItem className="note-item note-item-caption">
-                <p className="section-note">{t(catalogMessages.catalogLabelScaleResetNote)}</p>
-            </InspectorItem>
-        </SettingsSection>
+                    }),
+                    minimum: 0.001,
+                    maximum: resolveCatalogMetricMaximumInputMaximum(target.detectedUnit, target.detectedCategory),
+                    step: resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory),
+                },
+            }}
+            note={t(catalogMessages.catalogLabelScaleResetNote)}
+        />
     );
 }
 
-export function buildCatalogMetricCustomLabelPatch(customLabel: string): StoredWidgetSettingsPatch {
+export function buildCatalogMetricCustomLabelPatch(
+    customLabel: string,
+): StoredWidgetSettingsPatch {
     return {
-        catalog: { customLabel: normalizeCustomLabel(customLabel) },
+        catalog: { customLabel: normalizeMetricCustomLabelInput(customLabel) },
     };
 }
 
@@ -343,10 +351,6 @@ export function buildCatalogMetricSelectionPatch(
     };
 }
 
-function normalizeCustomLabel(value: string): string | undefined {
-    return value.trim().length === 0 ? undefined : value;
-}
-
 function countTypeOptions(options: readonly SelectOption<CatalogMetricTypeId | "">[]): number {
     return options.filter(option => option.value !== "" && option.disabled !== true).length;
 }
@@ -354,8 +358,3 @@ function countTypeOptions(options: readonly SelectOption<CatalogMetricTypeId | "
 function countEnabledOptions(options: readonly SelectOption[]): number {
     return options.filter(option => option.disabled !== true).length;
 }
-
-const scaleModeMessageByValue = {
-    auto: optionMessages.autoOption,
-    custom: optionMessages.customOption,
-} as const;

@@ -24,6 +24,17 @@ import type { WidgetSettingsPanelProps } from "./panel-props";
 import { SettingsSection } from "./SettingsSection";
 import { shouldEnableVendorHidBatterySupport } from "../../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
 import { resolveBatteryPollingFrequencyOptions } from "./battery-polling-options";
+import {
+    normalizeSystemBatteryCustomLabel,
+} from "../../settings/system-battery-label";
+import {
+    requireResolvedSingleMetricWidget,
+} from "../../settings/resolved-settings";
+import {
+    METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+} from "../../settings/metric-custom-label-policy";
+import { MetricCustomizationSettings } from "./MetricCustomizationSettings";
 
 export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
     readonly target: ResolvedSystemMetricTarget;
@@ -55,6 +66,14 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
         props.target.reading.peripheralIdentity,
     ) !== undefined;
     const isBatteryDeviceSearchPending = props.context.runtimeCacheStatus.batteryDeviceOptionsStatus === "pending";
+    const widget = requireResolvedSingleMetricWidget(props.context.resolved);
+    const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+        selectedView: widget.slot.appearance.view.selectedView,
+        keyShape: "square",
+    });
+    const selectedPeripheralDisplayName = props.target.reading.peripheralIdentity === undefined
+        ? undefined
+        : props.target.reading.detectedPeripheralDisplayName;
 
     return (
         <>
@@ -82,6 +101,10 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                                 detectedPeripheralDisplayName: descriptor?.identity === undefined
                                     ? undefined
                                     : descriptor.displayName,
+                                // A battery label is user-owned. Device names are
+                                // only fallback display text, so changing devices
+                                // clears stale custom text instead of copying it.
+                                customLabel: undefined,
                             },
                         });
                     }}
@@ -159,6 +182,25 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
                 )}
             </SettingsSection>
             <AppearanceSettings {...props} />
+            <MetricCustomizationSettings
+                label={{
+                    value: props.target.reading.customLabel,
+                    prefillValue: selectedPeripheralDisplayName,
+                    inputMaximumCharacters: METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
+                    displayMaximumCharacters: displayMaximumLabelCharacters,
+                    onValueChange: (label) => props.onSettingsPatch({
+                        system: {
+                            customLabel: normalizeSystemBatteryCustomLabel(label),
+                        },
+                    }),
+                }}
+                icon={{
+                    iconId: props.target.reading.iconId,
+                    onIconIdChange: (iconId) => props.onSettingsPatch({
+                        system: { iconId },
+                    }),
+                }}
+            />
             <LineSettings {...props} />
             <StandardColorSettings {...props} />
             {props.showPolling !== false && (

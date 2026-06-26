@@ -41,6 +41,7 @@ export interface ConstrainedSvgTextOptions {
     /** Legacy title-card escape hatch. New callers should prefer clipHeightEm. */
     clipHeight?: number;
     clipHeightEm?: number;
+    clipHorizontalBleedPixels?: number;
     letterSpacingEm?: number;
     /** Drawn inside the existing clip path; callers enabling outline must leave enough edge room. */
     outline?: RenderOutlineTokens;
@@ -110,6 +111,7 @@ export function renderStyledSvgText(options: StyledSvgTextOptions): string {
         textAnchor: options.textAnchor,
         dominantBaseline: options.dominantBaseline,
         clipHeightEm: options.textStyle.clipHeightEm,
+        clipHorizontalBleedPixels: options.textStyle.clipHorizontalBleedPixels,
         letterSpacingEm: options.letterSpacingEm ?? options.textStyle.letterSpacingEm,
         outline: options.outline,
         extraAttributes: options.extraAttributes,
@@ -143,7 +145,13 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
     const fontSize = options.fontSize * textFit.fontScale;
     const letterSpacing = fontSize * (options.letterSpacingEm ?? DEFAULT_RENDER_TEXT_LETTER_SPACING_EM);
     const clipHeight = options.clipHeight ?? fontSize * (options.clipHeightEm ?? DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM);
-    const clipXCoordinate = resolveTextClipXCoordinate(options.xCoordinate, maxWidth, textAnchor);
+    // SVG textLength constrains layout, but some bitmap-style fonts can paint
+    // just outside the exact width. Keep clipping as the safety boundary while
+    // allowing only caller-selected styles to opt into a tiny bleed.
+    const clipHorizontalBleedPixels = Math.max(0, options.clipHorizontalBleedPixels ?? 0);
+    const clipWidth = maxWidth + clipHorizontalBleedPixels * 2;
+    const clipXCoordinate = resolveTextClipXCoordinate(options.xCoordinate, maxWidth, textAnchor)
+        - clipHorizontalBleedPixels;
     const clipYCoordinate = dominantBaseline === "middle"
         ? options.yCoordinate - clipHeight / 2
         : options.yCoordinate - fontSize;
@@ -166,7 +174,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
         <defs>
             <clipPath id="${clipPathId}">
                 <rect x="${formatSvgNumber(clipXCoordinate)}" y="${formatSvgNumber(clipYCoordinate)}"
-                    width="${formatSvgNumber(maxWidth)}" height="${formatSvgNumber(clipHeight)}" />
+                    width="${formatSvgNumber(clipWidth)}" height="${formatSvgNumber(clipHeight)}" />
             </clipPath>
         </defs>
         <g clip-path="url(#${clipPathId})">

@@ -8,6 +8,7 @@ interface TextSettingProps extends SettingControlProps {
     onValueChange: (value: string) => void;
     placeholder?: string;
     inputType?: "text" | "password";
+    maxLength?: number;
     actionButton?: React.JSX.Element;
     validationMessage?: string;
     onFocus?: () => void;
@@ -20,6 +21,7 @@ export function TextSetting({
     onValueChange,
     placeholder,
     inputType = "text",
+    maxLength,
     actionButton,
     validationMessage,
     onFocus,
@@ -36,6 +38,7 @@ export function TextSetting({
             placeholder={placeholder ?? ""}
             value={value}
             disabled={disabled}
+            maxLength={maxLength}
             aria-invalid={validationMessage ? "true" : undefined}
             aria-describedby={validationMessageId}
             onChange={(event) => onValueChange(event.currentTarget.value)}

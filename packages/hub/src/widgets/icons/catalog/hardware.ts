@@ -1,9 +1,18 @@
-import { CircleQuestionMark, Cpu, Gpu, HardDrive, MemoryStick, Network } from "lucide";
+import { Battery, CircleQuestionMark, Cpu, Gpu, HardDrive, MemoryStick, Network } from "lucide";
 import { createLucideIconDefinition } from "../sources/lucide";
 import { createCustomIconDefinition } from "../sources/custom";
 import type { SvgIconDefinition } from "../icon-types";
 
-export type HardwareIconKind = "cpu" | "gpu" | "memory" | "disk" | "network" | "unspecified" | "other" | "unknown";
+export type HardwareIconKind =
+    | "cpu"
+    | "gpu"
+    | "memory"
+    | "disk"
+    | "network"
+    | "battery"
+    | "unspecified"
+    | "other"
+    | "unknown";
 export type DiskIconKind = "ssd" | "hdd" | "network" | "unknown";
 
 export function getHardwareIconDefinition(kind: HardwareIconKind): SvgIconDefinition {
@@ -33,6 +42,12 @@ export function getHardwareIconDefinition(kind: HardwareIconKind): SvgIconDefini
             return createLucideIconDefinition({
                 id: "hardware.network",
                 node: Network,
+                opticalScale: 1.08,
+            });
+        case "battery":
+            return createLucideIconDefinition({
+                id: "hardware.battery",
+                node: Battery,
                 opticalScale: 1.08,
             });
         case "unspecified":

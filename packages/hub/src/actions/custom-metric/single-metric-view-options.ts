@@ -13,9 +13,13 @@ import {
     type WidgetData,
 } from "../../view-rendering/widget-data";
 import {
-    getCustomMetricIconFragment,
-    getDefaultCustomMetricIconFragment,
-} from "../../widgets/icons/custom-metric-icons";
+    getMetricIconFragment,
+    getDefaultMetricIconFragment,
+} from "../../widgets/icons/metric-icons";
+import {
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
+} from "../../settings/metric-custom-label-policy";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 import { resolveCustomHttpRuntimeIdentity } from "./runtime-source-definition";
 import {
@@ -84,8 +88,13 @@ export function buildCustomMetricViewOptions(options: {
             const widgetDataResult = readCustomHttpWidgetData({
                 metrics: options.metrics,
                 metricKey: identity.metricKey,
-                shouldCompactCircleLabel: widget.slot.appearance.view.selectedView === "circle"
-                    && widget.slot.appearance.view.circleVariant !== "minimal",
+                labelMaximumCharacters: resolveMetricCustomLabelDisplayMaximumCharacters({
+                    selectedView: widget.slot.appearance.view.selectedView,
+                    keyShape: resolveMetricCustomLabelKeyShape({
+                        selectedView: widget.slot.appearance.view.selectedView,
+                        isTouchStrip: options.event.action.isDial(),
+                    }),
+                }),
             });
 
             return {
@@ -114,9 +123,9 @@ function buildCustomMetricViewIcons(options: {
     const fallbackIcons = buildMetricViewIcons({ hardware: "unknown", status: "percentage" });
     return {
         ...fallbackIcons,
-        centerIconFragment: getCustomMetricIconFragment(options.storedIconId)
-            ?? getCustomMetricIconFragment(options.suggestedIconId)
-            ?? getDefaultCustomMetricIconFragment(),
+        centerIconFragment: getMetricIconFragment(options.storedIconId)
+            ?? getMetricIconFragment(options.suggestedIconId)
+            ?? getDefaultMetricIconFragment(),
     };
 }
 

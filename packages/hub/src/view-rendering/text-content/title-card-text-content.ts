@@ -6,17 +6,23 @@ import type {
 import type { WidgetData } from "../widget-data";
 import { formatCompactDataRateUnitText, formatRenderUnitText } from "./render-unit-text";
 
+export const TITLE_CARD_BATTERY_CAPTION_TEXT = "電池量";
+
+/** Builds title-card text content for a single metric value. */
 export function buildTitleCardSingleMetricContent(data: WidgetData): TitleCardSingleMetricContent {
     const codeText = resolveTitleCardCodeText(data.label);
 
     return {
         codeText,
         compactCodeText: resolveTitleCardCompactCodeText(codeText),
-        threeCharacterCaptionText: resolveTitleCardSingleCaptionText(codeText, data.unit),
+        // TODO: Carry metric target context into title-card content so custom labels
+        // cannot mask target-specific captions such as battery.
+        threeCharacterCaptionText: data.titleCardCaptionText ?? resolveTitleCardSingleCaptionText(codeText, data.unit),
         unitText: formatTitleCardUnitText(data.unit),
     };
 }
 
+/** Builds title-card text content for paired positive/negative metric values. */
 export function buildTitleCardDualMetricContent(content: DualTextMetricContent): TitleCardDualMetricContent {
     const codeText = resolveTitleCardCodeText(content.titleText);
 

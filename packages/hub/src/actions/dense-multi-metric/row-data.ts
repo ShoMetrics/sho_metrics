@@ -390,7 +390,6 @@ function buildTargetWidgetData(
             return readCustomHttpWidgetData({
                 metrics,
                 metricKey: row.displayMetricKey,
-                shouldCompactCircleLabel: false,
                 displayOverrides: {
                     label: row.customLabel,
                     maximum: row.customMaximumValue,

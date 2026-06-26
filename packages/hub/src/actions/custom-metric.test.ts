@@ -39,9 +39,9 @@ import { CUSTOM_HTTP_SOURCE_ID } from "../runtime/sources/source-ids";
 import { composeMetricViewFrame } from "../view-rendering/metric-view-frame";
 import type { WidgetData } from "../view-rendering/widget-data";
 import {
-    getCustomMetricIconFragment,
-    getDefaultCustomMetricIconFragment,
-} from "../widgets/icons/custom-metric-icons";
+    getMetricIconFragment,
+    getDefaultMetricIconFragment,
+} from "../widgets/icons/metric-icons";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
@@ -296,7 +296,7 @@ test("Custom Metric view uses source suggested icon when no manual icon is selec
         }),
     });
 
-    assert.equal(viewOptions.centerIconFragment, getCustomMetricIconFragment("thermometer"));
+    assert.equal(viewOptions.centerIconFragment, getMetricIconFragment("thermometer"));
 });
 
 test("Custom Metric view uses manual icon before source suggested icon", () => {
@@ -323,7 +323,7 @@ test("Custom Metric view uses manual icon before source suggested icon", () => {
         }),
     });
 
-    assert.equal(viewOptions.centerIconFragment, getCustomMetricIconFragment("cloud-sun"));
+    assert.equal(viewOptions.centerIconFragment, getMetricIconFragment("cloud-sun"));
 });
 
 test("Custom Metric view uses non-question default icon without manual or suggested icon", () => {
@@ -336,7 +336,7 @@ test("Custom Metric view uses non-question default icon without manual or sugges
         target: readCustomMetricTarget(settings),
     });
 
-    assert.equal(viewOptions.centerIconFragment, getDefaultCustomMetricIconFragment());
+    assert.equal(viewOptions.centerIconFragment, getDefaultMetricIconFragment());
     assert.doesNotMatch(viewOptions.centerIconFragment, /question/iu);
 });
 
@@ -369,7 +369,7 @@ test("Custom Metric view preserves custom unit text without catalog unit formatt
     assert.equal(viewOptions.widgetData.displayValue, undefined);
 });
 
-test("Custom Metric circle variants compact long source labels before rendering", () => {
+test("Custom Metric circle variants limit long source labels before rendering", () => {
     for (const circleVariant of ["full-ring", "gauge"] as const) {
         const rawSettings = writeStoredWidgetSettingsPatch(buildCustomMetricWidgetSettings({
             url: "https://api.example.com/data",
@@ -393,7 +393,7 @@ test("Custom Metric circle variants compact long source labels before rendering"
                 current: 211.28,
                 sampleTimestampMilliseconds: 1234,
                 displayHint: {
-                    label: "Aether",
+                    label: "Aether Observatory",
                     unit: MetricUnit.UNSPECIFIED,
                     customUnit: "ms",
                     maximum: 300,
@@ -401,7 +401,7 @@ test("Custom Metric circle variants compact long source labels before rendering"
             }),
         });
 
-        assert.equal(viewOptions.widgetData.label, "AETH");
+        assert.equal(viewOptions.widgetData.label, "Aether O");
         assert.doesNotThrow(() => composeMetricViewFrame({ viewOptions, renderTarget: "key" }));
     }
 });

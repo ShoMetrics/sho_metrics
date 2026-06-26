@@ -17,8 +17,6 @@ import { backgroundMetricCollection } from "../runtime/metric-collection/backgro
 import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
 import {
     requireResolvedSingleMetricWidget,
-    type CircleViewVariant,
-    type MetricView,
     type ResolvedCatalogMetricTarget,
     type ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
@@ -28,7 +26,11 @@ import { formatMetricUnit } from "../metrics/metric-unit-format";
 import { resolveCatalogMetricDefaultMaximumValue } from "../metrics/catalog-metric-scale";
 import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-widget-data";
 import { metricStatusIconForCatalogReadingKind } from "../metrics/catalog-metric-view-icons";
-import { compactProgressCircleLabel } from "../widgets/primitives/progress-circle-label";
+import {
+    limitMetricCustomLabelCharacters,
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
+} from "../settings/metric-custom-label-policy";
 
 const log = logger.for("Action:CatalogMetric");
 const CATALOG_NO_SELECTION_DEBUG_INTERVAL_MILLISECONDS = 5_000;
@@ -151,11 +153,17 @@ export function buildCatalogMetricSelectedViewOptions(options: {
     const sourceLabel = options.target.customLabel
         ?? options.target.detectedLabel
         ?? CATALOG_NO_SELECTION_LABEL;
-    const label = resolveCatalogMetricRenderLabel({
-        label: sourceLabel,
-        selectedView: widget.slot.appearance.view.selectedView,
-        circleVariant: widget.slot.appearance.view.circleVariant,
-    });
+    const selectedView = widget.slot.appearance.view.selectedView;
+    const label = limitMetricCustomLabelCharacters(
+        sourceLabel,
+        resolveMetricCustomLabelDisplayMaximumCharacters({
+            selectedView,
+            keyShape: resolveMetricCustomLabelKeyShape({
+                selectedView,
+                isTouchStrip: options.event.action.isDial(),
+            }),
+        }),
+    ) ?? CATALOG_NO_SELECTION_LABEL;
     const maxValue = options.target.customMaximumValue
         ?? resolveCatalogMetricDefaultMaximumValue(
             options.target.detectedUnit,
@@ -192,18 +200,6 @@ export function buildCatalogMetricSelectedViewOptions(options: {
         ...(noticeText === undefined ? {} : { noticeText }),
         ...buildCatalogMetricViewIcons(options.target),
     };
-}
-
-function resolveCatalogMetricRenderLabel(options: {
-    readonly label: string;
-    readonly selectedView: MetricView;
-    readonly circleVariant: CircleViewVariant;
-}): string {
-    if (options.selectedView !== "circle" || options.circleVariant === "minimal") {
-        return options.label;
-    }
-
-    return compactProgressCircleLabel(options.label);
 }
 
 function buildCatalogMetricViewIcons(target: ResolvedCatalogMetricTarget): ReturnType<typeof buildMetricViewIcons> {

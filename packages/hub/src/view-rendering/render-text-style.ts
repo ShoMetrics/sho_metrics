@@ -21,13 +21,20 @@ export interface RenderTextStyle {
     readonly letterSpacingEm: number;
     /** Smallest font-size scale allowed before SVG textLength compression guards the text. */
     readonly minimumFontScale: number;
+    /** Per-side horizontal clip bleed for fonts that paint outside their SVG textLength box. */
+    readonly clipHorizontalBleedPixels: number;
     /** Optional SVG filter reference applied to this text role. */
     readonly filter: string | undefined;
 }
 
 type RenderTextStyleMetrics = Pick<
     RenderTextStyle,
-    "baselineShiftEm" | "clipHeightEm" | "widthScale" | "letterSpacingEm" | "minimumFontScale"
+    | "baselineShiftEm"
+    | "clipHeightEm"
+    | "widthScale"
+    | "letterSpacingEm"
+    | "minimumFontScale"
+    | "clipHorizontalBleedPixels"
 >;
 
 // Internal preset input only. Keep this private so runtime renderers consume
@@ -186,6 +193,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
         fontSizeScale: 1,
         baselineShiftEm: 0.02,
         widthScale: 0.9,
+        clipHorizontalBleedPixels: 2,
         filter: undefined,
     }),
     unit: createRenderTextStyle({
@@ -194,6 +202,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
         fontSizeScale: 1,
         baselineShiftEm: 0.08,
         widthScale: 0.9,
+        clipHorizontalBleedPixels: 2,
         filter: undefined,
     }),
     title: createRenderTextStyle({
@@ -203,6 +212,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         letterSpacingEm: 0.1,
+        clipHorizontalBleedPixels: 2,
         filter: undefined,
     }),
     label: createRenderTextStyle({
@@ -212,6 +222,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
         baselineShiftEm: 0.02,
         widthScale: 0.9,
         letterSpacingEm: 0.2,
+        clipHorizontalBleedPixels: 2,
         filter: undefined,
     }),
     smallLabel: createRenderTextStyle({
@@ -221,6 +232,7 @@ export const PIXEL_RENDER_TEXT_STYLES = {
         baselineShiftEm: 0.03,
         widthScale: 0.9,
         letterSpacingEm: 0.2,
+        clipHorizontalBleedPixels: 2,
         filter: undefined,
     }),
 } satisfies RenderTextStyles;
@@ -275,5 +287,6 @@ function createRenderTextStyle(textStyle: RenderTextStylePreset): RenderTextStyl
         widthScale: textStyle.widthScale ?? DEFAULT_RENDER_TEXT_WIDTH_SCALE,
         letterSpacingEm: textStyle.letterSpacingEm ?? DEFAULT_RENDER_TEXT_LETTER_SPACING_EM,
         minimumFontScale: textStyle.minimumFontScale ?? DEFAULT_RENDER_TEXT_MINIMUM_FONT_SCALE,
+        clipHorizontalBleedPixels: textStyle.clipHorizontalBleedPixels ?? 0,
     };
 }

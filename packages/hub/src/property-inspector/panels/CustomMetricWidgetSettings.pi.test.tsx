@@ -608,12 +608,12 @@ test("custom metric icon picker renders a bounded result list", async () => {
         jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
     })} />);
 
-    assert.equal(document.querySelectorAll(".custom-metric-icon-option").length, 0);
+    assert.equal(document.querySelectorAll(".metric-icon-option").length, 0);
     assert.equal(screen.queryByRole("listbox", { name: /^Widget Icon:/ }), null);
 
     await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "c");
 
-    assert.equal(document.querySelectorAll(".custom-metric-icon-option").length, 20);
+    assert.equal(document.querySelectorAll(".metric-icon-option").length, 20);
     assert.match(screen.getByText(/Keep typing to narrow the list/).textContent ?? "", /Keep typing/);
 });
 

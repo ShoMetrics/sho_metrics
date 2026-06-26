@@ -63,9 +63,12 @@ const SINGLE_TEXT_SQUARE_LAYOUT = {
 } as const;
 
 const SINGLE_TEXT_WIDE_LAYOUT = {
-    labelWidth: 52,
-    labelXOffset: 14,
+    labelWidth: 44,
+    labelXOffset: 12,
     labelYRatio: 0.52,
+    labelWrapCharacterCount: 4,
+    labelWrapYRatios: [0.42, 0.63],
+    labelTripleWrapYRatios: [0.30, 0.52, 0.74],
     valueXRatio: 0.56,
     valueYRatio: 0.56,
     valueWidthRatio: 0.50,
@@ -205,18 +208,12 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
     const valueXCoordinate = keySize.width * SINGLE_TEXT_WIDE_LAYOUT.valueXRatio;
 
     return `
-        ${renderStyledSvgText({
+        ${renderWideLabelText({
             id: "text-metric-label",
-            text: data.label,
-            xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
-            yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
-            maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
-            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
+            labelText: data.label,
+            keySize,
+            config,
             textStyle: labelTextStyle,
-            fill: config.labelTextColor,
-            textAnchor: "start",
-            outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
             id: "text-metric-value",
@@ -247,6 +244,69 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
             textAnchor: "end",
         })}
     `;
+}
+
+function renderWideLabelText(options: {
+    id: string;
+    labelText: string;
+    keySize: KeySize;
+    config: TextMetricConfig;
+    textStyle: RenderTextStyles["label"];
+}): string {
+    const characters = Array.from(options.labelText);
+
+    if (characters.length <= SINGLE_TEXT_WIDE_LAYOUT.labelWrapCharacterCount) {
+        return renderStyledSvgText({
+            id: options.id,
+            text: options.labelText,
+            xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
+            yCoordinate: options.keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
+            maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
+            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
+            textStyle: options.textStyle,
+            fill: options.config.labelTextColor,
+            textAnchor: "start",
+            outline: options.config.textOutline,
+            extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
+        });
+    }
+
+    const wrappedLineTexts = buildWrappedWideLabelLines(
+        characters,
+        SINGLE_TEXT_WIDE_LAYOUT.labelWrapCharacterCount,
+    );
+    const yRatios = wrappedLineTexts.length > 2
+        ? SINGLE_TEXT_WIDE_LAYOUT.labelTripleWrapYRatios
+        : SINGLE_TEXT_WIDE_LAYOUT.labelWrapYRatios;
+
+    // Wide touch-strip text shares the row with a large value. Wrapping after
+    // four and eight characters gives the left label breathing room without
+    // moving the value column, which users visually anchor on.
+    return wrappedLineTexts.map((lineText, lineIndex) => renderStyledSvgText({
+        id: `${options.id}-${lineIndex}`,
+        text: lineText,
+        xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
+        yCoordinate: options.keySize.height * (yRatios[lineIndex] ?? yRatios[yRatios.length - 1]),
+        maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
+        baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
+        textStyle: options.textStyle,
+        fill: options.config.labelTextColor,
+        textAnchor: "start",
+        outline: options.config.textOutline,
+        extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
+    })).join("");
+}
+
+function buildWrappedWideLabelLines(
+    characters: readonly string[],
+    lineCharacterCount: number,
+): readonly string[] {
+    const lines: string[] = [];
+    for (let startIndex = 0; startIndex < characters.length; startIndex += lineCharacterCount) {
+        lines.push(characters.slice(startIndex, startIndex + lineCharacterCount).join(""));
+    }
+
+    return lines;
 }
 
 function renderSquareCenteredDualTextMetric(

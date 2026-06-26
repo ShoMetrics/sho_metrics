@@ -856,6 +856,8 @@ test("widget patch writes selected System peripheral battery identity", () => {
                     },
                 },
                 detectedPeripheralDisplayName: "MX Master 4",
+                customLabel: "Mouse",
+                iconId: "cloud-sun",
             },
         },
     );
@@ -881,6 +883,32 @@ test("widget patch writes selected System peripheral battery identity", () => {
         assert.equal(vendorHidIdentity?.modelId, "mx-master-4");
         assert.equal(vendorHidIdentity?.receiverSlot, 2);
         assert.equal(target.value.reading.value.detectedPeripheralDisplayName, "MX Master 4");
+        assert.equal(target.value.reading.value.customLabel, "Mouse");
+        assert.equal(target.value.reading.value.icon?.id, "cloud-sun");
+    }
+});
+
+test("widget patch clears System battery icon", () => {
+    const settingsWithIcon = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "system").rawSettings,
+        {
+            system: {
+                iconId: "cloud-sun",
+            },
+        },
+    );
+
+    const nextSettings = writeStoredWidgetSettingsPatch(settingsWithIcon, {
+        system: {
+            iconId: undefined,
+        },
+    });
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+
+    assert.equal(target?.case, "system");
+    if (target?.case === "system") {
+        assert.equal(target.value.reading.case, "battery");
+        assert.equal(target.value.reading.value.icon, undefined);
     }
 });
 

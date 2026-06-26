@@ -7,6 +7,8 @@ export interface WidgetData {
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
     unavailableDisplayValue?: string; // Optional short key copy for render-owned no-data states.
     secondaryDisplayValue?: string;
+    /** Renderer hint for title-card's fixed three-character caption column. */
+    titleCardCaptionText?: string;
     barLabel?: string;
     barDisplayValue?: string;
     barUnit?: string;
