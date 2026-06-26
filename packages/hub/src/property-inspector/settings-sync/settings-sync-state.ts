@@ -18,6 +18,7 @@ export interface SettingsSyncState {
     readonly actionKind: ActionKind;
     readonly platform: PropertyInspectorPlatform;
     readonly isWindows: boolean;
+    readonly isTouchStrip: boolean;
     readonly rawSettings: unknown;
     readonly widgetSettingsStatus: LoadStatus;
     readonly runtimeCache: WidgetRuntimeCache;
@@ -52,6 +53,7 @@ export type SettingsSyncAction =
         readonly actionKind: ActionKind;
         readonly platform: PropertyInspectorPlatform;
         readonly isWindows: boolean;
+        readonly isTouchStrip: boolean;
         readonly widgetSettingsRead: InspectorWidgetSettingsRead;
     }
     | {
@@ -96,6 +98,7 @@ export const initialSettingsSyncState: SettingsSyncState = {
     actionKind: "unknown",
     platform: "other",
     isWindows: false,
+    isTouchStrip: false,
     rawSettings: undefined,
     widgetSettingsStatus: "pending",
     runtimeCache: { ...emptyWidgetRuntimeCache },
@@ -121,6 +124,7 @@ export function settingsSyncReducer(
                 actionKind: action.actionKind,
                 platform: action.platform,
                 isWindows: action.isWindows,
+                isTouchStrip: action.isTouchStrip,
                 rawSettings: action.widgetSettingsRead.rawSettings,
                 widgetSettingsStatus: "ready",
                 widgetSettingsNotice: action.widgetSettingsRead.notice,

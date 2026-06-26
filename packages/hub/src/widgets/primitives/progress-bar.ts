@@ -68,11 +68,13 @@ export const DEFAULT_PROGRESS_BAR_CONFIG: ProgressBarConfig = {
 };
 
 type ProgressBarLayoutMode = "square" | "wide";
+const WIDE_BAR_INLINE_ICON_MAX_TITLE_CHARACTERS = 4;
 
 interface ProgressBarLayoutPlan {
     mode: ProgressBarLayoutMode;
     padding: number;
-    title: TextLineLayout;
+    channelTitle: TextLineLayout;
+    singleTitle: TextLineLayout;
     singleValue: ValueLineLayout;
     singleBar: BarLayout;
     singleSecondaryText: TextLineLayout;
@@ -87,10 +89,16 @@ interface TextLineLayout {
     yCoordinate: number;
     fontSize: number;
     maxWidth: number;
+    dominantBaseline?: "middle" | "auto";
 }
+
+type ProgressBarTitleIconPlacement = "inline" | "above";
 
 interface ValueLineLayout extends TextLineLayout {
     unitFontSize: number;
+    textAnchor?: "start" | "middle" | "end";
+    unitXCoordinate?: number;
+    unitMaxWidth?: number;
 }
 
 interface BarLayout {
@@ -135,34 +143,47 @@ function buildProgressBarLayoutPlan(keySize: KeySize, config: ProgressBarConfig)
     const barHeight = clamp(Math.round(minimumSize * 0.095), 8, config.barHeight);
 
     if (mode === "wide") {
+        const channelTitleLayout = {
+            xCoordinate: padding,
+            yCoordinate: Math.round(keySize.height * 0.24),
+            fontSize: clamp(Math.round(keySize.height * 0.18), 14, 18),
+            maxWidth: contentWidth,
+        };
+
         return {
             mode,
             padding,
-            title: {
+            channelTitle: channelTitleLayout,
+            singleTitle: {
                 xCoordinate: padding,
-                yCoordinate: Math.round(keySize.height * 0.24),
-                fontSize: clamp(Math.round(keySize.height * 0.18), 14, 18),
-                maxWidth: contentWidth,
+                yCoordinate: Math.round(keySize.height * 0.53),
+                fontSize: clamp(Math.round(keySize.height * 0.14), 13, 15),
+                maxWidth: Math.round(keySize.width * 0.34),
+                dominantBaseline: "auto",
             },
             singleValue: {
-                xCoordinate: padding,
-                yCoordinate: Math.round(keySize.height * 0.62),
-                fontSize: clamp(Math.round(keySize.height * 0.32), 26, 34),
+                xCoordinate: Math.round(keySize.width * 0.77),
+                yCoordinate: Math.round(keySize.height * 0.53),
+                fontSize: clamp(Math.round(keySize.height * 0.42), 34, 44),
                 unitFontSize: clamp(Math.round(keySize.height * 0.17), 14, 18),
-                maxWidth: Math.round(keySize.width * 0.42),
+                maxWidth: Math.round(keySize.width * 0.36),
+                textAnchor: "end",
+                unitXCoordinate: Math.round(keySize.width * 0.80),
+                unitMaxWidth: keySize.width - Math.round(keySize.width * 0.80) - padding,
+                dominantBaseline: "auto",
             },
             singleBar: {
-                xCoordinate: Math.round(keySize.width * 0.54),
-                yCoordinate: Math.round(keySize.height * 0.66),
-                width: Math.round(keySize.width * 0.36),
+                xCoordinate: padding,
+                yCoordinate: Math.round(keySize.height * 0.60),
+                width: contentWidth,
                 height: barHeight,
                 radius: barHeight / 2,
             },
             singleSecondaryText: {
-                xCoordinate: Math.round(keySize.width * 0.54),
-                yCoordinate: Math.round(keySize.height * 0.43),
+                xCoordinate: padding,
+                yCoordinate: Math.round(keySize.height * 0.85),
                 fontSize: clamp(Math.round(keySize.height * 0.15), 12, 16),
-                maxWidth: Math.round(keySize.width * 0.36),
+                maxWidth: contentWidth,
             },
             channelValueFontSize: clamp(Math.round(keySize.height * 0.25), 22, 28),
             channelUnitFontSize: clamp(Math.round(keySize.height * 0.14), 12, 16),
@@ -174,7 +195,13 @@ function buildProgressBarLayoutPlan(keySize: KeySize, config: ProgressBarConfig)
     return {
         mode,
         padding,
-        title: {
+        channelTitle: {
+            xCoordinate: padding,
+            yCoordinate: Math.round(keySize.height * 0.21),
+            fontSize: clamp(Math.round(keySize.height * 0.125), 15, 18),
+            maxWidth: contentWidth,
+        },
+        singleTitle: {
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.21),
             fontSize: clamp(Math.round(keySize.height * 0.125), 15, 18),
@@ -221,9 +248,21 @@ function renderSingleBar(
     const valueText = data.barDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
     const unitText = data.barUnit ?? data.unit;
     const titleText = data.barLabel ?? data.label;
-    const valueLayout = data.barValueIconFragment
+    // On wide single bars, the optional value icon becomes the title-leading
+    // icon. Rendering it again beside the value would collide with the fixed
+    // value/unit columns.
+    const usesWideSingleLeadingIcon = layoutPlan.mode === "wide" && data.barValueIconFragment !== undefined;
+    const valueLayout = data.barValueIconFragment && !usesWideSingleLeadingIcon
         ? buildSingleValueLayoutWithIcon(layoutPlan.singleValue, layoutPlan)
         : layoutPlan.singleValue;
+    const singleTitleIconFragment = usesWideSingleLeadingIcon
+        ? data.barValueIconFragment
+        : config.topIconFragment;
+    const shouldStackTitleIcon = layoutPlan.mode === "wide"
+        && [...titleText].length > WIDE_BAR_INLINE_ICON_MAX_TITLE_CHARACTERS;
+    const titleIconPlacement: ProgressBarTitleIconPlacement = shouldStackTitleIcon
+        ? "above"
+        : "inline";
 
     return `
         ${config.colorConfig.isGradientEnabled ? `<defs>
@@ -233,11 +272,12 @@ function renderSingleBar(
             </linearGradient>
         </defs>` : ""}
         ${renderTitle({
-            iconFragment: config.topIconFragment,
+            iconFragment: singleTitleIconFragment,
             titleText,
-            layout: layoutPlan.title,
+            layout: layoutPlan.singleTitle,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
+            iconPlacement: titleIconPlacement,
             clipId: "progress-bar-single-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
@@ -245,14 +285,24 @@ function renderSingleBar(
             themeEffects: config.themeEffects,
             textOutline: config.textOutline,
         })}
-        ${data.barValueIconFragment ? renderSingleValueIcon({
+        ${data.barValueIconFragment && !usesWideSingleLeadingIcon ? renderSingleValueIcon({
             iconFragment: data.barValueIconFragment,
             iconColor: data.barValueIconColor ?? barColor,
             yCoordinate: layoutPlan.singleValue.yCoordinate,
             layoutPlan,
             themeEffects: config.themeEffects,
         }) : ""}
-        ${renderValueWithUnit({
+        ${layoutPlan.mode === "wide" ? renderWideValueWithFixedUnit({
+            clipId: "progress-bar-single",
+            valueText,
+            unitText,
+            layout: valueLayout,
+            valueTextColor: config.paints.primaryText,
+            unitTextColor: config.paints.supportingText,
+            textStyles: config.textStyles,
+            themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
+        }) : renderValueWithUnit({
             clipId: "progress-bar-single-value",
             valueText,
             unitText,
@@ -321,9 +371,10 @@ function renderChannelBars(
         ${renderTitle({
             iconFragment: config.topIconFragment,
             titleText,
-            layout: layoutPlan.title,
+            layout: layoutPlan.channelTitle,
             iconScale: layoutPlan.mode === "wide" ? 0.3 : 0.34,
             iconGap: layoutPlan.mode === "wide" ? 25 : 27,
+            iconPlacement: "inline",
             clipId: "progress-bar-channel-title",
             textColor: config.paints.secondaryText,
             iconColor: config.paints.icon,
@@ -435,6 +486,7 @@ function renderTitle(options: {
     layout: TextLineLayout;
     iconScale: number;
     iconGap: number;
+    iconPlacement: ProgressBarTitleIconPlacement;
     clipId: string;
     textColor: string;
     iconColor: string;
@@ -443,12 +495,23 @@ function renderTitle(options: {
     textOutline: RenderOutlineTokens | undefined;
 }): string {
     const titleTextStyle = options.textStyles.title;
-    const titleXCoordinate = options.iconFragment
+    const isInlineIcon = options.iconFragment !== undefined && options.iconPlacement === "inline";
+    const titleXCoordinate = isInlineIcon
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
     const titleMaxWidth = Math.max(1, options.layout.maxWidth - (titleXCoordinate - options.layout.xCoordinate));
+    const iconSize = 24 * options.iconScale;
+    const inlineIconYCoordinate = options.layout.dominantBaseline === "auto"
+        ? options.layout.yCoordinate - iconSize + 1
+        : options.layout.yCoordinate - 1;
+    const aboveIconYCoordinate = options.layout.dominantBaseline === "auto"
+        ? options.layout.yCoordinate - iconSize * 2.85
+        : options.layout.yCoordinate - iconSize - 1;
+    const iconYCoordinate = options.iconPlacement === "above"
+        ? aboveIconYCoordinate
+        : inlineIconYCoordinate;
     const iconSvg = options.iconFragment
-        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
+        ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${iconYCoordinate}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
 
     return `
@@ -462,6 +525,7 @@ function renderTitle(options: {
             baseFontSize: options.layout.fontSize,
             textStyle: titleTextStyle,
             fill: options.textColor,
+            dominantBaseline: options.layout.dominantBaseline,
             outline: options.textOutline,
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
@@ -509,6 +573,62 @@ function renderValueWithUnit(options: {
         },
         outline: options.textOutline,
     });
+}
+
+function renderWideValueWithFixedUnit(options: {
+    clipId: string;
+    valueText: string;
+    unitText: string;
+    layout: ValueLineLayout;
+    valueTextColor: string;
+    unitTextColor: string;
+    textStyles: RenderTextStyles;
+    themeEffects: RenderThemeEffectTokens;
+    textOutline: RenderOutlineTokens | undefined;
+}): string {
+    const valueTextStyle = options.textStyles.value;
+    const unitTextStyle = options.textStyles.unit;
+    const valueText = renderStyledSvgText({
+        id: `${options.clipId}-value`,
+        text: options.valueText,
+        xCoordinate: options.layout.xCoordinate,
+        yCoordinate: options.layout.yCoordinate,
+        maxWidth: options.layout.maxWidth,
+        baseFontSize: options.layout.fontSize,
+        textStyle: valueTextStyle,
+        fill: options.valueTextColor,
+        textAnchor: options.layout.textAnchor ?? "end",
+        dominantBaseline: options.layout.dominantBaseline,
+        outline: options.textOutline,
+        extraAttributes: [
+            "font-variant-numeric=\"tabular-nums\"",
+            ...buildSvgFilterAttributes(valueTextStyle.filter),
+        ],
+        fitOptions: { minimumFontScale: 0.44, widthGuardRatio: 1.08 },
+    });
+
+    if (options.unitText.length === 0) {
+        return valueText;
+    }
+
+    return `
+        ${valueText}
+        ${renderStyledSvgText({
+            id: `${options.clipId}-unit`,
+            text: options.unitText,
+            xCoordinate: options.layout.unitXCoordinate ?? options.layout.xCoordinate,
+            yCoordinate: options.layout.yCoordinate,
+            maxWidth: options.layout.unitMaxWidth ?? options.layout.maxWidth,
+            baseFontSize: options.layout.unitFontSize,
+            textStyle: unitTextStyle,
+            fill: options.unitTextColor,
+            textAnchor: "start",
+            dominantBaseline: options.layout.dominantBaseline,
+            outline: options.textOutline,
+            extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
+            fitOptions: { minimumFontScale: 0.50, widthGuardRatio: 1.8 },
+        })}
+    `;
 }
 
 function renderSecondaryText(options: {

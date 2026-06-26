@@ -19,6 +19,7 @@ import { buildPropertyInspectorContext } from "../inspector/context";
 import {
     readPropertyInspectorPlatformValue,
     readActionUuid,
+    type ActionInfo,
     type StreamDeckPropertyInspectorClient,
 } from "../stream-deck/stream-deck-client";
 import { normalizePropertyInspectorHostPlatform } from "../inspector/platform";
@@ -95,6 +96,7 @@ export function usePropertyInspectorSettings(
         actionKind: state.actionKind,
         platform: state.platform,
         isWindows: state.isWindows,
+        isTouchStrip: state.isTouchStrip,
     }), [
         state.rawSettings,
         state.rawGlobalSettings,
@@ -103,6 +105,7 @@ export function usePropertyInspectorSettings(
         state.actionKind,
         state.platform,
         state.isWindows,
+        state.isTouchStrip,
     ]);
 
     const updateWidgetSettings = useCallback((patch: StoredWidgetSettingsPatch): void => {
@@ -288,6 +291,7 @@ async function loadPropertyInspectorSettings(
     const actionKind = resolveStreamDeckActionKind(readActionUuid(connectionInfo));
     const platform = normalizePropertyInspectorHostPlatform(readPropertyInspectorPlatformValue(connectionInfo));
     const isWindows = platform === "win32";
+    const isTouchStrip = readIsTouchStripAction(connectionInfo.actionInfo);
     if (isDisposed()) {
         return;
     }
@@ -306,11 +310,16 @@ async function loadPropertyInspectorSettings(
         actionKind,
         platform,
         isWindows,
+        isTouchStrip,
         widgetSettingsRead,
     });
 
     void refreshWidgetSettings(client, dispatchSettingsAction, settingsInputSnapshotRef, actionKind, isDisposed);
     void refreshGlobalSettings(client, dispatchSettingsAction, settingsInputSnapshotRef, isDisposed);
+}
+
+function readIsTouchStripAction(actionInfo: ActionInfo | undefined): boolean {
+    return actionInfo?.payload?.controller === "Encoder";
 }
 
 async function refreshWidgetSettings(

@@ -802,6 +802,40 @@ test("progress bar renders single value icon", () => {
     assert.match(svgFragment, /progress-bar-single-value/);
 });
 
+test("progress bar uses a single neutral leading icon for wide single-direction bars", () => {
+    const svgFragment = progressBar.render({
+        ...buildWidgetData(),
+        label: "Net Speed",
+        displayValue: "126",
+        unit: "KB/s",
+        barValueIconFragment: "<path id=\"direction-icon\" />",
+        barValueIconColor: "#f97316",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
+    const directionIconMatches = svgFragment.match(/id="direction-icon"/gu) ?? [];
+
+    assert.equal(directionIconMatches.length, 1);
+    assert.doesNotMatch(svgFragment, /color="#f97316"/);
+    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-bar-single-value"), 72);
+    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-bar-single-unit"), 28);
+    assert.match(svgFragment, /KB\/s/);
+});
+
+test("progress bar stacks the title icon above long wide single-bar labels", () => {
+    const shortLabelFragment = progressBar.render({
+        ...buildWidgetData(),
+        label: "PING",
+        barValueIconFragment: "<path id=\"short-icon\" />",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
+    const longLabelFragment = progressBar.render({
+        ...buildWidgetData(),
+        label: "Battery",
+        barValueIconFragment: "<path id=\"long-icon\" />",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
+
+    assert.equal(readConstrainedTextClipWidth(shortLabelFragment, "progress-bar-single-title"), 43);
+    assert.equal(readConstrainedTextClipWidth(longLabelFragment, "progress-bar-single-title"), 68);
+});
+
 test("progress bar emits filled shape backings without drawing a zero-fill cap", () => {
     const filledFragment = progressBar.render(buildWidgetData(), {
         ...DEFAULT_PROGRESS_BAR_CONFIG,
