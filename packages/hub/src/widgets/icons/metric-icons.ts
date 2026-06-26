@@ -7,13 +7,13 @@ import type { SvgIconDefinition } from "./icon-types";
 import { renderCenteredIconFragment } from "./render-icon";
 import { createLucideIconDefinition } from "./sources/lucide";
 
-export const CUSTOM_METRIC_DEFAULT_ICON_ID = "activity";
+export const METRIC_DEFAULT_ICON_ID = "activity";
 
-const customMetricIconDefinitionById = new Map<string, SvgIconDefinition>();
+const metricIconDefinitionById = new Map<string, SvgIconDefinition>();
 const lucideIconNodes: Icons = lucideIcons;
 
 /** Normalizes user or AI supplied icon ids and rejects unknown Lucide ids. */
-export function normalizeCustomMetricIconId(value: string | undefined): string | undefined {
+export function normalizeMetricIconId(value: string | undefined): string | undefined {
     if (value === undefined) {
         return undefined;
     }
@@ -22,49 +22,49 @@ export function normalizeCustomMetricIconId(value: string | undefined): string |
     return readLucideIconNode(normalizedId) === undefined ? undefined : normalizedId;
 }
 
-/** Checks whether a value names a supported Custom Metric Lucide icon. */
-export function isCustomMetricIconId(value: string | undefined): boolean {
-    return normalizeCustomMetricIconId(value) !== undefined;
+/** Checks whether a value names a supported user-selectable metric icon. */
+export function isMetricIconId(value: string | undefined): boolean {
+    return normalizeMetricIconId(value) !== undefined;
 }
 
-/** Renders a centered SVG fragment for a Custom Metric icon id when it is known. */
-export function getCustomMetricIconFragment(iconId: string | undefined, size = 45): string | undefined {
-    const normalizedIconId = normalizeCustomMetricIconId(iconId);
+/** Renders a centered SVG fragment for a user-selectable metric icon id when it is known. */
+export function getMetricIconFragment(iconId: string | undefined, size = 45): string | undefined {
+    const normalizedIconId = normalizeMetricIconId(iconId);
     if (normalizedIconId === undefined) {
         return undefined;
     }
 
-    return renderCenteredIconFragment(getCustomMetricIconDefinition(normalizedIconId), size);
+    return renderCenteredIconFragment(getMetricIconDefinition(normalizedIconId), size);
 }
 
-/** Renders the fallback Custom Metric icon fragment. */
-export function getDefaultCustomMetricIconFragment(size = 45): string {
-    return renderCenteredIconFragment(getCustomMetricIconDefinition(CUSTOM_METRIC_DEFAULT_ICON_ID), size);
+/** Renders the fallback metric icon fragment. */
+export function getDefaultMetricIconFragment(size = 45): string {
+    return renderCenteredIconFragment(getMetricIconDefinition(METRIC_DEFAULT_ICON_ID), size);
 }
 
 /** Builds the small standalone SVG used by Property Inspector icon previews. */
-export function buildCustomMetricIconPreviewSvg(iconId: string): string {
-    const iconFragment = getCustomMetricIconFragment(iconId, 15) ?? getDefaultCustomMetricIconFragment(15);
+export function buildMetricIconPreviewSvg(iconId: string): string {
+    const iconFragment = getMetricIconFragment(iconId, 15) ?? getDefaultMetricIconFragment(15);
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -12 24 24">${iconFragment}</svg>`;
 }
 
-function getCustomMetricIconDefinition(iconId: string): SvgIconDefinition {
-    const cachedDefinition = customMetricIconDefinitionById.get(iconId);
+function getMetricIconDefinition(iconId: string): SvgIconDefinition {
+    const cachedDefinition = metricIconDefinitionById.get(iconId);
     if (cachedDefinition !== undefined) {
         return cachedDefinition;
     }
 
     const iconNode = readLucideIconNode(iconId);
     if (iconNode === undefined) {
-        throw new Error(`Unknown Custom Metric icon id: ${iconId}`);
+        throw new Error(`Unknown metric icon id: ${iconId}`);
     }
 
     const definition = createLucideIconDefinition({
-        id: `custom-metric.${iconId}`,
+        id: `metric-icon.${iconId}`,
         node: iconNode,
         strokeWidth: 2.35,
     });
-    customMetricIconDefinitionById.set(iconId, definition);
+    metricIconDefinitionById.set(iconId, definition);
     return definition;
 }
 

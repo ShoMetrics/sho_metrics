@@ -1,5 +1,5 @@
 import { MetricUnit } from "../metric-source";
-import { normalizeCustomMetricIconId } from "../../../widgets/icons/custom-metric-icons";
+import { normalizeMetricIconId } from "../../../widgets/icons/metric-icons";
 
 export const CUSTOM_HTTP_TRANSFORM_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -236,7 +236,7 @@ function normalizeCustomHttpUnitName(unit: string): string {
 
 function readSuggestedLucideIconId(value: unknown): string | undefined {
     return typeof value === "string"
-        ? normalizeCustomMetricIconId(value)
+        ? normalizeMetricIconId(value)
         : undefined;
 }
 

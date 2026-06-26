@@ -19,6 +19,7 @@ import {
     MemoryMetricTarget_UsageSchema,
     MemoryMetricTargetSchema,
     MetricSelectionSchema,
+    MetricIconSettingsSchema,
     MetricSourcePolicySchema,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricSlotSchema,
@@ -663,6 +664,16 @@ function applySystemPatch(
 
     if ("detectedPeripheralDisplayName" in patch) {
         target.detectedPeripheralDisplayName = patch.detectedPeripheralDisplayName;
+    }
+
+    if ("customLabel" in patch) {
+        target.customLabel = patch.customLabel;
+    }
+
+    if ("iconId" in patch) {
+        target.icon = patch.iconId === undefined
+            ? undefined
+            : create(MetricIconSettingsSchema, { id: patch.iconId });
     }
 }
 

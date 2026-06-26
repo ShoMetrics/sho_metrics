@@ -11,7 +11,18 @@ import {
     type ResolvedSystemMetricTarget,
     type ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
+import {
+    resolveSystemBatteryLabel,
+    resolveSystemBatterySecondaryLabel,
+    SYSTEM_BATTERY_TITLE_LABEL,
+} from "../../settings/system-battery-label";
+import {
+    resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
+} from "../../settings/metric-custom-label-policy";
 import type { SingleMetricViewOptions } from "../../view-updates/runner";
+import { TITLE_CARD_BATTERY_CAPTION_TEXT } from "../../view-rendering/text-content/title-card-text-content";
+import { getMetricIconFragment } from "../../widgets/icons/metric-icons";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
 
 const MISSING_BLUETOOTH_PRIMARY_IDENTIFIER_DESCRIPTOR_ID = "missing-primary-identifier";
@@ -24,19 +35,50 @@ export function buildSystemViewOptions(options: {
 }): SingleMetricViewOptions {
     const widget = requireResolvedSingleMetricWidget(options.settings);
     const metricKey = resolveSystemMetricKey(options.target);
+    const selectedView = widget.slot.appearance.view.selectedView;
+    const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
+        selectedView,
+        keyShape: resolveMetricCustomLabelKeyShape({
+            selectedView,
+            isTouchStrip: options.event.action.isDial(),
+        }),
+    });
+    const batteryLabel = resolveSystemBatteryLabel({
+        customLabel: options.target.reading.customLabel,
+        selectedPeripheralDisplayName: options.target.reading.detectedPeripheralDisplayName,
+        selectedView,
+        circleVariant: widget.slot.appearance.view.circleVariant,
+        textVariant: widget.slot.appearance.view.textVariant,
+        maximumCharacters: displayMaximumLabelCharacters,
+    });
+    const secondaryBatteryLabel = resolveSystemBatterySecondaryLabel({
+        customLabel: options.target.reading.customLabel,
+        selectedPeripheralDisplayName: options.target.reading.detectedPeripheralDisplayName,
+        maximumCharacters: displayMaximumLabelCharacters,
+    });
+    const defaultIcons = buildMetricViewIcons({ hardware: "battery", status: "percentage" });
 
     return {
         event: options.event,
         metricRenderKind: "singleMetric",
         resolvedSettings: widget.slot.appearance,
         metricKey,
-        widgetData: options.metrics.getWidgetData(
-            metricKey,
-            "BATT",
-            "%",
-            100,
-        ),
-        ...buildMetricViewIcons({ hardware: "other", status: "percentage" }),
+        widgetData: {
+            ...options.metrics.getWidgetData(
+                metricKey,
+                selectedView === "bar" ? SYSTEM_BATTERY_TITLE_LABEL : batteryLabel,
+                "%",
+                100,
+            ),
+            ...(selectedView === "bar" ? {
+                barLabel: SYSTEM_BATTERY_TITLE_LABEL,
+                secondaryDisplayValue: secondaryBatteryLabel,
+            } : {}),
+            titleCardCaptionText: TITLE_CARD_BATTERY_CAPTION_TEXT,
+        },
+        ...defaultIcons,
+        centerIconFragment: getMetricIconFragment(options.target.reading.iconId)
+            ?? defaultIcons.centerIconFragment,
     };
 }
 

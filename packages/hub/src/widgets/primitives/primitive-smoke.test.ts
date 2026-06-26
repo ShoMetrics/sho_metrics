@@ -37,6 +37,16 @@ test("progress circle clamps progress and escapes center text", () => {
     assert.doesNotMatch(svgFragment, /stroke-dashoffset="-/);
 });
 
+test("progress circle fits eight-character labels inside the arc", () => {
+    const svgFragment = progressCircle.render({
+        ...buildWidgetData(),
+        label: "ROG AZOT",
+    }, DEFAULT_PROGRESS_CIRCLE_CONFIG, keySize);
+
+    assert.match(svgFragment, /id="arc-label"[\s\S]*ROG AZOT/);
+    assert.match(svgFragment, /id="arc-label"[\s\S]*textLength=/);
+});
+
 test("progress bar clamps fill width and renders secondary text safely", () => {
     const svgFragment = progressBar.render({
         ...buildWidgetData(),
@@ -91,9 +101,36 @@ test("text metric uses a horizontal touch strip layout for wide keys", () => {
         unit: "%",
     }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
 
-    assert.match(svgFragment, /id="text-metric-label"[\s\S]*x="14" y="52"/);
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*x="12" y="52"/);
     assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
     assert.match(svgFragment, /id="text-metric-unit"[\s\S]*x="186" y="68"[\s\S]*text-anchor="end"/);
+});
+
+test("text metric wraps long touch strip labels without moving the value column", () => {
+    const svgFragment = renderCenteredTextMetric({
+        ...buildWidgetData(),
+        label: "888kk",
+        displayValue: "N/A",
+        unit: "",
+    }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
+
+    assert.match(svgFragment, /id="text-metric-label-0"[\s\S]*x="12" y="42"[\s\S]*>888k<\/text>/);
+    assert.match(svgFragment, /id="text-metric-label-1"[\s\S]*x="12" y="63"[\s\S]*>k<\/text>/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
+});
+
+test("text metric wraps very long touch strip labels to three lines", () => {
+    const svgFragment = renderCenteredTextMetric({
+        ...buildWidgetData(),
+        label: "123456789012",
+        displayValue: "75",
+        unit: "%",
+    }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
+
+    assert.match(svgFragment, /id="text-metric-label-0"[\s\S]*x="12" y="30"[\s\S]*>1234<\/text>/);
+    assert.match(svgFragment, /id="text-metric-label-1"[\s\S]*x="12" y="52"[\s\S]*>5678<\/text>/);
+    assert.match(svgFragment, /id="text-metric-label-2"[\s\S]*x="12" y="74"[\s\S]*>9012<\/text>/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
 });
 
 test("title-card text metric renders supplied asymmetrical caption content", () => {

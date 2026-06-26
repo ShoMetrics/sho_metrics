@@ -920,9 +920,9 @@ test("catalog metric settings render label and scale controls after theme", () =
         },
     });
 
-    assert.match(markup, /class="section-title"[^>]*>Label &amp; Scale</);
+    assert.match(markup, /class="section-title"[^>]*>Label, Icon &amp; Scale</);
     assert.match(markup, /Label:/);
-    assert.match(markup, /placeholder="GPU Board Power"/);
+    assert.match(markup, /placeholder="Detected label"/);
     assert.match(markup, /value="Board"/);
     assert.match(markup, /Use Detected/);
     assert.match(markup, /Scale:/);
@@ -930,8 +930,43 @@ test("catalog metric settings render label and scale controls after theme", () =
     assert.match(markup, /Max \(W\):/);
     assert.match(markup, /value="450"/);
     assert.match(markup, /Custom label and scale reset when you choose a different metric/);
-    assertTextOrder(markup, "Theme:", "Label &amp; Scale");
-    assertTextOrder(markup, "Label &amp; Scale", "Trend Line Smoothing");
+    assertTextOrder(markup, "Theme:", "Label, Icon &amp; Scale");
+    assertTextOrder(markup, "Label, Icon &amp; Scale", "Trend Line Smoothing");
+});
+
+test("catalog metric settings prefill detected labels when no custom label is set", () => {
+    const markup = renderWidgetSettings({
+        actionKind: "catalog",
+        settings: buildWidgetSettings("catalog", {
+            catalog: {
+                metricId: "lhm.sensor:/gpu/0/power/board",
+                detectedLabel: "GPU Board Power",
+                detectedUnit: MetricUnit.WATTS,
+                detectedCategory: "gpu",
+                detectedReadingKind: "power",
+            },
+        }),
+        runtimeCache: {
+            availableCatalogMetricDescriptors: [
+                buildMetricDescriptor({
+                    metricId: "lhm.sensor:/gpu/0/power/board",
+                    sourceSensorId: "gpu-board-power",
+                    hardwareId: "gpu0",
+                    hardwareName: "NVIDIA GPU",
+                    hardwareType: "GpuNvidia",
+                    sensorName: "GPU Board Power",
+                    sourceSensorType: "Power",
+                    unit: MetricUnit.WATTS,
+                }),
+            ],
+            catalogMetricDescriptorLoadState: "ready",
+        },
+        runtimeCacheStatus: {
+            catalogMetricDescriptorStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /value="GPU Board Power"/);
 });
 
 test("catalog metric settings show readable custom maximum input units", () => {
@@ -1020,10 +1055,13 @@ test("catalog metric label and scale patches keep independent overrides", () => 
     });
 
     assert.deepEqual(buildCatalogMetricCustomLabelPatch("  Board  "), {
-        catalog: { customLabel: "  Board  " },
+        catalog: { customLabel: "Board" },
     });
     assert.deepEqual(buildCatalogMetricCustomLabelPatch("   "), {
         catalog: { customLabel: undefined },
+    });
+    assert.deepEqual(buildCatalogMetricCustomLabelPatch("  Board Room  "), {
+        catalog: { customLabel: "Board Room" },
     });
     assert.deepEqual(buildCatalogMetricUseDetectedLabelPatch(), {
         catalog: { customLabel: undefined },
@@ -1383,7 +1421,7 @@ test("stacked metric settings page summarizes catalog slots without expanding th
 
     assert.match(markup, new RegExp(["Advanced", "Sensor"].join(" ")));
     assert.doesNotMatch(markup, /GPU Board Power/);
-    assert.doesNotMatch(markup, /Label &amp; Scale/);
+    assert.doesNotMatch(markup, /Label, Icon &amp; Scale/);
     assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
     assert.match(markup, /This polling frequency is shared by every metric in this key\./);
 });
@@ -1643,6 +1681,7 @@ test("system widget settings render battery selector and experimental vendor HID
 
     assert.match(markup, sectionTitlePattern("Battery"));
     assert.match(markup, /\[Dongle\] MX Master 4/);
+    assert.match(markup, /Label:/);
     assert.match(markup, /USB Device/);
     assert.match(markup, /Enable experimental support/);
     assert.match(markup, /Reads battery levels from Logitech\/ROG devices connected through USB receiver\/dongle/);
@@ -1668,6 +1707,7 @@ test("system widget settings keep selected battery snapshot while descriptors re
 
     assert.match(markup, /\[Dongle\] MX Master 4/);
     assert.match(markup, /Searching devices\.\.\./);
+    assertTextOrder(markup, "Searching devices...", "Label:");
     assert.doesNotMatch(markup, /Unavailable: \[Dongle\] MX Master 4/);
     assert.doesNotMatch(markup, /The selected device is not currently connected or responding/);
 });

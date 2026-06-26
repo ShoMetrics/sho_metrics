@@ -22,7 +22,6 @@ import {
     type SvgTextAnchor,
 } from "../../view-rendering/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
-import { assertProgressCircleLabel } from "./progress-circle-label";
 import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,
@@ -216,7 +215,9 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
         const labelYCoordinate = centerYCoordinate + ARC_LAYOUT.label.yOffset;
         const valueCenterYCoordinate = centerYCoordinate + ARC_LAYOUT.value.yOffset;
         const unitText = data.unit;
-        const labelMaxWidth = Math.max(24, radius * 1.55);
+        // Full-ring labels sit inside the upper arc, so they need a narrower
+        // safe area than footer labels used by gauge/minimal variants.
+        const labelMaxWidth = Math.max(24, radius * (circleVariant === "full-ring" ? 1.32 : 1.55));
         const centerTextMaxWidth = Math.max(24, radius * 1.5);
         const centerContentFragment = renderCenterContent({
             circleVariant,
@@ -548,7 +549,6 @@ function renderGaugeValueContent(options: {
     footerIconFragment: string | undefined;
     config: ProgressCircleConfig;
 }): string {
-    assertProgressCircleLabel(options.labelText);
     const bottomLabelYCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabel.yOffset;
 
     return `
@@ -786,7 +786,6 @@ function renderCenterValue(options: {
     footerIconFragment: string | undefined;
     config: ProgressCircleConfig;
 }): string {
-    assertProgressCircleLabel(options.labelText);
     const labelTextStyle = options.config.textStyles.label;
     const valueTextStyle = options.config.textStyles.value;
     const unitTextStyle = options.config.textStyles.unit;

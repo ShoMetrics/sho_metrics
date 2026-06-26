@@ -10,7 +10,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const packageDirectory = path.resolve(scriptDirectory, "..");
 const outputPath = path.resolve(
     packageDirectory,
-    "src/generated/custom-metric-lucide-search-index.generated.ts",
+    "src/generated/metric-lucide-search-index.generated.ts",
 );
 // Keeps common technical acronyms readable in generated picker labels, such as
 // "CPU" and "TV", instead of title-casing them as "Cpu" and "Tv".
@@ -78,15 +78,15 @@ const generatedSource = `${[
     "// Do not edit by hand.",
     "// </auto-generated>",
     "",
-    "export interface GeneratedCustomMetricLucideIconEntry {",
+    "export interface GeneratedMetricLucideIconEntry {",
     "    readonly id: string;",
     "    readonly label: string;",
     "    readonly exportName: string;",
     "    readonly terms: readonly string[];",
     "}",
     "",
-    "export const GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES = ",
-    `${JSON.stringify(entries, undefined, 4)} as const satisfies readonly GeneratedCustomMetricLucideIconEntry[];`,
+    "export const GENERATED_METRIC_LUCIDE_ICON_ENTRIES = ",
+    `${JSON.stringify(entries, undefined, 4)} as const satisfies readonly GeneratedMetricLucideIconEntry[];`,
     "",
 ].join("\n")}`;
 

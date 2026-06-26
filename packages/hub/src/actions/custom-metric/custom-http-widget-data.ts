@@ -7,7 +7,7 @@ import {
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     type WidgetData,
 } from "../../view-rendering/widget-data";
-import { compactProgressCircleLabel } from "../../widgets/primitives/progress-circle-label";
+import { limitMetricCustomLabelCharacters } from "../../settings/metric-custom-label-policy";
 
 export const CUSTOM_METRIC_DEFAULT_LABEL = "HTTP";
 
@@ -26,7 +26,7 @@ export interface CustomHttpWidgetDataResult {
 export function readCustomHttpWidgetData(options: {
     readonly metrics: MetricStoreReader;
     readonly metricKey: string;
-    readonly shouldCompactCircleLabel: boolean;
+    readonly labelMaximumCharacters?: number | undefined;
     /**
      * Dense rows own row-level labels and maxima, so they override source hints
      * without changing the stored Custom HTTP definition.
@@ -44,7 +44,7 @@ export function readCustomHttpWidgetData(options: {
     const displayHint = readResult.valueMetadata?.displayHint;
     const label = resolveCustomHttpLabel(
         displayHint,
-        options.shouldCompactCircleLabel,
+        options.labelMaximumCharacters,
         options.displayOverrides?.label,
     );
     const unit = resolveCustomHttpUnitText(displayHint);
@@ -106,19 +106,14 @@ export function readCustomHttpWidgetData(options: {
 
 function resolveCustomHttpLabel(
     displayHint: MetricValueDisplayHint | undefined,
-    shouldCompactCircleLabel: boolean,
+    labelMaximumCharacters: number | undefined,
     displayOverrideLabel: string | undefined,
 ): string {
     const trimmedLabel = (displayOverrideLabel ?? displayHint?.label ?? CUSTOM_METRIC_DEFAULT_LABEL).trim();
     const label = trimmedLabel.length === 0 ? CUSTOM_METRIC_DEFAULT_LABEL : trimmedLabel;
-    if (!shouldCompactCircleLabel) {
-        return label;
-    }
-
-    // Custom HTTP labels come from user or AI-authored transforms. The
-    // full-ring and gauge circle renderers have a four-character center-label
-    // contract, while text/bar/line views can keep the full source label.
-    return compactProgressCircleLabel(label);
+    return labelMaximumCharacters === undefined
+        ? label
+        : limitMetricCustomLabelCharacters(label, labelMaximumCharacters) ?? CUSTOM_METRIC_DEFAULT_LABEL;
 }
 
 function resolveCustomHttpUnitText(displayHint: MetricValueDisplayHint | undefined): string {

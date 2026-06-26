@@ -10,7 +10,7 @@ import { PollingSettings } from "./PollingSettings";
 import { LineSettings } from "./LineSettings";
 import { SettingsSection } from "./SettingsSection";
 import { customHttpPollingFrequencyOptionList } from "./setting-options";
-import { CustomMetricIconSettings } from "./custom-metric/CustomMetricIconSettings";
+import { MetricCustomizationSettings } from "./MetricCustomizationSettings";
 import { CustomMetricSourceEditorPanel } from "./custom-metric/CustomMetricSourceEditorPanel";
 import type {
     CustomMetricWidgetSettingsProps,
@@ -50,11 +50,13 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                 </InspectorItem>
             </SettingsSection>
             {props.target.configuration.state === "configured" && (
-                <CustomMetricIconSettings
-                    iconId={props.target.iconId}
-                    onIconIdChange={(iconId) => props.onSettingsPatch({
-                        customMetric: { iconId },
-                    })}
+                <MetricCustomizationSettings
+                    icon={{
+                        iconId: props.target.iconId,
+                        onIconIdChange: (iconId) => props.onSettingsPatch({
+                            customMetric: { iconId },
+                        }),
+                    }}
                 />
             )}
             <AppearanceSettings {...props} />

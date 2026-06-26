@@ -197,7 +197,7 @@ function buildMetricPreviewSample(target: ResolvedMetricTarget): MetricPreviewSa
             });
         case "system":
             return buildHardwarePreviewSample({
-                hardware: "other",
+                hardware: "battery",
                 label: "BATT",
                 current: 78,
                 unit: "%",

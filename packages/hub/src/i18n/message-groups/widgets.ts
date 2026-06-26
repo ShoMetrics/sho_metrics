@@ -189,6 +189,11 @@ export const systemMessages = {
         zh_CN: "电池",
         ja: "バッテリー",
     },
+    batteryLabelLabel: {
+        en: "Label",
+        zh_CN: "标签",
+        ja: "ラベル",
+    },
     systemBatteryOption: {
         en: "System",
         zh_CN: "系统",
@@ -355,16 +360,6 @@ export const catalogMessages = {
         zh_CN: "正在加载指标...",
         ja: "メトリクスを読み込んでいます...",
     },
-    labelScaleSection: {
-        en: "Label & Scale",
-        zh_CN: "标签与范围",
-        ja: "ラベルとスケール",
-    },
-    labelLabel: {
-        en: "Label",
-        zh_CN: "标签",
-        ja: "ラベル",
-    },
     detectedLabelPlaceholder: {
         en: "Detected label",
         zh_CN: "检测到的标签",
@@ -379,6 +374,59 @@ export const catalogMessages = {
         en: "Custom label and scale reset when you choose a different metric.",
         zh_CN: "选择其他指标时，自定义标签和范围会重置。",
         ja: "別のメトリクスを選択すると、カスタムラベルとスケールはリセットされます。",
+    },
+} as const satisfies LocalizedMessages;
+
+export const metricCustomizationMessages = {
+    section: {
+        en: "Label, Icon & Scale",
+        zh_CN: "标签、图标与范围",
+        ja: "ラベル、アイコン、スケール",
+    },
+    labelLabel: {
+        en: "Label",
+        zh_CN: "标签",
+        ja: "ラベル",
+    },
+    labelLimitNote: {
+        en: "Displayed as up to {count} characters in this view.",
+        zh_CN: "当前视图最多显示 {count} 个字符。",
+        ja: "この表示では最大 {count} 文字まで表示されます。",
+    },
+    iconSearchLabel: {
+        en: "Widget Icon",
+        zh_CN: "组件图标",
+        ja: "ウィジェットアイコン",
+    },
+    iconSearchPlaceholder: {
+        en: "Search icons",
+        zh_CN: "搜索图标",
+        ja: "アイコンを検索",
+    },
+    iconHint: {
+        en: "Icon is used in some views only.",
+        zh_CN: "图标只在部分视图中使用。",
+        ja: "アイコンは一部の表示でのみ使われます。",
+    },
+    iconShowingResultsStatus: {
+        en: "{shown} of {count} matches",
+        zh_CN: "{shown}/{count} 个匹配",
+        ja: "{shown}/{count} 件一致",
+    },
+    iconNoResultsStatus: {
+        en: "No matching icons",
+        zh_CN: "没有匹配的图标",
+        ja: "一致するアイコンはありません",
+    },
+    iconKeepTypingHint: {
+        en: "Showing {shown} of {count} matching icons. Keep typing to narrow the list.",
+        zh_CN: "正在显示 {count} 个匹配图标中的 {shown} 个。继续输入可缩小范围。",
+        ja: "{count} 件中 {shown} 件の一致アイコンを表示しています。入力を続けると絞り込めます。",
+    },
+    iconClearButton: {
+        en: "Clear Icon",
+        zh_CN: "清除图标",
+        ja: "アイコンをクリア",
     },
 } as const satisfies LocalizedMessages;
 
@@ -403,11 +451,6 @@ export const customMetricMessages = {
         zh_CN: "结果",
         ja: "結果",
     },
-    iconSection: {
-        en: "Icon",
-        zh_CN: "图标",
-        ja: "アイコン",
-    },
     sourceSummaryLabel: {
         en: "HTTP Source",
         zh_CN: "HTTP 来源",
@@ -427,41 +470,6 @@ export const customMetricMessages = {
         en: "Edit",
         zh_CN: "编辑",
         ja: "編集",
-    },
-    iconSearchLabel: {
-        en: "Widget Icon",
-        zh_CN: "组件图标",
-        ja: "ウィジェットアイコン",
-    },
-    iconSearchPlaceholder: {
-        en: "Search icons",
-        zh_CN: "搜索图标",
-        ja: "アイコンを検索",
-    },
-    iconHint: {
-        en: "This sets the key's icon. Icon is used in some views only.",
-        zh_CN: "这里设置按键图标。图标只在部分视图中使用。",
-        ja: "キーのアイコンを設定します。アイコンは一部の表示でのみ使われます。",
-    },
-    iconShowingResultsStatus: {
-        en: "{shown} of {count} matches",
-        zh_CN: "{shown}/{count} 个匹配",
-        ja: "{shown}/{count} 件一致",
-    },
-    iconNoResultsStatus: {
-        en: "No matching icons",
-        zh_CN: "没有匹配的图标",
-        ja: "一致するアイコンはありません",
-    },
-    iconKeepTypingHint: {
-        en: "Showing {shown} of {count} matching icons. Keep typing to narrow the list.",
-        zh_CN: "正在显示 {count} 个匹配图标中的 {shown} 个。继续输入可缩小范围。",
-        ja: "{count} 件中 {shown} 件の一致アイコンを表示しています。入力を続けると絞り込めます。",
-    },
-    iconClearButton: {
-        en: "Clear Icon",
-        zh_CN: "清除图标",
-        ja: "アイコンをクリア",
     },
     backToWidgetButton: {
         en: "Back",

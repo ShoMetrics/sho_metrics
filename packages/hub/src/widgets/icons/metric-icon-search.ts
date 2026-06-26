@@ -1,19 +1,19 @@
 import {
-    GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES,
-    type GeneratedCustomMetricLucideIconEntry,
-} from "../../generated/custom-metric-lucide-search-index.generated";
+    GENERATED_METRIC_LUCIDE_ICON_ENTRIES,
+    type GeneratedMetricLucideIconEntry,
+} from "../../generated/metric-lucide-search-index.generated";
 
-export const CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT = 20;
+export const METRIC_ICON_SEARCH_RESULT_LIMIT = 20;
 
-export interface CustomMetricIconMetadata {
+export interface MetricIconMetadata {
     readonly id: string;
     readonly label: string;
     readonly terms: readonly string[];
 }
 
 /** Searches Lucide icon ids, labels, and metadata terms for the icon picker. */
-export function searchCustomMetricIconOptions(query: string): {
-    readonly options: readonly CustomMetricIconMetadata[];
+export function searchMetricIconOptions(query: string): {
+    readonly options: readonly MetricIconMetadata[];
     readonly totalMatchCount: number;
 } {
     const normalizedQuery = query.trim().toLowerCase();
@@ -24,7 +24,7 @@ export function searchCustomMetricIconOptions(query: string): {
         };
     }
 
-    const scoredEntries = GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES
+    const scoredEntries = GENERATED_METRIC_LUCIDE_ICON_ENTRIES
         .map(entry => ({
             entry,
             score: scoreIconSearchEntry(entry, normalizedQuery),
@@ -33,18 +33,18 @@ export function searchCustomMetricIconOptions(query: string): {
         .sort((left, right) => right.score - left.score || left.entry.label.localeCompare(right.entry.label));
 
     return {
-        options: scoredEntries.slice(0, CUSTOM_METRIC_ICON_SEARCH_RESULT_LIMIT).map(scoredEntry => toMetadata(scoredEntry.entry)),
+        options: scoredEntries.slice(0, METRIC_ICON_SEARCH_RESULT_LIMIT).map(scoredEntry => toMetadata(scoredEntry.entry)),
         totalMatchCount: scoredEntries.length,
     };
 }
 
-/** Reads generated Lucide metadata for a stored Custom Metric icon id. */
-export function readCustomMetricIconMetadata(iconId: string): CustomMetricIconMetadata | undefined {
-    const entry = GENERATED_CUSTOM_METRIC_LUCIDE_ICON_ENTRIES.find(candidate => candidate.id === iconId);
+/** Reads generated Lucide metadata for a stored metric icon id. */
+export function readMetricIconMetadata(iconId: string): MetricIconMetadata | undefined {
+    const entry = GENERATED_METRIC_LUCIDE_ICON_ENTRIES.find(candidate => candidate.id === iconId);
     return entry === undefined ? undefined : toMetadata(entry);
 }
 
-function scoreIconSearchEntry(entry: GeneratedCustomMetricLucideIconEntry, query: string): number {
+function scoreIconSearchEntry(entry: GeneratedMetricLucideIconEntry, query: string): number {
     if (entry.id === query) {
         return 100;
     }
@@ -63,7 +63,7 @@ function scoreIconSearchEntry(entry: GeneratedCustomMetricLucideIconEntry, query
     return entry.terms.some(term => term.includes(query)) ? 30 : 0;
 }
 
-function toMetadata(entry: GeneratedCustomMetricLucideIconEntry): CustomMetricIconMetadata {
+function toMetadata(entry: GeneratedMetricLucideIconEntry): MetricIconMetadata {
     return {
         id: entry.id,
         label: entry.label,

@@ -243,6 +243,8 @@ export type ResolvedSystemReading =
         readonly kind: "batteryPercent";
         readonly peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined;
         readonly detectedPeripheralDisplayName: string | undefined;
+        readonly customLabel: string | undefined;
+        readonly iconId: string | undefined;
     };
 
 export interface ResolvedSystemPeripheralIdentity {

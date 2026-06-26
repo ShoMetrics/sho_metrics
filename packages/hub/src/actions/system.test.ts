@@ -11,15 +11,18 @@ import {
     buildBatteryMetricKeyFromIdentity,
 } from "../runtime/sources/battery/battery-metric-key";
 import type {
+    MetricView,
     ResolvedSystemMetricTarget,
     ResolvedSystemPeripheralIdentity,
     ResolvedSystemVendorHidPeripheralIdentity,
+    ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
 import {
     buildSystemViewOptions,
     resolveSystemMetricKeys,
 } from "./system/view-builder";
+import { getMetricIconFragment } from "../widgets/icons/metric-icons";
 import type { WidgetData } from "../view-rendering/widget-data";
 import {
     resolveBatteryDeviceCachePatchForPropertyInspector,
@@ -141,11 +144,100 @@ test("System view renders selected peripheral battery no-data safely", () => {
         read.calls[0]?.metricKey,
         buildBatteryMetricKeyFromIdentity(buildPeripheralIdentity()),
     );
-    assert.equal(read.calls[0]?.label, "BATT");
+    assert.equal(read.calls[0]?.label, "MX Maste");
     assert.equal(read.calls[0]?.unit, "%");
     assert.equal(read.calls[0]?.maxValue, 100);
     assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, undefined);
     assert.equal(viewOptions.noticeText, undefined);
+});
+
+test("System battery circle view passes the stored custom label to the renderer", () => {
+    const read = buildMetricReader();
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined, "Mouse"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "Mouse");
+    assert.equal(viewOptions.widgetData.titleCardCaptionText, "電池量");
+});
+
+test("System battery circle view preserves eight-character custom labels", () => {
+    const read = buildMetricReader();
+    buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined, "ROG AZOT"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "ROG AZOT");
+});
+
+test("System battery circle view caps long stored custom labels for display", () => {
+    const read = buildMetricReader();
+    buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined, "12345678901234567890"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "12345678");
+});
+
+test("System battery bar view defaults to the readable title label", () => {
+    const read = buildMetricReader();
+    buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withSelectedView(resolveInitialActionSettings(undefined, "system").resolvedSettings, "bar"),
+        target: buildSystemTarget(undefined),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "Battery");
+});
+
+test("System battery bar view renders custom label as secondary text", () => {
+    const read = buildMetricReader();
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withSelectedView(resolveInitialActionSettings(undefined, "system").resolvedSettings, "bar"),
+        target: buildSystemTarget(undefined, "MX Mouse"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "Battery");
+    assert.equal(viewOptions.widgetData.barLabel, "Battery");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "MX Mouse");
+});
+
+test("System battery bar view renders selected peripheral name as secondary text", () => {
+    const read = buildMetricReader();
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: withSelectedView(resolveInitialActionSettings(undefined, "system").resolvedSettings, "bar"),
+        target: buildSystemTarget(buildPeripheralIdentity()),
+        metrics: read.metrics,
+    });
+
+    assert.equal(read.calls[0]?.label, "Battery");
+    assert.equal(viewOptions.widgetData.barLabel, "Battery");
+    assert.equal(viewOptions.widgetData.secondaryDisplayValue, "MX Master 4");
+});
+
+test("System battery view can use a custom center icon", () => {
+    const read = buildMetricReader();
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined, undefined, "cloud-sun"),
+        metrics: read.metrics,
+    });
+
+    assert.equal(viewOptions.centerIconFragment, getMetricIconFragment("cloud-sun"));
 });
 
 test("System PI cache publish keeps selected peripheral pending while the battery device cache is initially empty", () => {
@@ -186,6 +278,8 @@ test("System PI cache publish keeps completed empty battery device refreshes", (
 
 function buildSystemTarget(
     peripheralIdentity: ResolvedSystemPeripheralIdentity | undefined,
+    customLabel: string | undefined = undefined,
+    iconId: string | undefined = undefined,
 ): ResolvedSystemMetricTarget {
     return {
         domain: "system",
@@ -195,6 +289,34 @@ function buildSystemTarget(
             detectedPeripheralDisplayName: peripheralIdentity === undefined
                 ? undefined
                 : "MX Master 4",
+            customLabel,
+            iconId,
+        },
+    };
+}
+
+function withSelectedView(
+    settings: ResolvedWidgetSettings,
+    selectedView: MetricView,
+): ResolvedWidgetSettings {
+    if (settings.widget.widgetKind !== "singleMetric") {
+        throw new Error("System action tests expect single metric settings.");
+    }
+
+    return {
+        ...settings,
+        widget: {
+            ...settings.widget,
+            slot: {
+                ...settings.widget.slot,
+                appearance: {
+                    ...settings.widget.slot.appearance,
+                    view: {
+                        ...settings.widget.slot.appearance.view,
+                        selectedView,
+                    },
+                },
+            },
         },
     };
 }

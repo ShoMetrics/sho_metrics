@@ -241,14 +241,14 @@ test("catalog metric selected view uses stored detected label unit and unit maxi
     assert.deepEqual(metricReader.widgetDataCalls, [
         {
             metricKey: "source.sensor:/gpu/0/power",
-            label: "GPU Board Power",
+            label: "GPU Board Po",
             unit: "W",
             maxValue: 450,
         },
     ]);
     assert.equal(viewOptions.widgetData.current, 150);
     assert.equal(viewOptions.widgetData.progress, 1 / 3);
-    assert.equal(viewOptions.widgetData.label, "GPU Board Power");
+    assert.equal(viewOptions.widgetData.label, "GPU Board Po");
     assert.equal(viewOptions.widgetData.unit, "W");
 });
 
@@ -277,7 +277,7 @@ test("catalog metric selected view uses catalog metadata icons", () => {
     assert.doesNotMatch(viewOptions.centerIconFragment, /question/iu);
 });
 
-test("catalog metric selected circle value view compacts long labels", () => {
+test("catalog metric selected circle value view limits long labels", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         buildCatalogWidgetSettings("source.sensor:/cpu/0/temperature/package", {
             detectedLabel: "CPU Package",
@@ -307,7 +307,7 @@ test("catalog metric selected circle value view compacts long labels", () => {
         helperStatus: { state: "available" },
     });
 
-    assert.equal(viewOptions.widgetData.label, "CP");
+    assert.equal(viewOptions.widgetData.label, "CPU Pack");
 });
 
 test("catalog metric selected view uses custom label and custom maximum", () => {
@@ -656,6 +656,10 @@ class FakeStreamDeckAction {
 
     constructor(readonly id: string) {}
 
+    isDial(): boolean {
+        return false;
+    }
+
     setSettings(settings: unknown): Promise<void> {
         this.writtenSettingsList.push(settings);
         return Promise.resolve();
@@ -734,4 +738,3 @@ function buildPropertyInspectorDidAppearEvent(action: FakeStreamDeckAction): Pro
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
 }
-

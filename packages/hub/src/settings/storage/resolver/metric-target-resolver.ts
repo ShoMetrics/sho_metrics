@@ -135,6 +135,8 @@ function resolveSystemBatteryMetricTarget(
             kind: "batteryPercent",
             peripheralIdentity: resolveSystemPeripheralIdentity(storedTarget?.peripheralIdentity),
             detectedPeripheralDisplayName: normalizeOptionalText(storedTarget?.detectedPeripheralDisplayName),
+            customLabel: normalizeOptionalText(storedTarget?.customLabel),
+            iconId: normalizeOptionalText(storedTarget?.icon?.id),
         },
     };
 }
