@@ -14,6 +14,7 @@ export function buildVisibilityContext(options: {
     actionKind?: ActionKind;
     platform?: PropertyInspectorPlatform;
     isWindows?: boolean;
+    isTouchStrip?: boolean;
     settings?: InspectorTestSettings;
     globalSettings?: InspectorTestSettings;
     runtimeCache?: WidgetRuntimeCachePatch;
@@ -31,5 +32,6 @@ export function buildVisibilityContext(options: {
         actionKind: options.actionKind ?? "cpu",
         platform: options.platform ?? (options.isWindows === true ? "win32" : "darwin"),
         isWindows: options.isWindows ?? false,
+        isTouchStrip: options.isTouchStrip ?? false,
     });
 }

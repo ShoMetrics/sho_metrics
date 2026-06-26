@@ -33,6 +33,7 @@ import {
 import {
     METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
     resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
 } from "../../settings/metric-custom-label-policy";
 import { MetricCustomizationSettings } from "./MetricCustomizationSettings";
 
@@ -69,7 +70,10 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
     const widget = requireResolvedSingleMetricWidget(props.context.resolved);
     const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
         selectedView: widget.slot.appearance.view.selectedView,
-        keyShape: "square",
+        keyShape: resolveMetricCustomLabelKeyShape({
+            selectedView: widget.slot.appearance.view.selectedView,
+            isTouchStrip: props.context.isTouchStrip,
+        }),
     });
     const selectedPeripheralDisplayName = props.target.reading.peripheralIdentity === undefined
         ? undefined

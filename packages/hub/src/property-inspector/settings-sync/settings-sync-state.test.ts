@@ -16,12 +16,14 @@ test("connectionLoaded sets action metadata and marks widget settings ready", ()
         actionKind: "network",
         platform: "win32",
         isWindows: true,
+        isTouchStrip: true,
         widgetSettingsRead: buildWidgetSettingsRead({ rawSettings }),
     });
 
     assert.equal(nextState.actionKind, "network");
     assert.equal(nextState.platform, "win32");
     assert.equal(nextState.isWindows, true);
+    assert.equal(nextState.isTouchStrip, true);
     assert.equal(nextState.rawSettings, rawSettings);
     assert.equal(nextState.widgetSettingsStatus, "ready");
     assert.equal(nextState.widgetSettingsNotice, null);

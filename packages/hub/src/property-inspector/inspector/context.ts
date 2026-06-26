@@ -17,6 +17,7 @@ export function buildPropertyInspectorContext(options: {
     actionKind: ActionKind;
     platform: PropertyInspectorPlatform;
     isWindows: boolean;
+    isTouchStrip: boolean;
 }): VisibilityContext {
     const quickStartSettings = resolveQuickStartStoredWidgetSettings(options.rawSettings, options.actionKind);
     const storedGlobalSettings = readStoredGlobalSettings(options.rawGlobalSettings).settings;
@@ -26,6 +27,7 @@ export function buildPropertyInspectorContext(options: {
         actionKind: options.actionKind,
         platform: options.platform,
         isWindows: options.isWindows,
+        isTouchStrip: options.isTouchStrip,
         runtimeCache: options.runtimeCache,
         runtimeCacheStatus: options.runtimeCacheStatus,
         globalSettings,

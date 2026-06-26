@@ -24,6 +24,8 @@ export interface VisibilityContext {
     actionKind: ActionKind;
     platform: PropertyInspectorPlatform;
     isWindows: boolean;
+    /** Whether the PI is editing a Stream Deck+ dial action with a touch strip target. */
+    isTouchStrip: boolean;
     runtimeCache: WidgetRuntimeCache;
     runtimeCacheStatus: PropertyInspectorRuntimeCacheStatus;
     globalSettings: ResolvedGlobalSettings;

@@ -28,6 +28,7 @@ import {
     METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
     normalizeMetricCustomLabelInput,
     resolveMetricCustomLabelDisplayMaximumCharacters,
+    resolveMetricCustomLabelKeyShape,
 } from "../../settings/metric-custom-label-policy";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import { StandardColorSettings } from "./ColorSettings";
@@ -203,7 +204,10 @@ function CatalogMetricLabelScaleSettings({
     const widget = requireResolvedSingleMetricWidget(context.resolved);
     const displayMaximumLabelCharacters = resolveMetricCustomLabelDisplayMaximumCharacters({
         selectedView: widget.slot.appearance.view.selectedView,
-        keyShape: "square",
+        keyShape: resolveMetricCustomLabelKeyShape({
+            selectedView: widget.slot.appearance.view.selectedView,
+            isTouchStrip: context.isTouchStrip,
+        }),
     });
 
     return (

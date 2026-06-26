@@ -1690,6 +1690,33 @@ test("system widget settings render battery selector and experimental vendor HID
     assert.match(markup, /60m/);
 });
 
+test("system widget settings show touch strip label display cap", () => {
+    const batteryDevice = buildBatteryDeviceDescriptor();
+    const markup = renderWidgetSettings({
+        actionKind: "system",
+        isTouchStrip: true,
+        settings: buildWidgetSettings("system", {
+            appearance: {
+                view: { selectedView: "bar" },
+            },
+            system: {
+                peripheralIdentity: batteryDevice.identity,
+                detectedPeripheralDisplayName: batteryDevice.displayName,
+                customLabel: "MX Master 4",
+            },
+        }),
+        runtimeCache: {
+            availableBatteryDevices: [batteryDevice],
+        },
+        runtimeCacheStatus: {
+            batteryDeviceOptionsStatus: "ready",
+        },
+    });
+
+    assert.match(markup, /Displayed as up to 24 characters in this view/);
+    assert.doesNotMatch(markup, /Displayed as up to 12 characters in this view/);
+});
+
 test("system widget settings keep selected battery snapshot while descriptors refresh", () => {
     const batteryDevice = buildBatteryDeviceDescriptor();
     const markup = renderWidgetSettings({
@@ -1902,6 +1929,7 @@ function renderWidgetSettings(options: {
     actionKind: ActionKind;
     platform?: PropertyInspectorPlatform;
     isWindows?: boolean;
+    isTouchStrip?: boolean;
     isGlobalViewOverrideEnabled?: boolean;
     isGlobalThemeOverrideEnabled?: boolean;
     isGlobalTransparentSurfaceOverrideEnabled?: boolean;
@@ -1916,6 +1944,7 @@ function renderWidgetSettings(options: {
             actionKind: options.actionKind,
             platform: options.platform,
             isWindows: options.isWindows ?? (options.platform === undefined || options.platform === "win32"),
+            isTouchStrip: options.isTouchStrip,
             settings: options.settings,
             globalSettings: options.globalSettings,
             runtimeCache: options.runtimeCache,
