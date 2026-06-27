@@ -466,6 +466,11 @@ export const customMetricMessages = {
         zh_CN: "需要设置",
         ja: "設定が必要",
     },
+    customLabelPlaceholder: {
+        en: "Keep empty to use jq inferred label",
+        zh_CN: "留空则使用 jq 推断的标签",
+        ja: "空のままにすると jq が推定したラベルを使用します",
+    },
     editSourceButton: {
         en: "Edit",
         zh_CN: "编辑",

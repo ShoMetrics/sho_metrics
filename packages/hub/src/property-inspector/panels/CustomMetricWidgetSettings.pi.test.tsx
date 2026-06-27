@@ -40,6 +40,10 @@ test("custom metric panel sends fetch and transform test commands through the pl
     })} />);
 
     assert.equal(screen.getByText("Configured").textContent, "Configured");
+    assert.equal(
+        (screen.getByRole("textbox", { name: /^Label:/ }) as HTMLInputElement).placeholder,
+        "Keep empty to use jq inferred label",
+    );
     setPropertyInspectorScrollTopForTest(420);
     await user.click(screen.getByRole("button", { name: "Edit" }));
     await waitFor(() => {

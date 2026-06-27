@@ -70,6 +70,7 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
                 <MetricCustomizationSettings
                     label={{
                         value: props.target.customLabel,
+                        placeholder: t(customMetricMessages.customLabelPlaceholder),
                         inputMaximumCharacters: METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS,
                         displayMaximumCharacters: displayMaximumLabelCharacters,
                         onValueChange: (customLabel) => props.onSettingsPatch({
