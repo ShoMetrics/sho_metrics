@@ -29,11 +29,6 @@ The Windows Helper service and Control Panel publish outputs include the followi
 | Package | Version | License | Source |
 | --- | --- | --- | --- |
 | BlackSharp.Core | 1.0.7 | MPL-2.0 | <https://github.com/Blacktempel/BlackSharp> |
-| CommunityToolkit.Common | 8.2.1 | MIT | <https://github.com/CommunityToolkit/dotnet> |
-| CommunityToolkit.WinUI.Controls.SettingsControls | 8.2.251219 | MIT | <https://github.com/CommunityToolkit/Windows> |
-| CommunityToolkit.WinUI.Extensions | 8.2.251219 | MIT | <https://github.com/CommunityToolkit/Windows> |
-| CommunityToolkit.WinUI.Helpers | 8.2.251219 | MIT | <https://github.com/CommunityToolkit/Windows> |
-| CommunityToolkit.WinUI.Triggers | 8.2.251219 | MIT | <https://github.com/CommunityToolkit/Windows> |
 | DiskInfoToolkit | 1.1.2 | MPL-2.0 | <https://github.com/Blacktempel/DiskInfoToolkit> |
 | Google.Protobuf | 3.34.1 | BSD-3-Clause | <https://github.com/protocolbuffers/protobuf> |
 | Grpc.AspNetCore.Server | 2.71.0 | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
@@ -46,13 +41,8 @@ The Windows Helper service and Control Panel publish outputs include the followi
 | Microsoft.Extensions.Hosting.WindowsServices | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
 | Microsoft.Web.WebView2 | 1.0.3719.77 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/webview> |
-| Microsoft.Windows.AI.MachineLearning | 2.1.1 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
-| Microsoft.WindowsAppSDK | 2.1.3 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
-| Microsoft.WindowsAppSDK.AI | 2.1.10 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
 | Microsoft.WindowsAppSDK.Foundation | 2.0.21 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
 | Microsoft.WindowsAppSDK.InteractiveExperiences | 2.0.13 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
-| Microsoft.WindowsAppSDK.ML | 2.1.1 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
-| Microsoft.WindowsAppSDK.Widgets | 2.0.5 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
 | Microsoft.WindowsAppSDK.WinUI | 2.1.0 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
 | Mono.Posix.NETStandard | 1.0.0 | https://go.microsoft.com/fwlink/?linkid=869050 | <https://go.microsoft.com/fwlink/?linkid=869051> |
 | RAMSPDToolkit-NDD | 1.4.2 | MPL-2.0 | <https://github.com/Blacktempel/RAMSPDToolkit> |
@@ -65,5 +55,4 @@ The Windows Helper service and Control Panel publish outputs include the followi
 | System.CodeDom | 10.0.2 | MIT | <https://github.com/dotnet/dotnet> |
 | System.IO.Ports | 10.0.3 | MIT | <https://github.com/dotnet/dotnet> |
 | System.Management | 10.0.2 | MIT | <https://github.com/dotnet/dotnet> |
-| System.Numerics.Tensors | 9.0.0 | MIT | <https://github.com/dotnet/runtime> |
 | System.ServiceProcess.ServiceController | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |

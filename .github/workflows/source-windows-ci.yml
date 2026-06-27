@@ -116,6 +116,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: ./packages/installer/windows/Build-WindowsInstaller.ps1 -Configuration Release -RuntimeIdentifier win-x64 -ShoMetricsVersionPrefix 0.1.0 -Distribution FrameworkDependent
 
+      - name: Check source-windows third-party notices
+        working-directory: ${{ github.workspace }}
+        run: node scripts/generate-third-party-notices.mjs --target source-windows --check
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v7
         with:
