@@ -11,7 +11,7 @@ public partial class MainWindow
 {
     private async void OnRefreshClicked(object sender, RoutedEventArgs args)
     {
-        await RefreshStatusAsync().ConfigureAwait(true);
+        await RefreshStatusAsync(StatusRefreshReason.Manual).ConfigureAwait(true);
     }
 
     private void OnCopyDiagnosticsClicked(object sender, RoutedEventArgs args)
@@ -128,7 +128,7 @@ public partial class MainWindow
         try
         {
             await RunServiceStartCommandAsync().ConfigureAwait(true);
-            await RefreshStatusAsync().ConfigureAwait(true);
+            await RefreshStatusAsync(StatusRefreshReason.ServiceStart).ConfigureAwait(true);
         }
         catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
         {
