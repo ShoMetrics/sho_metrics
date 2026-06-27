@@ -173,6 +173,7 @@ Release workflow.
 | CI Windows helper installers | `Windows Source CI` workflow | `.github/workflows/source-windows-ci.yml` |
 | Production release dry run | `Release` workflow, run manually with `tag` and `dry_run=true` | `.github/workflows/release.yml` |
 | Production release | `Release` workflow, run manually with `tag` and `dry_run=false` | `.github/workflows/release.yml` |
+| Regenerate source-windows third-party notices | `node scripts/generate-third-party-notices.mjs --target source-windows` | `scripts/generate-third-party-notices.mjs` |
 
 The Release workflow creates the requested tag, creates a GitHub Release,
 uploads the selected product artifacts, and uploads `checksums.txt`.
@@ -185,6 +186,14 @@ versions to publish. `CHANGELOG.md` must contain a non-empty `## <tag>` section
 before the Release workflow runs. The workflow adds a short product/version
 summary before that section and publishes the combined text as the GitHub
 Release notes.
+
+When NuGet dependencies, Windows runtime dependencies, installer payloads, or
+published `.deps.json` files change, regenerate
+`packages/source-windows/THIRD_PARTY_NOTICES.md` after building both Windows
+installer distributions. The source-windows third-party notice generator reads
+the full release dependency matrix for framework-dependent and standalone
+payloads, so CI runs the matching `--check` after both installer builds and
+fails if the tracked license notice is stale.
 
 Before any production release, complete:
 

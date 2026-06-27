@@ -1,4 +1,4 @@
-import { copyFile, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,10 +6,11 @@ import { fileURLToPath } from "node:url";
 const repositoryDirectory = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const hubPackageDirectory = join(repositoryDirectory, "packages", "hub");
 const sourceWindowsDirectory = join(repositoryDirectory, "packages", "source-windows");
+const sourceWindowsInstallerBuildDirectory = join(repositoryDirectory, "artifacts", "installer", "windows", "build");
 const hubNoticePath = join(hubPackageDirectory, "THIRD_PARTY_NOTICES.md");
 const sourceWindowsNoticePath = join(sourceWindowsDirectory, "THIRD_PARTY_NOTICES.md");
 
-export async function updateThirdPartyNotices(targetList = ["hub", "source-windows"], options = {}) {
+export async function updateThirdPartyNotices(targetList = ["hub", "source-windows"]) {
     const normalizedTargetSet = new Set(targetList);
     const resultList = [];
 
@@ -18,13 +19,13 @@ export async function updateThirdPartyNotices(targetList = ["hub", "source-windo
     }
 
     if (normalizedTargetSet.has("source-windows")) {
-        resultList.push(await writeNoticeFileIfChanged(sourceWindowsNoticePath, await buildSourceWindowsThirdPartyNotices(options.sourceWindowsDepsJsonPathList ?? [])));
+        resultList.push(await writeNoticeFileIfChanged(sourceWindowsNoticePath, await buildSourceWindowsThirdPartyNotices()));
     }
 
     return resultList;
 }
 
-export async function checkThirdPartyNotices(targetList = ["hub", "source-windows"], options = {}) {
+export async function checkThirdPartyNotices(targetList = ["hub", "source-windows"]) {
     const normalizedTargetSet = new Set(targetList);
     const resultList = [];
 
@@ -33,7 +34,7 @@ export async function checkThirdPartyNotices(targetList = ["hub", "source-window
     }
 
     if (normalizedTargetSet.has("source-windows")) {
-        resultList.push(await checkNoticeFile(sourceWindowsNoticePath, await buildSourceWindowsThirdPartyNotices(options.sourceWindowsDepsJsonPathList ?? [])));
+        resultList.push(await checkNoticeFile(sourceWindowsNoticePath, await buildSourceWindowsThirdPartyNotices()));
     }
 
     return resultList;
@@ -123,8 +124,8 @@ async function buildHubThirdPartyNotices() {
     ].join("\n");
 }
 
-async function buildSourceWindowsThirdPartyNotices(sourceWindowsDepsJsonPathList) {
-    const packageEntries = await readNuGetRuntimePackageEntries(sourceWindowsDepsJsonPathList);
+async function buildSourceWindowsThirdPartyNotices() {
+    const packageEntries = await readNuGetRuntimePackageEntries(await readSourceWindowsReleaseMatrixDepsJsonPaths());
 
     return [
         "# Third-Party Notices",
@@ -182,7 +183,7 @@ function readNpmRuntimePackageEntries(packageLock) {
 
 async function readNuGetRuntimePackageEntries(sourceWindowsDepsJsonPathList) {
     if (sourceWindowsDepsJsonPathList.length === 0) {
-        throw new Error("--target source-windows requires at least one --source-windows-deps-json path from a published output.");
+        throw new Error("source-windows notices require release matrix dependency manifests. Build both Windows installer distributions first.");
     }
 
     const packageByName = new Map();
@@ -191,7 +192,12 @@ async function readNuGetRuntimePackageEntries(sourceWindowsDepsJsonPathList) {
         const depsJson = await readJson(resolve(depsJsonPath));
 
         for (const packageEntry of readNuGetPackageEntriesFromDepsJson(depsJson)) {
-            if (packageByName.has(packageEntry.name)) {
+            const existingPackageEntry = packageByName.get(packageEntry.name);
+            if (existingPackageEntry !== undefined) {
+                if (existingPackageEntry.version !== packageEntry.version) {
+                    throw new Error(`NuGet package '${packageEntry.name}' has multiple runtime versions in source-windows release outputs: ${existingPackageEntry.version}, ${packageEntry.version}.`);
+                }
+
                 continue;
             }
 
@@ -206,6 +212,38 @@ async function readNuGetRuntimePackageEntries(sourceWindowsDepsJsonPathList) {
     }
 
     return sortPackageEntries([...packageByName.values()]);
+}
+
+async function readSourceWindowsReleaseMatrixDepsJsonPaths() {
+    const depsJsonPathList = [];
+    for (const distributionDirectoryName of ["framework-dependent", "standalone"]) {
+        for (const payloadDirectoryName of ["service", "control-panel"]) {
+            depsJsonPathList.push(await readRequiredDepsJsonPath(distributionDirectoryName, payloadDirectoryName));
+        }
+    }
+
+    return depsJsonPathList;
+}
+
+async function readRequiredDepsJsonPath(distributionDirectoryName, payloadDirectoryName) {
+    const payloadDirectory = join(sourceWindowsInstallerBuildDirectory, distributionDirectoryName, "payload", payloadDirectoryName);
+    const candidatePathList = payloadDirectoryName === "service"
+        ? [
+            join(payloadDirectory, "ShoMetricsHelperService.deps.json"),
+            join(payloadDirectory, "ShoMetrics.Source.Windows.Service.deps.json"),
+        ]
+        : [
+            join(payloadDirectory, "ShoMetricsHelper.deps.json"),
+            join(payloadDirectory, "ShoMetrics.Source.Windows.ControlPanel.deps.json"),
+        ];
+
+    for (const candidatePath of candidatePathList) {
+        if (await fileExists(candidatePath)) {
+            return candidatePath;
+        }
+    }
+
+    throw new Error(`Published dependency manifest was not found for ${distributionDirectoryName}/${payloadDirectoryName}. Build both Windows installer distributions before generating source-windows notices.`);
 }
 
 function readNuGetPackageEntriesFromDepsJson(depsJson) {
@@ -397,6 +435,15 @@ async function readOptionalText(path) {
     }
 }
 
+async function fileExists(path) {
+    try {
+        await access(path);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function decodeXmlText(value) {
     return value
         .replaceAll("&amp;", "&")
@@ -408,7 +455,6 @@ function decodeXmlText(value) {
 
 async function main(argumentList) {
     const targetList = [];
-    const sourceWindowsDepsJsonPathList = [];
     let shouldCheck = false;
 
     for (let argumentIndex = 0; argumentIndex < argumentList.length; argumentIndex += 1) {
@@ -429,26 +475,12 @@ async function main(argumentList) {
             continue;
         }
 
-        if (argument === "--source-windows-deps-json") {
-            const depsJsonPath = argumentList[argumentIndex + 1];
-            if (depsJsonPath === undefined || depsJsonPath.startsWith("--")) {
-                throw new Error("--source-windows-deps-json requires a value.");
-            }
-
-            sourceWindowsDepsJsonPathList.push(depsJsonPath);
-            argumentIndex += 1;
-            continue;
-        }
-
         throw new Error(`Unsupported argument: ${argument}`);
     }
 
     let noticeTargetList = targetList;
     if (noticeTargetList.length === 0) {
         noticeTargetList = ["hub"];
-        if (sourceWindowsDepsJsonPathList.length > 0) {
-            noticeTargetList = ["hub", "source-windows"];
-        }
     }
     for (const target of noticeTargetList) {
         if (target !== "hub" && target !== "source-windows") {
@@ -457,8 +489,8 @@ async function main(argumentList) {
     }
 
     const resultList = shouldCheck
-        ? await checkThirdPartyNotices(noticeTargetList, { sourceWindowsDepsJsonPathList })
-        : await updateThirdPartyNotices(noticeTargetList, { sourceWindowsDepsJsonPathList });
+        ? await checkThirdPartyNotices(noticeTargetList)
+        : await updateThirdPartyNotices(noticeTargetList);
     for (const result of resultList) {
         const relativePath = result.path.startsWith(repositoryDirectory)
             ? result.path.slice(repositoryDirectory.length + 1)

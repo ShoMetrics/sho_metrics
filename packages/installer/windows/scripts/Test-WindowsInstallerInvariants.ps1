@@ -204,6 +204,9 @@ Assert-Contains -Name "Installer payload output is separated by distribution" -T
 Assert-Contains -Name "CI uploads installers from distribution subdirectories" -Text $ciWorkflowText -Pattern 'artifacts/installer/windows/setup/\*\*/\*\.exe'
 Assert-Contains -Name "Control Panel publish output blocks unused ONNX Runtime payload" -Text $publishControlPanelScriptText -Pattern 'onnxruntime\.dll'
 Assert-Contains -Name "Control Panel publish output blocks unused DirectML payload" -Text $publishControlPanelScriptText -Pattern 'DirectML\.dll'
+Assert-NotContains -Name "Installer build must not rewrite tracked source-windows third-party notices" -Text $buildScriptText -Pattern 'generate-third-party-notices\.mjs'
+Assert-NotContains -Name "Service publish must not rewrite tracked source-windows third-party notices" -Text $publishServiceScriptText -Pattern 'generate-third-party-notices\.mjs'
+Assert-NotContains -Name "Control Panel publish must not rewrite tracked source-windows third-party notices" -Text $publishControlPanelScriptText -Pattern 'generate-third-party-notices\.mjs'
 Assert-Contains -Name "Control Panel starts the service executable only through the fixed command" -Text $controlPanelMainWindowText -Pattern 'ServiceStartCommand\s*=\s*"--start-service"'
 Assert-Contains -Name "Control Panel elevates only the service executable" -Text $controlPanelMainWindowText -Pattern 'ServiceExecutableName\s*=\s*"ShoMetricsHelperService\.exe"'
 # "runas" is the UAC boundary. Keep exactly one call site because extra
