@@ -102,12 +102,17 @@
                                        Text="Check ShoMetrics Helper, driver access, and sensor diagnostics."
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="0"
-                                       Text="Closing this panel does not stop the background service."
-                                       FontWeight="SemiBold"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
+                            <StackPanel Grid.Row="2"
+                                        Grid.Column="0"
+                                        Spacing="2">
+                                <TextBlock Text="This panel is only for diagnostics. You can close it anytime."
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="Closing this panel does not stop the background service."
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
 
                             <StackPanel Grid.Row="0"
                                         Grid.Column="1"

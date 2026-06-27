@@ -56,7 +56,7 @@ internal sealed record UpdateAppcastStatus
             CheckedAt = checkedAt,
             CurrentVersionText = FormatDisplayVersion(currentVersion),
             StatusText = "Up to date",
-            DetailText = "This Control Panel version is the latest version in the selected update feed.",
+            DetailText = "You're up to date.",
             ReleaseNotesUri = null,
             DownloadUri = null,
         };
