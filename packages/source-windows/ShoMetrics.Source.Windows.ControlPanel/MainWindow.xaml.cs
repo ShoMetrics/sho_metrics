@@ -12,19 +12,25 @@ public partial class MainWindow : Window
     private const string PawnIoInstallUrl = "https://pawnio.eu/";
     private const int MinimumWindowWidthDips = 900;
     private const int MinimumWindowHeightDips = 480;
+    private const int StartupStatusRetryLimit = 6;
+    private const int StatusRefreshTimeoutSeconds = 12;
     private const double NavigationMinimalWidthDips = 1008;
     private const double DiagnosticValueColumnWidthRatio = 0.62;
     private const string ServiceExecutableName = "ShoMetricsHelperService.exe";
     private const string ServiceStartCommand = "--start-service";
+    private static readonly TimeSpan StartupStatusRetryInterval = TimeSpan.FromSeconds(3);
 
     private readonly HelperControlPanelStatusReader _statusReader = new();
     private readonly UpdateAppcastClient _updateAppcastClient = new();
     private readonly DispatcherTimer _checkedAtTimer = new();
+    private readonly DispatcherTimer _startupStatusRetryTimer = new();
     private HelperControlPanelStatus? _currentStatus;
     private UpdateAppcastStatus _currentUpdateStatus = UpdateAppcastStatus.Initial(ControlPanelIdentity.Version);
     private bool? _isNavigationMinimal;
     private bool _hasStartedAutomaticUpdateCheck;
     private bool _isCheckingForUpdates;
+    private bool _isRefreshingStatus;
+    private int _startupStatusRetryCount;
 
     /// <summary>
     /// Creates the normal-user status surface and wires lightweight service recovery actions.
@@ -49,13 +55,17 @@ public partial class MainWindow : Window
         _checkedAtTimer.Interval = TimeSpan.FromSeconds(1);
         _checkedAtTimer.Tick += OnCheckedAtTimerTick;
         _checkedAtTimer.Start();
-        _ = RefreshStatusAsync();
+        _startupStatusRetryTimer.Interval = StartupStatusRetryInterval;
+        _startupStatusRetryTimer.Tick += OnStartupStatusRetryTimerTick;
+        _ = RefreshStatusAsync(StatusRefreshReason.PanelStartupInitialTry);
         ControlPanelStartupLog.Write("MainWindow ctor exit");
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _checkedAtTimer.Stop();
+        _startupStatusRetryTimer.Stop();
+        _startupStatusRetryTimer.Tick -= OnStartupStatusRetryTimerTick;
         WarningDiagnosticsCard.SizeChanged -= OnDiagnosticValueCardSizeChanged;
         RootGrid.Loaded -= OnRootGridLoaded;
         RootGrid.SizeChanged -= OnRootGridSizeChanged;

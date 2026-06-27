@@ -148,7 +148,7 @@ public partial class MainWindow
             return;
         }
 
-        CheckedAtItem.Content = $"Last checked: {FormatCheckedAge(_currentStatus.CheckedAt, now)}";
+        CheckedAtItem.Content = $"Checked: {FormatCheckedAge(_currentStatus.CheckedAt, now)}";
     }
 
     private void ApplyStatusIcon(FontIcon icon, ControlPanelStatusTone tone)
