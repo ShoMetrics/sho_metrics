@@ -149,6 +149,13 @@ subscriber refresh fan-out. They should be derived from existing
   inactive.
 - `failed`: no runner refreshed and at least one runner failed.
 
+Aggregate precedence is part of the contract:
+
+- if at least one runner refreshed and at least one runner did not, return
+  `partial` regardless of the non-refreshed statuses;
+- otherwise, when no runner refreshed, use `failed > pending > backoff >
+  skipped`.
+
 Do not include source-specific data in these public aggregate types. If logs
 need source details, log them inside runner/supervisor, where collector-group
 context already exists.

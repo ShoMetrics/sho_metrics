@@ -18,12 +18,24 @@ import {
 } from "./metric-store-ingest-diagnostics";
 import type { MetricStoreIngestReport } from "../metric-store";
 
+/** Result status for one collector group runner refresh attempt. */
 export type CollectorGroupRefreshStatus =
+    /** The runner completed a source read and ingested the snapshot. */
     | "refreshed"
+
+    /** The source read threw and the runner recorded failure backoff. */
     | "failed"
+
+    /** The runner did not read because retry backoff blocked the attempt. */
     | "skippedBackoff"
+
+    /** The runner did not read because another refresh was already in flight. */
     | "skippedPending"
+
+    /** The runner read completed after its collector group generation changed. */
     | "skippedSuperseded"
+
+    /** The runner was stopped before the attempt could produce usable data. */
     | "stopped";
 
 export interface CollectorGroupRefreshResult {
@@ -204,6 +216,11 @@ export class CollectorGroupRunner {
                 this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
             }
         }
+    }
+
+    /** Whether this runner currently backs the given subscriber id. */
+    hasSubscriber(subscriberId: string): boolean {
+        return this.collectorGroup.subscriberIds.includes(subscriberId);
     }
 
     private async refresh(refreshGeneration: number): Promise<CollectorGroupRefreshResult> {
