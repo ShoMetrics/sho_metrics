@@ -38,6 +38,7 @@
 		"Tooltip": "在一个按键上轮播多个指标小组件。",
 		"Encoder": {
 			"TriggerDescription": {
+				"Push": "刷新",
 				"Rotate": "切换指标"
 			}
 		}

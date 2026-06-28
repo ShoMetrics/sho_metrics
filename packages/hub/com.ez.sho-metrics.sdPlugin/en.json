@@ -38,6 +38,7 @@
 		"Tooltip": "Rotates between multiple metric widgets on one key.",
 		"Encoder": {
 			"TriggerDescription": {
+				"Push": "Refresh",
 				"Rotate": "Switch metric"
 			}
 		}

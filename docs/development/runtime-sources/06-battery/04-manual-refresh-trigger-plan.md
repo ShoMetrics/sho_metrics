@@ -10,14 +10,20 @@ this document disagree, stop and resolve the drift before coding.
 
 - A supported user interaction requests a refresh for the current widget.
 - Keypad actions use `onKeyDown`.
-- Encoder/touch-strip actions use `onTouchTap`.
+- Encoder/touch-strip actions use physical `onDialDown`. Touch tap is not bound
+  in v1.
 - Dense refreshes the whole widget. It must not refresh only battery rows or a
   selected row.
-- Stacked Metric does not get manual refresh in v1. It already uses key press
-  and dial rotation for slot switching.
-- Feedback is a small lower-left frame badge using the existing Stacked badge
-  visual language. It is a static refresh icon plus ellipsis state, not an
-  animated loader.
+- Stacked Metric key press advances to the next slot and requests refresh for
+  the whole stacked widget. Encoder push refreshes, and encoder rotation
+  continues to switch metrics.
+- Feedback is a small upper-right frame badge using the existing frame badge
+  visual language. It is a static refresh icon, not an animated loader.
+- The feedback badge is an interaction acknowledgement: it means the refresh
+  request was accepted and sent to background collection. It is not a guarantee
+  that the displayed value changed or that hardware returned a fresh value.
+- The feedback badge must remain visible for at least 300 ms. If collection is
+  still pending after that, keep the badge visible until the request settles.
 - This feature is not battery-only. Battery motivates it, but every supported
   metric widget should use the same interaction contract.
 - Runtime may return several diagnostic aggregate statuses, but the user-visible
@@ -316,7 +322,7 @@ Implement:
 
 Required visual behavior:
 
-- Static icon plus ellipsis only.
+- Static icon only.
 - No animation timers.
 - No per-frame animation render loop.
 - Works for square key and touch strip render sizes.
@@ -325,7 +331,7 @@ Required visual behavior:
 Required tests:
 
 - No refresh indicator renders when option is absent.
-- Refresh indicator renders lower-left when option is present.
+- Refresh indicator renders upper-right when option is present.
 - Stacked indicator still renders lower-right.
 - Both indicators can render in one frame without replacing each other.
 - Body viewport output is unchanged when only the overlay option changes.
@@ -347,24 +353,21 @@ Implement:
 
 - Add shared manual refresh handling to `MetricAction`.
 - Keypad: override `onKeyDown` and request refresh for `event.action.id`.
-- Touch strip: override `onTouchTap` and request refresh for `event.action.id`.
-- During implementation, verify that non-Stacked touch-strip metric actions
-  actually receive `onTouchTap`, and that tap handling does not conflict with
-  dial down/up semantics.
+- Touch strip: override `onDialDown` and request refresh for `event.action.id`.
+- Touch tap is intentionally unbound in v1.
 - The call must use `backgroundMetricCollection.requestSubscriberRefresh`.
 - Add action-owned transient indicator state keyed by action id.
 - Repeated presses while the action already has a manual refresh pending should
   not create multiple overlay flickers.
 - `onWillDisappear` must clear indicator state and any lifecycle-owned timer.
-- Add a protected opt-out method, for example
-  `shouldHandleManualRefreshInteraction()`. The default should be true.
-- `StackedMetric` must opt out in v1 because its key press and dial rotation
-  are slot navigation.
+- `StackedMetric` key down must keep its existing slot switch and then reuse
+  the shared manual refresh path. Dial down should inherit the shared manual
+  refresh behavior.
 - Pass the action-owned indicator state into render options using the explicit
   Step 5 refresh indicator option.
 - When manual refresh is requested, render once with refresh indicator visible.
-- When the awaited aggregate result settles, render again to clear the
-  indicator.
+- When the awaited aggregate result settles and the 300 ms minimum visible
+  duration has elapsed, render again to clear the indicator.
 
 Required behavior:
 
@@ -379,6 +382,9 @@ Required behavior:
   indicator if the runtime returns `missingSubscriber`.
 - A pending/backoff/skipped result can still acknowledge the interaction with
   the transient badge. Do not invent source values.
+- Repeated interactions while feedback is visible must not start another action
+  request. They are coalesced by action-owned feedback state. Runner-level
+  pending/backoff/coalescing remains separate.
 - Do not change action settings on press/tap.
 - Do not call `refreshMetricKeys`.
 - Do not special-case battery.
@@ -390,18 +396,22 @@ Required behavior:
 Required tests:
 
 - Base metric action key down calls collection refresh.
-- Base metric action touch tap calls collection refresh.
+- Base metric action dial down calls collection refresh.
 - Repeated key down while pending coalesces indicator state without adding
   source-read de-dupe in the action.
-- Indicator state clears when the awaited refresh request settles.
+- Indicator state remains visible when the awaited refresh request settles
+  before the 300 ms minimum visible duration.
+- Indicator state remains visible after 300 ms while the awaited refresh
+  request is still pending.
 - Indicator state clears on `onWillDisappear`.
 - A normal metric action passes refresh indicator options while pending.
 - Dense passes refresh indicator options while pending.
 - A `missingSubscriber` result does not crash and does not require a visible
   badge.
 - Pending/backoff/skipped aggregate statuses do not create separate UI states.
-- Stacked does not pass refresh indicator options for manual refresh.
-- Stacked key down still switches slots and does not request collection refresh.
+- Stacked passes refresh indicator options while manual refresh is pending.
+- Stacked key down switches slots and requests collection refresh.
+- Stacked dial down requests collection refresh without switching slots.
 
 Do not merge this with Step 5. Step 5 proves the renderer can draw a supplied
 state. Step 6 proves actions create, clear, and pass that state at the right
@@ -425,11 +435,38 @@ Manual validation:
 - A 1-second metric does not start overlapping source reads when pressed
   repeatedly.
 - Dense with mixed metrics refreshes as one widget.
-- Stacked key press still switches slots.
+- Stacked key press switches slots and refreshes.
 - Stacked dial rotation still switches slots.
-- Touch-strip tap refreshes a non-Stacked action.
-- Refresh badge appears lower-left and clears.
+- Stacked encoder push refreshes.
+- Touch-strip physical press refreshes a non-Stacked action.
+- Refresh badge appears upper-right and clears.
 - Stacked slot badge remains lower-right.
+
+## Manual Validation Notes
+
+Validated on 2026-06-28 with temporary action logs after commit `d285092`.
+
+- CPU rapid presses: 138 accepted requests, 123 repeated interactions ignored
+  while feedback was visible, and 138 request-settled/minimum-visible/cleared
+  lifecycles. Every accepted request cleared.
+- Battery/System rapid presses: 19 accepted requests, 144 repeated
+  interactions ignored while feedback was visible, and 19
+  request-settled/minimum-visible/cleared lifecycles. Every accepted request
+  cleared.
+- Alternating CPU and Battery/System presses showed independent per-action
+  coalescing. CPU continued to accept new requests between Battery/System slow
+  refresh windows; Battery/System repeated presses were ignored until its
+  pending feedback cleared.
+- CPU requests settled before the 300 ms minimum visible duration in all
+  observed cases. The badge stayed visible until the minimum elapsed.
+- Battery/System requests usually outlived the 300 ms minimum visible duration.
+  The badge stayed visible until the request settled.
+- No stuck badge, missing clear, timer leak, or cross-action blocking was
+  observed.
+
+These notes describe action feedback behavior only. The throttled
+`subscriberRefresh` debug log is not one line per accepted interaction and must
+not be used as a request count.
 
 ## Drift Alarms
 
@@ -442,7 +479,7 @@ Stop and ask before continuing if implementation requires any of these:
 - adding a generic renderer overlay bag;
 - persisting refresh state in settings;
 - pushing source results directly into `MetricStore` from a notification;
-- changing Stacked key press or dial rotation semantics;
+- removing Stacked key press or dial rotation slot-navigation semantics;
 - adding an animation loop for the badge;
 - letting `MetricAction` branch on metric domain to decide refresh behavior.
 

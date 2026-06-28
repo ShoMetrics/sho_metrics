@@ -38,6 +38,7 @@
 		"Tooltip": "1 つのキーで複数のメトリクスウィジェットを切り替えます。",
 		"Encoder": {
 			"TriggerDescription": {
+				"Push": "更新",
 				"Rotate": "メトリクスを切り替え"
 			}
 		}

@@ -125,16 +125,13 @@ export class StackedMetric extends MetricAction {
 
     override onKeyDown(event: KeyDownEvent): void {
         this.switchActiveSlot(event.action.id, 1);
+        super.onKeyDown(event);
     }
 
     override onDialRotate(event: DialRotateEvent): void {
         if (event.payload.ticks !== 0) {
             this.switchActiveSlot(event.action.id, event.payload.ticks);
         }
-    }
-
-    protected override shouldHandleManualRefreshInteraction(): boolean {
-        return false;
     }
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
@@ -272,7 +269,7 @@ export class StackedMetric extends MetricAction {
             consumerSlug: buildStackedCustomHttpConsumerSlug(activeSlot.slotId),
         });
 
-        setMetricView({
+        const stackedViewOptions = {
             ...viewOptions,
             // The active slot renders exactly like a single metric. Stacked
             // adds indicator data only after a completed switch, so the
@@ -280,7 +277,9 @@ export class StackedMetric extends MetricAction {
             ...(actionState?.indicatorVisible === true
                 ? { stackedIndicator: buildStackedMetricIndicator(widget, activeSlot) }
                 : {}),
-        });
+        };
+
+        setMetricView(this.withManualRefreshIndicator(event, stackedViewOptions));
     }
 
     protected isIndicatorVisibleForTest(actionId: string): boolean {

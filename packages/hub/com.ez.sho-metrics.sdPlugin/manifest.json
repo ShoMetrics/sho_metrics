@@ -249,6 +249,7 @@
 				"Icon": "imgs/actions/sho-metrics/icon",
 				"layout": "$B1",
 				"TriggerDescription": {
+					"Push": "Refresh",
 					"Rotate": "Switch metric"
 				}
 			},
