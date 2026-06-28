@@ -13,12 +13,10 @@ import type { MetricRenderAppearance } from "./render-appearance";
  */
 export type MetricRefreshIndicator = "visible";
 
-const INDICATOR_WIDTH = 42;
+const INDICATOR_WIDTH = 20;
 const INDICATOR_HEIGHT = 16;
 const INDICATOR_CORNER_RADIUS = 7;
 const REFRESH_ICON_SIZE = 10.5;
-const DOT_RADIUS = 1.45;
-const DOT_GAP = 4.2;
 const REFRESH_ICON = createLucideIconDefinition({
     id: "manual-refresh",
     node: RefreshCw,
@@ -37,13 +35,13 @@ export function renderMetricRefreshIndicator(options: {
         width: INDICATOR_WIDTH,
         height: INDICATOR_HEIGHT,
         cornerRadius: INDICATOR_CORNER_RADIUS,
-        corner: "lowerLeft",
+        corner: "upperRight",
         renderContent: renderRefreshIndicatorContent,
     });
 }
 
 function renderRefreshIndicatorContent(foregroundColor: string, box: FrameBadgeBox): string {
-    const iconCenterXCoordinate = box.xCoordinate + 12;
+    const iconCenterXCoordinate = box.xCoordinate + (box.width / 2);
     const centerYCoordinate = box.yCoordinate + (box.height / 2);
 
     return `
@@ -51,24 +49,5 @@ function renderRefreshIndicatorContent(foregroundColor: string, box: FrameBadgeB
             transform="translate(${iconCenterXCoordinate.toFixed(2)} ${centerYCoordinate.toFixed(2)})">
             ${renderCenteredIconFragment(REFRESH_ICON, REFRESH_ICON_SIZE)}
         </g>
-        <g class="metric-refresh-indicator-ellipsis">
-        ${renderEllipsisDots({
-            firstDotXCoordinate: box.xCoordinate + 27,
-            centerYCoordinate,
-            color: foregroundColor,
-        })}
-        </g>
     `;
-}
-
-function renderEllipsisDots(options: {
-    readonly firstDotXCoordinate: number;
-    readonly centerYCoordinate: number;
-    readonly color: string;
-}): string {
-    return Array.from({ length: 3 }, (_, index) => `
-        <circle cx="${(options.firstDotXCoordinate + (index * DOT_GAP)).toFixed(2)}"
-            cy="${options.centerYCoordinate.toFixed(2)}" r="${DOT_RADIUS}"
-            fill="${options.color}" />
-    `).join("");
 }

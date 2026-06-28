@@ -877,7 +877,7 @@ test("refresh indicator is absent by default", () => {
     assert.doesNotMatch(frame.svg, /class="metric-refresh-indicator"/);
 });
 
-test("refresh indicator renders as a bottom-left overlay", () => {
+test("refresh indicator renders as a top-right overlay", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
             widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
@@ -887,10 +887,9 @@ test("refresh indicator renders as a bottom-left overlay", () => {
     });
 
     assert.match(frame.svg, /class="metric-refresh-indicator"/);
-    assert.match(frame.svg, /<rect x="5\.00" y="123\.00"[\s\S]*width="42\.00" height="16\.00"/);
+    assert.match(frame.svg, /<rect x="119\.00" y="5\.00"[\s\S]*width="20\.00" height="16\.00"/);
     assert.match(frame.svg, /class="metric-refresh-indicator-icon"/);
-    assert.match(frame.svg, /class="metric-refresh-indicator-ellipsis"/);
-    assert.match(frame.svg, /<circle cx="32\.00"[\s\S]*r="1\.45"/);
+    assert.doesNotMatch(frame.svg, /class="metric-refresh-indicator-ellipsis"/);
 });
 
 test("refresh indicator can render beside stacked indicator", () => {
@@ -908,7 +907,7 @@ test("refresh indicator can render beside stacked indicator", () => {
 
     assert.match(frame.svg, /class="metric-refresh-indicator"/);
     assert.match(frame.svg, /class="stacked-metric-indicator"/);
-    assert.match(frame.svg, /<rect x="5\.00" y="123\.00"[\s\S]*width="42\.00" height="16\.00"/);
+    assert.match(frame.svg, /<rect x="119\.00" y="5\.00"[\s\S]*width="20\.00" height="16\.00"/);
     assert.match(frame.svg, /<rect x="113\.20" y="124\.60"[\s\S]*width="25\.80" height="14\.40"/);
 });
 
@@ -999,7 +998,7 @@ test("refresh indicator uses touch strip coordinates", () => {
     });
 
     assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
-    assert.match(frame.svg, /<rect x="5\.00" y="79\.00"[\s\S]*width="42\.00" height="16\.00"/);
+    assert.match(frame.svg, /<rect x="175\.00" y="5\.00"[\s\S]*width="20\.00" height="16\.00"/);
 });
 
 function buildSingleMetricRenderOptions(options: {

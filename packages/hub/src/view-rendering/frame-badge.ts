@@ -3,6 +3,7 @@ import { buildSvgFilterAttributes } from "./render-svg-effects";
 import { parseHexColor, resolveReadableTextColor } from "../shared/color-utils";
 import type { KeySize } from "./widget-data";
 
+/** SVG bounds of a badge inside the full rendered frame. */
 export interface FrameBadgeBox {
     readonly xCoordinate: number;
     readonly yCoordinate: number;
@@ -10,7 +11,14 @@ export interface FrameBadgeBox {
     readonly height: number;
 }
 
-export type FrameBadgeCorner = "lowerLeft" | "lowerRight";
+/**
+ * Frame corners currently safe for transient badge overlays.
+ *
+ * The current view styles reserve broadly safe overlay space only on the
+ * right-side corners. Add left-side corners only together with view-specific
+ * spacing changes; title-card and similar layouts otherwise collide with them.
+ */
+export type FrameBadgeCorner = "lowerRight" | "upperRight";
 
 const FRAME_BADGE_MARGIN = 5;
 const FRAME_BADGE_STROKE_WIDTH = 0.75;
@@ -54,13 +62,14 @@ function resolveFrameBadgeBox(options: {
     readonly height: number;
     readonly corner: FrameBadgeCorner;
 }): FrameBadgeBox {
-    const xCoordinate = options.corner === "lowerLeft"
+    const xCoordinate = options.size.width - FRAME_BADGE_MARGIN - options.width;
+    const yCoordinate = options.corner === "upperRight"
         ? FRAME_BADGE_MARGIN
-        : options.size.width - FRAME_BADGE_MARGIN - options.width;
+        : options.size.height - FRAME_BADGE_MARGIN - options.height;
 
     return {
         xCoordinate,
-        yCoordinate: options.size.height - FRAME_BADGE_MARGIN - options.height,
+        yCoordinate,
         width: options.width,
         height: options.height,
     };

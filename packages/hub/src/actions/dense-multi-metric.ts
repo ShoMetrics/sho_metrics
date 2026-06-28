@@ -210,7 +210,7 @@ export class DenseMultiMetric extends MetricAction {
             ?.metricKey
             ?? "dense-multi-metric";
 
-        setMetricView({
+        setMetricView(this.withManualRefreshIndicator(event, {
             event,
             metricRenderKind: "denseMetric",
             metricKey: firstMetricKey,
@@ -219,7 +219,7 @@ export class DenseMultiMetric extends MetricAction {
             // TODO(dense-render-contract): split dense render options from single/dual-only icon requirements.
             centerIconFragment: "",
             statusIcon: getMetricStatusIcon("percentage"),
-        });
+        }));
     }
 
     protected buildDenseWidgetData(event: WillAppearEvent): DenseMetricWidgetData {

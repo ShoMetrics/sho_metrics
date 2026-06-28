@@ -51,12 +51,12 @@ export class System extends MetricAction {
         const settings = this.resolveSettings(event);
         const target = readResolvedMetricTarget(settings, "system");
 
-        setMetricView(buildSystemViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildSystemViewOptions({
             event,
             settings,
             target,
             metrics: this.getMetricReader(event),
-        }));
+        })));
     }
 
     protected override onResolvedSettingsChanged(event: WillAppearEvent, settings: ResolvedWidgetSettings): void {

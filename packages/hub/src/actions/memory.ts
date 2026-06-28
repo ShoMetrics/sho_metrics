@@ -27,12 +27,12 @@ export class Memory extends MetricAction {
         const settings = this.resolveSettings(event);
         const target = readResolvedMetricTarget(settings, "memory");
 
-        setMetricView(buildMemoryMetricViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildMemoryMetricViewOptions({
             event,
             settings,
             target,
             metrics: this.getMetricReader(event),
-        }));
+        })));
     }
 }
 
@@ -68,4 +68,3 @@ export function buildMemoryMetricViewOptions(options: {
         ...buildMetricViewIcons({ hardware: "memory", status: "percentage" }),
     };
 }
-

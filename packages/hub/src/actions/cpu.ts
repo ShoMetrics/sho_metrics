@@ -45,13 +45,13 @@ export class Cpu extends MetricAction {
         const cpuTarget = readResolvedMetricTarget(settings, "cpu");
         const metrics = this.getMetricReader(event);
 
-        setMetricView(buildCpuViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildCpuViewOptions({
             event,
             settings,
             target: cpuTarget,
             metrics,
             helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
-        }));
+        })));
     }
 }
 

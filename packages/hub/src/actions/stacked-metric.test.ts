@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type {
+    DialDownEvent,
     DialRotateEvent,
     KeyDownEvent,
     PropertyInspectorDidAppearEvent,
@@ -75,9 +76,26 @@ test("stacked metric key press switches to the next slot and resets timers", () 
 
         assert.equal(action.activeSlotId(streamDeckAction.id), "slot-2");
         assert.equal(action.indicatorVisible(streamDeckAction.id), true);
+        assert.deepEqual(action.subscriberRefreshActionIds, []);
         assert.deepEqual(timers.clearedHandles, [firstAutoTimer]);
         assert.equal(timers.scheduledTimers.at(-2)?.delayMilliseconds, 1000);
         assert.equal(timers.scheduledTimers.at(-1)?.delayMilliseconds, 3000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("stacked metric dial down does not request manual collection refresh", () => {
+    const timers = new FakeTimerScheduler();
+    const action = new TestStackedMetric(timers);
+    const streamDeckAction = new FakeStreamDeckAction("stacked-dial-down-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedWidgetSettings()));
+        action.onDialDown(buildDialDownEvent(streamDeckAction));
+
+        assert.deepEqual(action.subscriberRefreshActionIds, []);
+        assert.equal(action.activeSlotId(streamDeckAction.id), "slot-1");
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
     }
@@ -278,6 +296,7 @@ class TestStackedMetric extends StackedMetric {
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
     readonly customHttpSourceEditorResponses: CustomHttpSourceEditorResponse[] = [];
+    readonly subscriberRefreshActionIds: string[] = [];
 
     constructor(
         timerScheduler: StackedMetricTimerScheduler,
@@ -365,6 +384,11 @@ class TestStackedMetric extends StackedMetric {
     ): Promise<void> {
         void event;
         this.runtimeCachePatchList.push(patch);
+        return Promise.resolve();
+    }
+
+    protected override requestSubscriberRefresh(actionId: string): Promise<void> {
+        this.subscriberRefreshActionIds.push(actionId);
         return Promise.resolve();
     }
 }
@@ -527,6 +551,10 @@ function buildPropertyInspectorDidAppearEvent(action: FakeStreamDeckAction): Pro
 
 function buildKeyDownEvent(action: FakeStreamDeckAction): KeyDownEvent {
     return { action } as unknown as KeyDownEvent;
+}
+
+function buildDialDownEvent(action: FakeStreamDeckAction): DialDownEvent {
+    return { action } as unknown as DialDownEvent;
 }
 
 function buildDialRotateEvent(action: FakeStreamDeckAction, ticks: number): DialRotateEvent {

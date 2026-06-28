@@ -81,12 +81,12 @@ export class CustomMetric extends MetricAction {
         const settings = this.resolveSettings(event);
         const target = readResolvedMetricTarget(settings, "customMetric");
 
-        setMetricView(buildCustomMetricViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildCustomMetricViewOptions({
             event,
             settings,
             target,
             ...(target.configuration.state === "configured" ? { metrics: this.getMetricReader(event) } : {}),
-        }));
+        })));
     }
 
 }

@@ -133,6 +133,10 @@ export class StackedMetric extends MetricAction {
         }
     }
 
+    protected override shouldHandleManualRefreshInteraction(): boolean {
+        return false;
+    }
+
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         return listStackedMetricReadPlanKeys(this.buildStackedReadPlan(event));
     }
