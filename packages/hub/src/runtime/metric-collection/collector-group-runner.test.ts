@@ -89,6 +89,162 @@ test("refreshNow records failure backoff and skips attempts during cooldown", as
     );
 });
 
+test("requestOnDemandRefresh reads immediately and writes scoped samples to MetricStore", async () => {
+    const metricStore = new MetricStore();
+    const sourceClient = new FakeSourceClient([
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient,
+        snapshotStore: metricStore,
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+    });
+
+    assert.deepEqual(await runner.requestOnDemandRefresh(), { status: "refreshed" });
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+    assert.equal(
+        metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").current,
+        42,
+    );
+});
+
+test("requestOnDemandRefresh clears a later scheduled poll before reading", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient([
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        buildSnapshot(2000, { "cpu.usage_percent": 55 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+
+    assert.equal(fakeTimer.activeHandleCount(), 1);
+
+    assert.deepEqual(await runner.requestOnDemandRefresh(), { status: "refreshed" });
+
+    assert.equal(fakeTimer.activeHandleCount(), 1);
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 1000, 1000]);
+});
+
+test("requestOnDemandRefresh schedules the next poll from trigger completion", async () => {
+    const fakeTimer = new FakeTimer();
+    const triggeredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient([
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        triggeredSnapshot.promise,
+        buildSnapshot(3000, { "cpu.usage_percent": 77 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+    const onDemandRefreshPromise = runner.requestOnDemandRefresh();
+
+    await fakeTimer.advanceBy(100_000);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+
+    triggeredSnapshot.resolve(buildSnapshot(2000, { "cpu.usage_percent": 55 }));
+    assert.deepEqual(await onDemandRefreshPromise, { status: "refreshed" });
+
+    await fakeTimer.advanceBy(999);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+
+    await fakeTimer.advanceBy(1);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+});
+
+test("requestOnDemandRefresh skips without reading while another refresh is pending", async () => {
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient([deferredSnapshot.promise]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+    });
+
+    const firstRefreshPromise = runner.refreshNow();
+
+    assert.deepEqual(await runner.requestOnDemandRefresh(), { status: "skippedPending" });
+
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 42 }));
+
+    assert.deepEqual(await firstRefreshPromise, { status: "refreshed" });
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+});
+
+test("requestOnDemandRefresh respects backoff without clearing the scheduled poll", async () => {
+    let currentTimestampMilliseconds = 0;
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient([
+        Promise.reject(new Error("source failed")),
+        buildSnapshot(2000, { "cpu.usage_percent": 55 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => currentTimestampMilliseconds, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+
+    assert.equal(fakeTimer.activeHandleCount(), 1);
+    assert.deepEqual(await runner.requestOnDemandRefresh(), { status: "skippedBackoff" });
+    assert.equal(fakeTimer.activeHandleCount(), 1);
+
+    currentTimestampMilliseconds = 1000;
+    await fakeTimer.advanceBy(1000);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.usage_percent"],
+    ]);
+});
+
 test("refreshNow reports collector group no-data when refreshed snapshot has no requested keys", async () => {
     const noDataObserver = new RecordingCollectorGroupNoDataObserver();
     const runner = new CollectorGroupRunner({
@@ -305,6 +461,65 @@ test("updateCollectorGroup queues an immediate refresh after a pending old gener
         ["cpu.model"],
     ]);
     assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 0, 5000]);
+});
+
+test("requestOnDemandRefresh keeps the settings-change trailing refresh while pending", async () => {
+    const fakeTimer = new FakeTimer();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient([
+        deferredSnapshot.promise,
+        buildSnapshot(2000, { "cpu.model": 1 }),
+    ]);
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient,
+        snapshotStore: new MetricStore(),
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    runner.start();
+    await fakeTimer.runNext();
+    runner.updateCollectorGroup(buildCollectorGroup({
+        metricKeys: ["cpu.model"],
+        intervalMilliseconds: 5000,
+    }));
+
+    assert.deepEqual(await runner.requestOnDemandRefresh(), { status: "skippedPending" });
+
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 99 }));
+    await fakeTimer.drainMicrotasks();
+    await fakeTimer.runNext();
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["cpu.model"],
+    ]);
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 0, 5000]);
+});
+
+test("requestOnDemandRefresh prevents an in-flight old generation from writing", async () => {
+    const metricStore = new MetricStore();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+        sourceClient: new FakeSourceClient([deferredSnapshot.promise]),
+        snapshotStore: metricStore,
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+    });
+
+    const refreshPromise = runner.requestOnDemandRefresh();
+    runner.updateCollectorGroup(buildCollectorGroup({ metricKeys: ["cpu.model"] }));
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 99 }));
+
+    assert.deepEqual(await refreshPromise, { status: "skippedSuperseded" });
+    assert.equal(
+        metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
 });
 
 test("start does not create a second timer while a running refresh is pending", async () => {
@@ -571,6 +786,10 @@ class FakeTimer {
         for (let tick = 0; tick < ASYNC_TIMER_DRAIN_MICROTASK_TICKS; tick += 1) {
             await Promise.resolve();
         }
+    }
+
+    activeHandleCount(): number {
+        return this.handles.filter(handle => handle.active).length;
     }
 
     private shiftNextActiveHandle(): FakeTimerHandle | undefined {

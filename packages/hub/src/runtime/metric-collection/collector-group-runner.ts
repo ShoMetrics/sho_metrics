@@ -183,6 +183,29 @@ export class CollectorGroupRunner {
         return this.pendingRefreshPromise;
     }
 
+    /**
+     * Requests an immediate pull while preserving runner-owned scheduling rules.
+     *
+     * Trigger causes are owned by subscriber fan-out. This runner remains
+     * reason-independent because it owns only timer state, single-flight
+     * suppression, backoff, generation guards, and normal timer rescheduling.
+     */
+    async requestOnDemandRefresh(): Promise<CollectorGroupRefreshResult> {
+        if (this.isStopped || this.pendingRefreshPromise !== null || !this.backoffPolicy.canAttempt()) {
+            return this.refreshNow();
+        }
+
+        this.clearScheduledRefresh();
+
+        try {
+            return await this.refreshNow();
+        } finally {
+            if (this.isRunningLoop && !this.isStopped) {
+                this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
+            }
+        }
+    }
+
     private async refresh(refreshGeneration: number): Promise<CollectorGroupRefreshResult> {
         try {
             const readResult = await this.sourceClient.readSnapshot(this.collectorGroup.metricKeys);
