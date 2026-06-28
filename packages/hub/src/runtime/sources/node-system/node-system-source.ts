@@ -555,6 +555,8 @@ export class NodeSystemSource implements MetricSource {
         const currentMonotonicMilliseconds = this.monotonicNow();
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
+        let hasPublishableDownloadRate = false;
+        let hasPublishableUploadRate = false;
         const rateCalculations: NodeSystemNetworkRateCalculation[] = [];
 
         this.networkRegistry.update(interfaceOptions);
@@ -581,27 +583,36 @@ export class NodeSystemSource implements MetricSource {
 
             rateCalculations.push(downloadRate, uploadRate);
 
-            metrics[getNetworkInterfaceMetricKey("download", networkStat.iface)] = buildScalarMetricValue(
-                downloadBytesPerSecond,
-                { unit: MetricUnit.BYTES_PER_SECOND },
-            );
-            metrics[getNetworkInterfaceMetricKey("upload", networkStat.iface)] = buildScalarMetricValue(
-                uploadBytesPerSecond,
-                { unit: MetricUnit.BYTES_PER_SECOND },
-            );
-
-            aggregateDownloadBytesPerSecond += downloadBytesPerSecond;
-            aggregateUploadBytesPerSecond += uploadBytesPerSecond;
+            if (downloadRate.shouldPublishRate) {
+                metrics[getNetworkInterfaceMetricKey("download", networkStat.iface)] = buildScalarMetricValue(
+                    downloadBytesPerSecond,
+                    { unit: MetricUnit.BYTES_PER_SECOND },
+                );
+                aggregateDownloadBytesPerSecond += downloadBytesPerSecond;
+                hasPublishableDownloadRate = true;
+            }
+            if (uploadRate.shouldPublishRate) {
+                metrics[getNetworkInterfaceMetricKey("upload", networkStat.iface)] = buildScalarMetricValue(
+                    uploadBytesPerSecond,
+                    { unit: MetricUnit.BYTES_PER_SECOND },
+                );
+                aggregateUploadBytesPerSecond += uploadBytesPerSecond;
+                hasPublishableUploadRate = true;
+            }
         }
 
-        metrics[getNetworkAggregateMetricKey("download")] = buildScalarMetricValue(
-            aggregateDownloadBytesPerSecond,
-            { unit: MetricUnit.BYTES_PER_SECOND },
-        );
-        metrics[getNetworkAggregateMetricKey("upload")] = buildScalarMetricValue(
-            aggregateUploadBytesPerSecond,
-            { unit: MetricUnit.BYTES_PER_SECOND },
-        );
+        if (networkStats.length === 0 || hasPublishableDownloadRate) {
+            metrics[getNetworkAggregateMetricKey("download")] = buildScalarMetricValue(
+                aggregateDownloadBytesPerSecond,
+                { unit: MetricUnit.BYTES_PER_SECOND },
+            );
+        }
+        if (networkStats.length === 0 || hasPublishableUploadRate) {
+            metrics[getNetworkAggregateMetricKey("upload")] = buildScalarMetricValue(
+                aggregateUploadBytesPerSecond,
+                { unit: MetricUnit.BYTES_PER_SECOND },
+            );
+        }
 
         this.logNetworkPollDebug({
             networkInterfaces: cachedNetworkInterfaces.rawNetworkInterfaces,
@@ -683,15 +694,18 @@ export class NodeSystemSource implements MetricSource {
     }): NodeSystemNetworkRateCalculation {
         const sampleKey = `${options.interfaceId}:${options.direction}`;
         const previousSample = this.lastNetworkStatsByInterface.get(sampleKey);
-        this.lastNetworkStatsByInterface.set(sampleKey, {
-            bytes: options.currentBytes,
-            monotonicMilliseconds: options.currentMonotonicMilliseconds,
-        });
-
-        return calculateNetworkRate({
+        const rateCalculation = calculateNetworkRate({
             ...options,
             previousSample,
         });
+        if (rateCalculation.shouldPublishRate) {
+            this.lastNetworkStatsByInterface.set(sampleKey, {
+                bytes: options.currentBytes,
+                monotonicMilliseconds: options.currentMonotonicMilliseconds,
+            });
+        }
+
+        return rateCalculation;
     }
 
     private logNetworkPollDebug(options: {
@@ -704,21 +718,29 @@ export class NodeSystemSource implements MetricSource {
         currentMonotonicMilliseconds: number;
     }): void {
         const hasPreviousSample = options.rateCalculations.some(rateCalculation => rateCalculation.hadPreviousSample);
+        const hasPublishableRate = options.rateCalculations.some(rateCalculation => rateCalculation.shouldPublishRate);
+        const hasShortSample = options.rateCalculations.some(rateCalculation =>
+            rateCalculation.hadPreviousSample && !rateCalculation.shouldPublishRate);
         const hasUsableInterfaces = options.interfaceOptions.length > 0;
         const hasStats = options.networkStats.length > 0;
         const isAggregateZero = options.aggregateDownloadBytesPerSecond === 0 && options.aggregateUploadBytesPerSecond === 0;
         const shouldLogPeriodic = options.currentMonotonicMilliseconds - this.lastNetworkPollDebugLogMonotonicMilliseconds
             >= NodeSystemSource.NETWORK_DEBUG_LOG_INTERVAL_MS;
-        const shouldLogSuspiciousZero = hasUsableInterfaces && hasStats && hasPreviousSample && isAggregateZero;
+        const shouldLogShortSample = hasUsableInterfaces && hasStats && hasShortSample && !hasPublishableRate;
+        const shouldLogSuspiciousZero = hasUsableInterfaces && hasStats && hasPreviousSample && hasPublishableRate
+            && isAggregateZero;
 
-        if (!shouldLogPeriodic && !shouldLogSuspiciousZero) {
+        if (!shouldLogPeriodic && !shouldLogShortSample && !shouldLogSuspiciousZero) {
             return;
         }
 
         this.lastNetworkPollDebugLogMonotonicMilliseconds = options.currentMonotonicMilliseconds;
 
         networkLog.debug(() => [
-            `reason=${shouldLogSuspiciousZero ? "suspicious-zero" : "periodic"}`,
+            `reason=${resolveNetworkPollDebugReason({
+                shouldLogShortSample,
+                shouldLogSuspiciousZero,
+            })}`,
             `usable=${JSON.stringify(options.interfaceOptions.map(formatNetworkInterfaceOptionDebug))}`,
             `stats=${JSON.stringify(options.networkStats.map(formatNetworkStatDebug))}`,
             `rates=${JSON.stringify(options.rateCalculations.map(formatNetworkRateCalculationDebug))}`,
@@ -805,6 +827,21 @@ export class NodeSystemSource implements MetricSource {
 
         return await this.pollSystemInformationGpuTelemetry(this.systemInformation);
     }
+}
+
+function resolveNetworkPollDebugReason(options: {
+    readonly shouldLogShortSample: boolean;
+    readonly shouldLogSuspiciousZero: boolean;
+}): "periodic" | "short-sample" | "suspicious-zero" {
+    if (options.shouldLogShortSample) {
+        return "short-sample";
+    }
+
+    if (options.shouldLogSuspiciousZero) {
+        return "suspicious-zero";
+    }
+
+    return "periodic";
 }
 
 export function resolveCollectorGroups(metricKeys: readonly string[]): Set<NodeSystemMetricGroup> {

@@ -19,6 +19,11 @@ export interface NodeSystemNetworkRateCalculation {
     elapsedMilliseconds: number | null;
     bytesPerSecond: number;
     hadPreviousSample: boolean;
+    /**
+     * Whether this delta is old enough to publish as a real network rate.
+     * Short manual-refresh samples are reported for diagnostics only.
+     */
+    shouldPublishRate: boolean;
 }
 
 export interface NodeSystemGpuTelemetryData {

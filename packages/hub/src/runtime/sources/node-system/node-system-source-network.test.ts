@@ -108,6 +108,36 @@ test("node system source uses stale network interfaces when refresh fails", asyn
     assert.equal(readScalarMetric(staleSnapshot, "net.down.eth0"), 100);
 });
 
+test("node system source suppresses network rates sampled before the minimum interval", async () => {
+    const receivedByteQueue = [1000, 1200, 3000];
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            networkInterfaces: async () => [buildNetworkInterface({ iface: "eth0" })],
+            networkStats: (async () => [buildNetworkStats({
+                iface: "eth0",
+                rx_bytes: receivedByteQueue.shift() ?? 3000,
+                tx_bytes: 500,
+            })]) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        monotonicNow: () => currentTimestampMilliseconds,
+    });
+
+    await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 1200;
+    const shortIntervalSnapshot = await source.pollMetrics(["net.down"]);
+    currentTimestampMilliseconds = 2000;
+    const validIntervalSnapshot = await source.pollMetrics(["net.down"]);
+
+    assert.equal(readScalarMetric(shortIntervalSnapshot, "net.down.eth0"), undefined);
+    assert.equal(readScalarMetric(shortIntervalSnapshot, "net.down"), undefined);
+    assert.equal(readScalarMetric(validIntervalSnapshot, "net.down.eth0"), 2000);
+    assert.equal(readScalarMetric(validIntervalSnapshot, "net.down"), 2000);
+});
+
 test("node system source stops using stale network interfaces after the freshness budget", async () => {
     let networkInterfacePollCount = 0;
     let networkStatsPollCount = 0;
@@ -254,4 +284,3 @@ function readScalarMetric(
 
     return metricValue.value.value;
 }
-

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import type {
     DialDownEvent,
     DidReceiveSettingsEvent,
@@ -246,7 +246,8 @@ test("metric collection uses action-owned render timer", () => {
     assert.equal(action.bindings[0].disposeCallCount, 1);
 });
 
-test("key down requests subscriber refresh and shows refresh indicator while pending", async () => {
+test("key down requests subscriber refresh and shows refresh feedback for the minimum visible duration", async () => {
+    vi.useFakeTimers();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("manual-key-action");
     const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
@@ -260,21 +261,56 @@ test("key down requests subscriber refresh and shows refresh indicator while pen
         action.onKeyDown(buildKeyDownEvent(streamDeckAction));
 
         assert.deepEqual(action.subscriberRefreshActionIds, ["manual-key-action"]);
-        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
         assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), "visible");
 
         request.resolve();
         await request.promise;
         await Promise.resolve();
 
-        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), false);
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
+        vi.advanceTimersByTime(299);
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
+        vi.advanceTimersByTime(1);
+
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), false);
         assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), undefined);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        vi.useRealTimers();
+    }
+});
+
+test("manual refresh feedback remains visible after the minimum duration while the request is still pending", async () => {
+    vi.useFakeTimers();
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("manual-slow-action");
+    const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
+    const request = createDeferredPromise();
+    action.queueSubscriberRefreshRequestForTest(request.promise);
+
+    try {
+        action.onWillAppear(willAppearEvent);
+        action.onKeyDown(buildKeyDownEvent(streamDeckAction));
+
+        vi.advanceTimersByTime(300);
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
+        assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), "visible");
+
+        request.resolve();
+        await request.promise;
+        await Promise.resolve();
+
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), false);
+        assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), undefined);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        vi.useRealTimers();
     }
 });
 
 test("dial down requests subscriber refresh", () => {
+    vi.useFakeTimers();
     const action = new TestMetricAction();
     const streamDeckAction = new FakeStreamDeckAction("manual-dial-action");
 
@@ -283,9 +319,10 @@ test("dial down requests subscriber refresh", () => {
         action.onDialDown(buildDialDownEvent(streamDeckAction));
 
         assert.deepEqual(action.subscriberRefreshActionIds, ["manual-dial-action"]);
-        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+        assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+        vi.useRealTimers();
     }
 });
 
@@ -315,9 +352,9 @@ test("manual refresh state clears on disappear", async () => {
     action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
     action.onKeyDown(buildKeyDownEvent(streamDeckAction));
 
-    assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+    assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), true);
     action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
-    assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), false);
+    assert.equal(action.isManualRefreshFeedbackVisibleForTest(streamDeckAction.id), false);
 
     request.resolve();
     await request.promise;
@@ -837,8 +874,8 @@ class TestMetricAction extends MetricAction {
         this.subscriberRefreshRequests.push(request);
     }
 
-    isManualRefreshPendingForTest(actionId: string): boolean {
-        return this.isManualRefreshPending(actionId);
+    isManualRefreshFeedbackVisibleForTest(actionId: string): boolean {
+        return this.isManualRefreshFeedbackVisible(actionId);
     }
 
     readManualRefreshIndicatorForTest(event: WillAppearEvent): "visible" | undefined {
