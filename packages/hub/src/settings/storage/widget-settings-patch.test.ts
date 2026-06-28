@@ -832,6 +832,51 @@ test("widget patch writes System battery target for dense metric slots", () => {
     }
 });
 
+test("widget patch writes selected System peripheral battery identity for dense metric slots", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch({
+        denseMultiMetric: {
+            slots: [
+                { slotId: "slot-1", slot: { metric: { cpu: {} } } },
+                { slotId: "slot-2", slot: { metric: { gpu: {} } } },
+            ],
+        },
+    }, {
+        dense: {
+            updateSlot: {
+                slotId: "slot-2",
+                target: {
+                    domain: "system",
+                    peripheralIdentity: {
+                        evidence: {
+                            kind: "bluetooth",
+                            primaryIdentifier: {
+                                kind: "platformInstanceId",
+                                hash: "3".repeat(64),
+                            },
+                            fallbackIdentifier: undefined,
+                        },
+                    },
+                    detectedPeripheralDisplayName: "MX Master",
+                },
+            },
+        },
+    });
+    const widget = readStoredWidgetSettings(nextSettings).settings.widget;
+
+    assert.equal(widget.case, "denseMultiMetric");
+    const target = widget.value.slots[1]?.slot?.metric?.target;
+    assert.equal(target?.case, "system");
+    if (target?.case === "system") {
+        assert.equal(target.value.reading.case, "battery");
+        assert.equal(target.value.reading.value.detectedPeripheralDisplayName, "MX Master");
+        const identity = target.value.reading.value.peripheralIdentity;
+        assert.equal(identity?.evidence.case, "bluetoothIdentity");
+        if (identity?.evidence.case === "bluetoothIdentity") {
+            assert.equal(identity.evidence.value.primaryIdentifier?.hash, "3".repeat(64));
+        }
+    }
+});
+
 test("widget patch writes selected System peripheral battery identity", () => {
     const nextSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "system").rawSettings,

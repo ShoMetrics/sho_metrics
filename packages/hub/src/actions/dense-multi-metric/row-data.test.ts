@@ -4,6 +4,7 @@ import {
     buildDenseMetricReadPlan,
     buildDenseMetricWidgetData,
 } from "./row-data";
+import { resolveDefaultDenseRowLabel } from "../../settings/dense-metric-row-label";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../../runtime/metric-store";
 import type {
     ResolvedAppearanceSettings,
@@ -12,7 +13,12 @@ import type {
     ResolvedMetricSourcePolicy,
     ResolvedMetricTarget,
 } from "../../settings/resolved-settings";
-import { CPU_USAGE_METRIC_KEY, GPU_USAGE_METRIC_KEY } from "../../runtime/metric-keys";
+import {
+    CPU_USAGE_METRIC_KEY,
+    GPU_USAGE_METRIC_KEY,
+    buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
+    buildBluetoothBatteryPercentMetricKey,
+} from "../../runtime/metric-keys";
 import { resolveDiskUsageMetricKey } from "../../runtime/disk-metric-keys";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import type { SourceMetricValueMetadata } from "../../runtime/sources/source-client";
@@ -79,6 +85,31 @@ test("dense disk usage rows subscribe the selected disk volume", () => {
         resolveDiskUsageMetricKey("total", "E:\\"),
         resolveDiskUsageMetricKey("used", "E:\\"),
     ]);
+});
+
+test("dense system rows subscribe the selected peripheral battery metric", () => {
+    const bluetoothTarget = buildBluetoothBatteryTarget();
+    const expectedMetricKey = buildBluetoothBatteryMetricKey();
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", bluetoothTarget, nodeSourcePolicy, { customLabel: "MSE" }),
+        buildSlot("slot-2", buildCpuUsageTarget()),
+    ]);
+
+    const readPlanResolution = buildDenseMetricReadPlan({ widget, platform: "win32" });
+
+    assert.deepEqual(listMetricReadPlanKeys(readPlanResolution.readPlan), [
+        expectedMetricKey,
+        CPU_USAGE_METRIC_KEY,
+    ]);
+});
+
+test("dense default row labels match row-level empty label fallback", () => {
+    assert.equal(resolveDefaultDenseRowLabel(buildNetworkPingTarget()), "PING");
+    assert.equal(resolveDefaultDenseRowLabel(buildNetworkTrafficTarget("both")), "NET");
+    assert.equal(resolveDefaultDenseRowLabel({
+        ...buildCatalogTarget("sensor:/network/utilization"),
+        customLabel: "Network Util",
+    }), "Network Util");
 });
 
 test("dense read plan downgrades later duplicate rows with conflicting source routes", () => {
@@ -176,6 +207,65 @@ test("dense widget data applies catalog label and raw maximum resolution", () =>
         unit: "W",
         sampleTimestampMilliseconds: 10_000,
     });
+});
+
+test("dense system row data reads the selected peripheral battery metric", () => {
+    const metricKey = buildBluetoothBatteryMetricKey();
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", buildBluetoothBatteryTarget(), nodeSourcePolicy, { customLabel: "MSE" }),
+        buildSlot("slot-2", buildGpuUsageTarget()),
+    ]);
+    const metrics = new FakeMetricStoreReader({
+        [metricKey]: buildWidgetData({
+            current: 85,
+            progress: 0.85,
+            label: "MSE",
+            unit: "%",
+            sampleTimestampMilliseconds: 10_000,
+        }),
+    });
+
+    const widgetData = buildDenseMetricWidgetData({
+        widget,
+        metrics,
+        platform: "win32",
+        currentTimestampMilliseconds: 10_000,
+    });
+
+    assert.deepEqual(widgetData.rows[0]?.widgetData, {
+        current: 85,
+        progress: 0.85,
+        history: [],
+        label: "MSE",
+        unit: "%",
+        sampleTimestampMilliseconds: 10_000,
+    });
+});
+
+test("dense system row data falls back to the selected battery device label", () => {
+    const metricKey = buildBluetoothBatteryMetricKey();
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", buildBluetoothBatteryTarget(), nodeSourcePolicy),
+        buildSlot("slot-2", buildGpuUsageTarget()),
+    ]);
+    const metrics = new FakeMetricStoreReader({
+        [metricKey]: buildWidgetData({
+            current: 85,
+            progress: 0.85,
+            label: "ignored-source-label",
+            unit: "%",
+            sampleTimestampMilliseconds: 10_000,
+        }),
+    });
+
+    const widgetData = buildDenseMetricWidgetData({
+        widget,
+        metrics,
+        platform: "win32",
+        currentTimestampMilliseconds: 10_000,
+    });
+
+    assert.equal(widgetData.rows[0]?.widgetData.label, "MX M");
 });
 
 test("dense empty catalog rows are unconfigured without affecting other rows", () => {
@@ -352,6 +442,34 @@ function buildMemoryUsageTarget(): ResolvedMetricTarget {
     };
 }
 
+function buildBluetoothBatteryTarget(): ResolvedMetricTarget {
+    return {
+        domain: "system",
+        reading: {
+            kind: "batteryPercent",
+            peripheralIdentity: {
+                evidence: {
+                    kind: "bluetooth",
+                    primaryIdentifier: {
+                        kind: "platformInstanceId",
+                        hash: BLUETOOTH_IDENTIFIER_HASH,
+                    },
+                    fallbackIdentifier: undefined,
+                },
+            },
+            detectedPeripheralDisplayName: "MX Master",
+            customLabel: undefined,
+            customIconId: undefined,
+        },
+    };
+}
+
+function buildBluetoothBatteryMetricKey(): string {
+    return buildBluetoothBatteryPercentMetricKey(
+        buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(BLUETOOTH_IDENTIFIER_HASH),
+    );
+}
+
 function buildDiskUsageTarget(volumeId: string | undefined): ResolvedMetricTarget {
     return {
         domain: "disk",
@@ -364,7 +482,37 @@ function buildDiskUsageTarget(volumeId: string | undefined): ResolvedMetricTarge
     };
 }
 
-function buildCatalogTarget(metricId: string): ResolvedMetricTarget {
+function buildNetworkTrafficTarget(
+    direction: "download" | "upload" | "both",
+): Extract<ResolvedMetricTarget, { readonly domain: "network" }> {
+    return {
+        domain: "network",
+        reading: {
+            kind: "traffic",
+            direction,
+            interfaceId: undefined,
+            trafficDisplayMode: "mirrored",
+            display: {
+                scaleMode: "auto",
+                maximumDownloadSpeedMegabitsPerSecond: undefined,
+                maximumUploadSpeedMegabitsPerSecond: undefined,
+                unitBase: "byte",
+            },
+        },
+    };
+}
+
+function buildNetworkPingTarget(): Extract<ResolvedMetricTarget, { readonly domain: "network" }> {
+    return {
+        domain: "network",
+        reading: {
+            kind: "ping",
+            targetHost: "1.1.1.1",
+        },
+    };
+}
+
+function buildCatalogTarget(metricId: string): Extract<ResolvedMetricTarget, { readonly domain: "catalog" }> {
     return {
         domain: "catalog",
         metricId,
@@ -426,7 +574,10 @@ class FakeMetricStoreReader implements MetricStoreReader {
     ) {}
 
     getWidgetData(metricKey: string, label: string, unit: string, maxValue = 100): WidgetData {
-        return this.widgetDataByMetricKey[metricKey] ?? buildWidgetData({ label, unit, progress: 0 / maxValue });
+        const widgetData = this.widgetDataByMetricKey[metricKey];
+        return widgetData === undefined
+            ? buildWidgetData({ label, unit, progress: 0 / maxValue })
+            : { ...widgetData, label, unit };
     }
 
     getWidgetDataReadResult(
@@ -447,3 +598,5 @@ class FakeMetricStoreReader implements MetricStoreReader {
         return undefined;
     }
 }
+
+const BLUETOOTH_IDENTIFIER_HASH = "1".repeat(64);

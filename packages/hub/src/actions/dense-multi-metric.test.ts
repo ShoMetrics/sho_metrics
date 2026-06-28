@@ -19,6 +19,11 @@ import {
     CustomHttpDefinitionRegistry,
 } from "../runtime/sources/custom-http/custom-http-definition-registry";
 import { buildCustomHttpRuntimeIdentity, buildDenseCustomHttpConsumerSlug } from "../runtime/sources/custom-http/custom-http-metric-key";
+import {
+    buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash,
+    buildBluetoothBatteryPercentMetricKey,
+} from "../runtime/metric-keys";
+import { bluetoothBatteryRouteRegistry } from "../runtime/sources/node-system/bluetooth-battery/route-registry";
 import type { CustomHttpFetchOptions, CustomHttpFetchResult, CustomHttpFetcher } from "../runtime/sources/custom-http/custom-http-fetcher";
 import {
     CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
@@ -127,6 +132,28 @@ test("dense multi metric registers and unregisters Custom HTTP row definitions",
     action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
 
     assert.deepEqual(definitionRegistry.list(), []);
+});
+
+test("dense multi metric registers and unregisters selected Bluetooth battery routes", () => {
+    const action = new TestDenseMultiMetric({
+        descriptors: [],
+        descriptorFingerprint: "empty",
+    });
+    const streamDeckAction = new FakeStreamDeckAction("dense-bluetooth-battery-action");
+    const metricKey = buildBluetoothBatteryMetricKey();
+    bluetoothBatteryRouteRegistry.clear();
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildDenseBluetoothBatteryWidgetSettings()));
+
+        assert.equal(bluetoothBatteryRouteRegistry.read(metricKey)?.metricKey, metricKey);
+
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+
+        assert.equal(bluetoothBatteryRouteRegistry.read(metricKey), undefined);
+    } finally {
+        bluetoothBatteryRouteRegistry.clear();
+    }
 });
 
 test("dense multi metric handles Custom HTTP PI sample fetch messages", async () => {
@@ -303,6 +330,14 @@ class TestDenseMultiMetric extends DenseMultiMetric {
         return Promise.resolve();
     }
 
+    protected override refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        void event;
+        this.runtimeCachePatchList.push({
+            availableBatteryDevices: [],
+        });
+        return Promise.resolve();
+    }
+
     protected override sendRuntimeCachePatchToPropertyInspector(
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         patch: WidgetRuntimeCachePatch,
@@ -448,6 +483,36 @@ function buildDenseCustomHttpWidgetSettings(): unknown {
     });
 }
 
+function buildDenseBluetoothBatteryWidgetSettings(): unknown {
+    return writeStoredWidgetSettingsPatch(buildDenseWidgetSettings(), {
+        dense: {
+            updateSlot: {
+                slotId: "slot-1",
+                target: {
+                    domain: "system",
+                    peripheralIdentity: {
+                        evidence: {
+                            kind: "bluetooth",
+                            primaryIdentifier: {
+                                kind: "platformInstanceId",
+                                hash: BLUETOOTH_IDENTIFIER_HASH,
+                            },
+                            fallbackIdentifier: undefined,
+                        },
+                    },
+                    detectedPeripheralDisplayName: "MX Master",
+                },
+            },
+        },
+    });
+}
+
+function buildBluetoothBatteryMetricKey(): string {
+    return buildBluetoothBatteryPercentMetricKey(
+        buildBluetoothBatteryDescriptorIdFromPrimaryIdentifierHash(BLUETOOTH_IDENTIFIER_HASH),
+    );
+}
+
 function createSequentialSlotIdGenerator(slotIds: readonly string[]): () => string {
     const remainingSlotIds = [...slotIds];
     return () => remainingSlotIds.shift() ?? "unexpected-slot";
@@ -505,3 +570,5 @@ function defaultSourceEditorAuthReference() {
         allowPublicHttpCredentials: false,
     };
 }
+
+const BLUETOOTH_IDENTIFIER_HASH = "2".repeat(64);

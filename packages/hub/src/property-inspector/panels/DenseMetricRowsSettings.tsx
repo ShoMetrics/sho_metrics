@@ -11,9 +11,11 @@ import { readCatalogMetricMaximumInputValue, resolveCatalogMetricMaximumInputLab
 import { resolveDefaultDiskVolumeOption } from "../../runtime/disk-volumes";
 import { buildDenseCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 import type { MetricDescriptor, SourceClientStatus } from "../../runtime/sources/source-client";
-import type { ResolvedCpuReading, ResolvedDenseMetricSlot, ResolvedDenseMultiMetricWidget, ResolvedDiskMetricTarget, ResolvedGpuReading, ResolvedMetricTarget, ResolvedNetworkReading } from "../../settings/resolved-settings";
+import type { ResolvedCpuReading, ResolvedDenseMetricSlot, ResolvedDenseMultiMetricWidget, ResolvedDiskMetricTarget, ResolvedGpuReading, ResolvedMetricTarget, ResolvedNetworkReading, ResolvedSystemMetricTarget } from "../../settings/resolved-settings";
 import { DENSE_MULTI_METRIC_MAX_SLOT_COUNT, DENSE_MULTI_METRIC_MIN_SLOT_COUNT } from "../../settings/storage/dense-multi-metric-constraints";
 import type { DenseMetricTargetPatch, StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
+import { resolveDenseBatteryPrefillLabel } from "../../settings/metric-custom-label-policy";
+import { resolveDefaultDenseRowLabel } from "../../settings/dense-metric-row-label";
 import { SelectSetting } from "../controls/SelectSetting";
 import { TextSetting } from "../controls/TextSetting";
 import type { SelectOption } from "../inspector/types";
@@ -21,6 +23,8 @@ import { buildCatalogMetricOptions, type CatalogMetricOptions, type CatalogMetri
 import { resolveDiskVolumeOptions, resolveNetworkInterfaceOptions } from "../select-options/runtime-select-options";
 import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import { CustomMetricSourceEditorPanel } from "./custom-metric/CustomMetricSourceEditorPanel";
+import { BatteryDeviceSelector } from "./BatteryDeviceSettingsSection";
+import { resolveMinimumBatteryPollingFrequencySeconds } from "./battery-polling-options";
 import {
     buildDiskThroughputMaximumInputSpec,
     buildMillisecondsMaximumInputSpec,
@@ -47,10 +51,18 @@ const denseMetricCategoryOptionList = [
     { value: "memory", label: "Memory" },
     { value: "disk", label: "Disk" },
     { value: "network", label: "Network" },
+    { value: "system", label: "System & Battery" },
     { value: "catalog", label: "Catalog" },
     { value: "customMetric", label: "Custom Metric" },
 ] as const satisfies readonly SelectOption<DenseMetricCategoryId>[];
 
+/**
+ * Renders the Dense row editor and writes row-scoped metric patches.
+ *
+ * Dense keeps labels and maximums at the row level, but delegates target-owned
+ * editors such as battery device selection and Custom HTTP source editing to
+ * their domain components so PI defaults stay aligned with runtime rendering.
+ */
 export function DenseMetricRowsSettings({
     context,
     widget,
@@ -60,6 +72,7 @@ export function DenseMetricRowsSettings({
     onCustomHttpCredentialUpsert,
     onCustomHttpCredentialDelete,
     onSettingsPatch,
+    onGlobalSettingsPatch,
 }: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
     editingCustomMetricSlotId: string | undefined;
@@ -99,6 +112,7 @@ export function DenseMetricRowsSettings({
                     isReorderEnabled={isReorderEnabled}
                     onEditCustomMetricSource={onEditingCustomMetricSlotIdChange}
                     onSettingsPatch={onSettingsPatch}
+                    onGlobalSettingsPatch={onGlobalSettingsPatch}
                 />
             ))}
             <InspectorItem className="note-item note-item-caption">
@@ -151,6 +165,7 @@ function DenseMetricRowSettings({
     isReorderEnabled,
     onEditCustomMetricSource,
     onSettingsPatch,
+    onGlobalSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
     readonly slot: ResolvedDenseMetricSlot;
@@ -159,6 +174,7 @@ function DenseMetricRowSettings({
     readonly isReorderEnabled: boolean;
     readonly onEditCustomMetricSource: (slotId: string) => void;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    readonly onGlobalSettingsPatch: WidgetSettingsPanelProps["onGlobalSettingsPatch"];
 }): React.JSX.Element {
     const i18n = useI18n();
     const { t } = i18n;
@@ -171,6 +187,7 @@ function DenseMetricRowSettings({
             <SectionHeading text={`${t(denseMessages.rowMetricLabel)} ${rowIndex + 1}`} />
             <DenseMetricCategorySetting
                 categoryId={categoryId}
+                context={context}
                 descriptors={context.runtimeCache.availableCatalogMetricDescriptors}
                 i18n={i18n}
                 slotId={slot.slotId}
@@ -182,11 +199,12 @@ function DenseMetricRowSettings({
                 slotId={slot.slotId}
                 onEditCustomMetricSource={onEditCustomMetricSource}
                 onSettingsPatch={onSettingsPatch}
+                onGlobalSettingsPatch={onGlobalSettingsPatch}
             />
             <TextSetting
                 label={t(denseMessages.rowLabelLabel)}
                 value={slot.customLabel ?? ""}
-                placeholder={resolveDenseMetricPlaceholderLabel(target)}
+                placeholder={resolveDefaultDenseRowLabel(target)}
                 onValueChange={(customLabel) => onSettingsPatch({
                     dense: {
                         updateSlot: {
@@ -253,12 +271,14 @@ function DenseMetricRowSettings({
 
 function DenseMetricCategorySetting({
     categoryId,
+    context,
     descriptors,
     i18n,
     slotId,
     onSettingsPatch,
 }: {
     readonly categoryId: DenseMetricCategoryId;
+    readonly context: WidgetSettingsPanelProps["context"];
     readonly descriptors: readonly MetricDescriptor[];
     readonly i18n: I18n;
     readonly slotId: string;
@@ -273,6 +293,7 @@ function DenseMetricCategorySetting({
             optionList={localizeOptionList(t, denseMetricCategoryOptionList, denseMetricCategoryMessageByValue)}
             onValueChange={(nextCategoryId) => {
                 onSettingsPatch({
+                    ...buildDenseMinimumPollingPatchForMetricCategory(nextCategoryId, context),
                     dense: {
                         updateSlot: {
                             slotId,
@@ -293,12 +314,14 @@ function DenseMetricTargetSettings({
     slotId,
     onEditCustomMetricSource,
     onSettingsPatch,
+    onGlobalSettingsPatch,
 }: {
     readonly context: WidgetSettingsPanelProps["context"];
     readonly target: ResolvedMetricTarget;
     readonly slotId: string;
     readonly onEditCustomMetricSource: (slotId: string) => void;
     readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    readonly onGlobalSettingsPatch: WidgetSettingsPanelProps["onGlobalSettingsPatch"];
 }): React.JSX.Element {
     switch (target.domain) {
         case "cpu":
@@ -312,7 +335,15 @@ function DenseMetricTargetSettings({
         case "network":
             return <DenseNetworkMetricSettings context={context} reading={target.reading} slotId={slotId} onSettingsPatch={onSettingsPatch} />;
         case "system":
-            return <></>;
+            return (
+                <DenseSystemMetricSettings
+                    context={context}
+                    target={target}
+                    slotId={slotId}
+                    onSettingsPatch={onSettingsPatch}
+                    onGlobalSettingsPatch={onGlobalSettingsPatch}
+                />
+            );
         case "catalog":
             return (
                 <DenseCatalogMetricSettings
@@ -332,6 +363,44 @@ function DenseMetricTargetSettings({
                 />
             );
     }
+}
+
+function DenseSystemMetricSettings({
+    context,
+    target,
+    slotId,
+    onSettingsPatch,
+    onGlobalSettingsPatch,
+}: {
+    readonly context: WidgetSettingsPanelProps["context"];
+    readonly target: ResolvedSystemMetricTarget;
+    readonly slotId: string;
+    readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    readonly onGlobalSettingsPatch: WidgetSettingsPanelProps["onGlobalSettingsPatch"];
+}): React.JSX.Element {
+    return (
+        <BatteryDeviceSelector
+            context={context}
+            target={target}
+            onBatterySettingsPatch={(system, selectedDevice) => {
+                onSettingsPatch({
+                    ...buildDenseMinimumPollingPatchForBattery(system.peripheralIdentity, context),
+                    dense: {
+                        updateSlot: {
+                            slotId,
+                            customLabel: resolveDenseBatteryPrefillLabel(selectedDevice?.displayName),
+                            target: {
+                                domain: "system",
+                                peripheralIdentity: system.peripheralIdentity,
+                                detectedPeripheralDisplayName: system.detectedPeripheralDisplayName,
+                            },
+                        },
+                    },
+                });
+            }}
+            onGlobalSettingsPatch={onGlobalSettingsPatch}
+        />
+    );
 }
 
 function DenseCustomMetricSourceSummary({
@@ -848,6 +917,9 @@ function resolveDenseMaximumInputSpec(
                 step: resolveCatalogMetricMaximumInputStep(target.detectedUnit, target.detectedCategory),
                 optional: true,
             };
+        case "system":
+        case "customMetric":
+            return undefined;
     }
 }
 
@@ -908,27 +980,6 @@ function resolveGpuDenseMaximumInputSpec(
     }
 }
 
-function resolveDenseMetricPlaceholderLabel(target: ResolvedMetricTarget): string {
-    switch (target.domain) {
-        case "cpu":
-            return "CPU";
-        case "gpu":
-            return target.reading.kind === "vram" ? "VRAM" : "GPU";
-        case "memory":
-            return "RAM";
-        case "disk":
-            return target.reading.kind === "usage" ? "DSK" : "DISK";
-        case "network":
-            return target.reading.kind === "traffic" && target.reading.direction === "upload" ? "UP" : "DOWN";
-        case "system":
-            return "BATT";
-        case "catalog":
-            return target.detectedLabel ?? "METRIC";
-        case "customMetric":
-            return "CUSTOM";
-    }
-}
-
 function normalizeDenseLabel(value: string): string | undefined {
     const normalized = value.trim();
     return normalized.length === 0 ? undefined : normalized;
@@ -941,13 +992,44 @@ const denseMetricCategoryMessageByValue = {
     disk: optionMessages.diskOption,
     network: optionMessages.networkOption,
     system: {
-        en: "System Metric",
-        zh_CN: "系统指标",
-        ja: "システムメトリクス",
+        en: "System & Battery",
+        zh_CN: "系统与电池",
+        ja: "システムとバッテリー",
     },
     catalog: denseMessages.catalogMetricChoice,
     customMetric: denseMessages.customMetricChoice,
 } as const satisfies Record<DenseMetricCategoryId, LocalizedMessage>;
+
+function buildDenseMinimumPollingPatchForMetricCategory(
+    categoryId: DenseMetricCategoryId,
+    context: WidgetSettingsPanelProps["context"],
+): Pick<StoredWidgetSettingsPatch, "preferences"> {
+    return buildDenseMinimumPollingPatch(
+        categoryId === "system" ? resolveMinimumBatteryPollingFrequencySeconds(undefined) : 1,
+        context,
+    );
+}
+
+function buildDenseMinimumPollingPatchForBattery(
+    peripheralIdentity: ResolvedSystemMetricTarget["reading"]["peripheralIdentity"],
+    context: WidgetSettingsPanelProps["context"],
+): Pick<StoredWidgetSettingsPatch, "preferences"> {
+    return buildDenseMinimumPollingPatch(
+        resolveMinimumBatteryPollingFrequencySeconds(peripheralIdentity),
+        context,
+    );
+}
+
+function buildDenseMinimumPollingPatch(
+    minimumPollingFrequencySeconds: number,
+    context: WidgetSettingsPanelProps["context"],
+): Pick<StoredWidgetSettingsPatch, "preferences"> {
+    // Dense has one polling interval for all rows. Adding a slower battery row
+    // raises the shared floor; removing it leaves the user's current choice as-is.
+    return context.resolved.preferences.pollingFrequencySeconds < minimumPollingFrequencySeconds
+        ? { preferences: { pollingFrequencySeconds: minimumPollingFrequencySeconds } }
+        : {};
+}
 
 const cpuMetricKindMessageByValue = {
     usage: optionMessages.usageOption,

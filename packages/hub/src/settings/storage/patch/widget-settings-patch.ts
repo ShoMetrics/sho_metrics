@@ -579,7 +579,12 @@ function buildDenseMetricTarget(patch: DenseMetricTargetPatch): StoredMetricSele
                 value: create(SystemMetricTargetSchema, {
                     reading: {
                         case: "battery",
-                        value: create(SystemBatteryMetricTargetSchema),
+                        value: create(SystemBatteryMetricTargetSchema, {
+                            peripheralIdentity: patch.peripheralIdentity === undefined
+                                ? undefined
+                                : buildStoredSystemPeripheralIdentity(patch.peripheralIdentity),
+                            detectedPeripheralDisplayName: patch.detectedPeripheralDisplayName,
+                        }),
                     },
                 }),
             };

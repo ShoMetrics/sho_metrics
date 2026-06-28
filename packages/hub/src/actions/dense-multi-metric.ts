@@ -10,6 +10,7 @@ import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import {
     requireResolvedDenseMultiMetricWidget,
     type ResolvedDenseMultiMetricWidget,
+    type ResolvedSystemPeripheralIdentity,
     type ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
 import { listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
@@ -38,17 +39,37 @@ import {
     CustomHttpActionConnector,
     type CustomHttpActionConnectorDependencies,
 } from "./custom-metric/custom-http-action-connector";
+import type { BatteryDeviceDescriptor } from "../runtime/sources/battery/battery-device-descriptor";
+import { areBatteryPeripheralIdentitiesEquivalentForSelection } from "../runtime/sources/battery/battery-peripheral-identity-comparison";
+import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
+import { readBatteryDeviceDescriptorSnapshotForPropertyInspector } from "../runtime/sources/battery/battery-device-descriptor-snapshot";
+import {
+    readBatteryCacheSuppressionIdentity,
+    resolveBatteryDeviceCachePatchForPropertyInspector,
+} from "../runtime/sources/battery/battery-device-cache-patch";
+import { SelectedBatteryRouteRegistrar } from "../runtime/sources/battery/selected-battery-route-registrar";
+import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import { resolveSystemMetricKeys } from "./system/view-builder";
 
 const log = logger.for("Action:DenseMultiMetric");
+const DENSE_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 30_000;
 
 type DenseMultiMetricActionDependencies = CustomHttpActionConnectorDependencies;
 
-/** Dense Multi Metric action that collects several metric rows for one key. */
+/**
+ * Runs Dense Multi Metric actions and owns row-level runtime cache refreshes.
+ *
+ * Dense rows can include Custom HTTP and System battery targets. Those targets
+ * need action-owned lifecycle hooks for local metric keys, selected battery
+ * routes, and PI runtime cache refreshes before rendering can treat them like
+ * ordinary metric rows.
+ */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric })
 export class DenseMultiMetric extends MetricAction {
     protected readonly actionKind = "denseMultiMetric";
 
     private readonly customHttpConnector: CustomHttpActionConnector;
+    private readonly selectedBatteryRouteRegistrar = new SelectedBatteryRouteRegistrar();
 
     constructor(options: DenseMultiMetricActionDependencies = {}) {
         super();
@@ -79,10 +100,12 @@ export class DenseMultiMetric extends MetricAction {
             event.action.id,
             resolveDenseCustomHttpMetricDefinitions(widget, event.action.id),
         );
+        this.selectedBatteryRouteRegistrar.sync(event.action.id, readSelectedSystemPeripheralRoutes(widget));
     }
 
     protected override onActionWillDisappear(event: WillDisappearEvent): void {
         this.customHttpConnector.clearAction(event.action.id);
+        this.selectedBatteryRouteRegistrar.clear(event.action.id);
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
@@ -111,6 +134,10 @@ export class DenseMultiMetric extends MetricAction {
             .catch(error => {
                 log.warn(() => `Failed to refresh dense metric network interface runtime cache: ${String(error)}`);
             });
+        this.refreshBatteryDevicesForPropertyInspector(event)
+            .catch(error => {
+                log.warn(() => `Failed to refresh dense metric battery device runtime cache: ${String(error)}`);
+            });
     }
 
     protected refreshDiskVolumesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
@@ -135,6 +162,43 @@ export class DenseMultiMetric extends MetricAction {
             platform: this.currentPlatform(),
             updateRuntimeCache: patch => this.updateRuntimeCache(event, patch),
         });
+    }
+
+    protected override sendRuntimeCachePatchToPropertyInspector(
+        event: WillAppearEvent | PropertyInspectorDidAppearEvent,
+        patch: WidgetRuntimeCachePatch,
+    ): Promise<void> {
+        const widget = requireResolvedDenseMultiMetricWidget(this.resolveSettings(event));
+        const cacheSuppressionIdentity = readBatteryCacheSuppressionIdentity(
+            widget.slots.map(slot => slot.slot.metric.target),
+        );
+
+        return super.sendRuntimeCachePatchToPropertyInspector(
+            event,
+            resolveBatteryDeviceCachePatchForPropertyInspector(patch, cacheSuppressionIdentity),
+        );
+    }
+
+    protected async refreshBatteryDevicesForPropertyInspector(event: PropertyInspectorDidAppearEvent): Promise<void> {
+        const isVendorHidBatterySupported = shouldEnableVendorHidBatterySupport(this.currentPlatform());
+        const batteryDeviceSnapshot = await readBatteryDeviceDescriptorSnapshotForPropertyInspector({
+            isExperimentalVendorHidEnabled: isVendorHidBatterySupported
+                && this.resolveGlobalVendorHidBatteryEnabled(),
+        });
+        const availableBatteryDevices = batteryDeviceSnapshot.availableBatteryDevices;
+        const selectedRoutes = readSelectedSystemPeripheralRoutes(
+            requireResolvedDenseMultiMetricWidget(this.resolveSettings(event)),
+        );
+        logDenseBatteryDeviceCacheRefresh(event.action.id, availableBatteryDevices, selectedRoutes);
+
+        await this.updateRuntimeCache(event, {
+            availableBatteryDevices,
+            batteryDeviceDiscoveryDiagnostics: batteryDeviceSnapshot.batteryDeviceDiscoveryDiagnostics,
+        });
+    }
+
+    private resolveGlobalVendorHidBatteryEnabled(): boolean {
+        return pluginGlobalSettingsStore.getResolved().system.experimentalVendorHidBatteryEnabled;
     }
 
     protected onMetricsUpdate(event: WillAppearEvent): void {
@@ -181,6 +245,63 @@ export class DenseMultiMetric extends MetricAction {
     protected readCatalogMetricDescriptorSnapshot(): Promise<MetricDescriptorSnapshot> {
         return backgroundMetricCollection.readSourceMetricDescriptors(WINDOWS_HELPER_SOURCE_ID);
     }
+}
+
+function readSelectedSystemPeripheralRoutes(widget: ResolvedDenseMultiMetricWidget): readonly {
+    readonly metricKey: string;
+    readonly identity: ResolvedSystemPeripheralIdentity;
+}[] {
+    const routes: {
+        readonly metricKey: string;
+        readonly identity: ResolvedSystemPeripheralIdentity;
+    }[] = [];
+
+    for (const slot of widget.slots) {
+        const target = slot.slot.metric.target;
+        if (target.domain !== "system" || target.reading.peripheralIdentity === undefined) {
+            continue;
+        }
+
+        for (const metricKey of resolveSystemMetricKeys(target)) {
+            routes.push({ metricKey, identity: target.reading.peripheralIdentity });
+        }
+    }
+
+    return routes;
+}
+
+function logDenseBatteryDeviceCacheRefresh(
+    actionId: string,
+    availableBatteryDevices: readonly BatteryDeviceDescriptor[],
+    selectedRoutes: readonly {
+        readonly metricKey: string;
+        readonly identity: ResolvedSystemPeripheralIdentity;
+    }[],
+): void {
+    if (selectedRoutes.length === 0) {
+        return;
+    }
+
+    const identityMatchCount = selectedRoutes.filter(route =>
+        availableBatteryDevices.some(device =>
+            device.identity !== undefined
+            && areBatteryPeripheralIdentitiesEquivalentForSelection(device.identity, route.identity),
+        )).length;
+    const metricKeyMatchCount = selectedRoutes.filter(route =>
+        availableBatteryDevices.some(device => device.metricKey === route.metricKey)).length;
+
+    log.atDebug()
+        .everyMs("dense-battery-device-cache-refresh", DENSE_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+        .log(() => [
+            "denseBatteryDeviceCacheRefresh",
+            `actionId=${actionId}`,
+            `deviceCount=${availableBatteryDevices.length}`,
+            `selectedRouteCount=${selectedRoutes.length}`,
+            `identityMatchCount=${identityMatchCount}`,
+            `metricKeyMatchCount=${metricKeyMatchCount}`,
+            `selectedMetricKeys=${selectedRoutes.map(route => route.metricKey).join("|")}`,
+            `descriptorMetricKeys=${availableBatteryDevices.map(device => device.metricKey).join("|")}`,
+        ].join(" "));
 }
 
 function resolveDenseCustomHttpMetricDefinitions(

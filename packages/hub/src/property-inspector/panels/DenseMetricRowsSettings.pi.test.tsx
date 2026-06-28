@@ -4,6 +4,8 @@ import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import type { BatteryDeviceDescriptor } from "../../runtime/sources/battery/battery-device-descriptor";
 import { buildDenseCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
@@ -53,12 +55,59 @@ test("dense custom metric source editing uses a focused child page", async () =>
     assert.notEqual(screen.queryByRole("heading", { name: "Metrics" }), null);
 });
 
+test("dense row metric selector exposes System & Battery", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric,
+    });
+
+    render(<DenseSettingsHarness client={client} settings={buildDenseCustomMetricSettings()} />);
+
+    await user.click(screen.getAllByRole("combobox", { name: /^Metric:/ })[0]);
+
+    assert.notEqual(screen.queryByRole("option", { name: "System & Battery" }), null);
+});
+
+test("dense System battery row uses inline device selection and prefills the row label", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.denseMultiMetric,
+    });
+
+    render(<DenseSettingsHarness
+        client={client}
+        settings={buildDenseCustomMetricSettings()}
+        runtimeCache={{
+            availableBatteryDevices: [buildBatteryDeviceDescriptor()],
+        }}
+        runtimeCacheStatus={{
+            batteryDeviceOptionsStatus: "ready",
+        }}
+    />);
+
+    await user.click(screen.getAllByRole("combobox", { name: /^Metric:/ })[0]);
+    await user.click(screen.getByRole("option", { name: "System & Battery" }));
+
+    assert.equal(screen.queryByRole("heading", { name: "Battery" }), null);
+
+    await user.click(screen.getByRole("combobox", { name: /^Battery:/ }));
+    await user.click(screen.getByRole("option", { name: "[Bluetooth] MX Master 4" }));
+
+    await waitFor(() => {
+        assert.equal((screen.getAllByRole("textbox", { name: /^Label:/ })[0] as HTMLInputElement).value, "MX M");
+    });
+});
+
 function DenseSettingsHarness({
     client,
     settings: initialSettings,
+    runtimeCache,
+    runtimeCacheStatus,
 }: {
     readonly client: TestPropertyInspectorClient;
     readonly settings: InspectorTestSettings;
+    readonly runtimeCache?: WidgetRuntimeCachePatch | undefined;
+    readonly runtimeCacheStatus?: NonNullable<Parameters<typeof buildVisibilityContext>[0]>["runtimeCacheStatus"];
 }): React.JSX.Element {
     const [settings, setSettings] = useState<InspectorTestSettings>(initialSettings);
 
@@ -69,6 +118,8 @@ function DenseSettingsHarness({
                     actionKind: "denseMultiMetric",
                     isWindows: true,
                     settings,
+                    runtimeCache,
+                    runtimeCacheStatus,
                 })}
                 isGlobalViewOverrideEnabled={false}
                 isGlobalThemeOverrideEnabled={false}
@@ -86,6 +137,28 @@ function DenseSettingsHarness({
             />
         </StreamDeckClientProvider>
     );
+}
+
+function buildBatteryDeviceDescriptor(): BatteryDeviceDescriptor {
+    return {
+        descriptorId: "bluetooth-mx-master-4",
+        displayName: "MX Master 4",
+        metricKey: "system:battery:bluetooth:mx-master-4",
+        transport: "bluetooth",
+        receiverKind: undefined,
+        isExperimental: false,
+        supportState: "supported",
+        identity: {
+            evidence: {
+                kind: "bluetooth",
+                primaryIdentifier: {
+                    kind: "platformInstanceId",
+                    hash: "1".repeat(64),
+                },
+                fallbackIdentifier: undefined,
+            },
+        },
+    };
 }
 
 function buildDenseCustomMetricSettings(): InspectorTestSettings {

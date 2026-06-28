@@ -10,7 +10,6 @@ import {
     GPU_VRAM_USED_METRIC_KEY,
     RAM_TOTAL_METRIC_KEY,
     RAM_USED_METRIC_KEY,
-    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
 } from "../../runtime/metric-keys";
 import {
     getDiskThroughputMetricKey,
@@ -58,7 +57,6 @@ import { buildNetworkSpeedWidgetData } from "../../metrics/network-speed-widget-
 import { resolveCatalogMetricDefaultMaximumValue } from "../../metrics/catalog-metric-scale";
 import { formatCatalogMetricFreshWidgetData } from "../../metrics/catalog-metric-widget-data";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
-import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import type { DiskThroughputMetricDirection } from "../../runtime/disk-metric-keys";
 import { resolveDiskMaximumThroughputMebibytesPerSecond } from "../disk/view-builder";
@@ -69,6 +67,8 @@ import {
 } from "../network/view-builder";
 import { resolveCustomHttpMetricDefinition } from "../custom-metric/runtime-source-definition";
 import { readCustomHttpWidgetData } from "../custom-metric/custom-http-widget-data";
+import { resolveSystemMetricKeys } from "../system/view-builder";
+import { resolveDefaultDenseRowLabel } from "../../settings/dense-metric-row-label";
 
 export interface DenseMetricWidgetData {
     readonly rows: readonly DenseMetricRowWidgetData[];
@@ -259,7 +259,7 @@ function resolveDenseMetricKeys(
         case "network":
             return resolveNetworkDenseMetricKeys(target);
         case "system":
-            return buildSingleKey(SYSTEM_BATTERY_PERCENT_METRIC_KEY);
+            return buildDenseMetricKeys(resolveSystemMetricKeys(target));
         case "catalog":
             return buildSingleKey(target.metricId);
         case "customMetric": {
@@ -379,10 +379,10 @@ function buildTargetWidgetData(
             return buildNetworkRowWidgetData(row, metrics, currentTimestampMilliseconds);
         case "system":
             return metrics.getWidgetData(
-                SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+                row.displayMetricKey,
                 resolveDenseRowLabel(row),
                 "%",
-                row.customMaximumValue,
+                100,
             );
         case "catalog":
             return buildCatalogRowWidgetData(row, metrics);
@@ -608,6 +608,18 @@ function buildSingleKey(metricKey: string): {
     };
 }
 
+function buildDenseMetricKeys(metricKeys: readonly string[]): DenseMetricKeys {
+    const displayMetricKey = metricKeys[0];
+    if (displayMetricKey === undefined) {
+        throw new Error("Dense metric key resolution returned no metric keys.");
+    }
+
+    return {
+        displayMetricKey,
+        subscriptionMetricKeys: metricKeys,
+    };
+}
+
 function buildDenseRowReadPlan(row: DenseMetricConfiguredRow, platform: NodeJS.Platform | undefined): MetricReadPlan {
     if (row.customHttpIdentity !== undefined) {
         return buildCustomHttpMetricReadPlan([row.customHttpIdentity]);
@@ -641,40 +653,6 @@ function buildRouteIdentity(route: MetricReadRoute): string {
 
 function resolveDenseRowLabel(row: DenseMetricConfiguredRow): string {
     return row.customLabel ?? resolveDefaultDenseRowLabel(row.target);
-}
-
-function resolveDefaultDenseRowLabel(target: ResolvedMetricTarget): string {
-    switch (target.domain) {
-        case "cpu":
-            return PROGRESS_CIRCLE_LABELS.cpu;
-        case "memory":
-            return PROGRESS_CIRCLE_LABELS.ram;
-        case "gpu":
-            return target.reading.kind === "vram" ? PROGRESS_CIRCLE_LABELS.vram : PROGRESS_CIRCLE_LABELS.gpu;
-        case "disk":
-            return target.reading.kind === "throughput" ? "DISK" : "DSK";
-        case "network":
-            return target.reading.kind === "ping"
-                ? "PING"
-                : resolveNetworkDirectionLabel(target.reading.direction);
-        case "system":
-            return "BATT";
-        case "catalog":
-            return target.customLabel ?? target.detectedLabel ?? "METRIC";
-        case "customMetric":
-            return "CUSTOM";
-    }
-}
-
-function resolveNetworkDirectionLabel(direction: NetworkDirection): string {
-    switch (direction) {
-        case "download":
-            return PROGRESS_CIRCLE_LABELS.download;
-        case "upload":
-            return PROGRESS_CIRCLE_LABELS.upload;
-        case "both":
-            return "NET";
-    }
 }
 
 function resolveDiskMaximumBytesPerSecond(
