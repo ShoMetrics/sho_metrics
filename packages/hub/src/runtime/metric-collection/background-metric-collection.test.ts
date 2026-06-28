@@ -15,6 +15,10 @@ import { BackoffPolicy } from "../sources/backoff-policy";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
+import type {
+    MetricCollectionRefreshReason,
+    MetricCollectionSubscriberRefreshResult,
+} from "./metric-collection-refresh";
 import {
     MetricStoreIngestDiagnostics,
     type MetricStoreInvalidValuesLogEntry,
@@ -386,6 +390,27 @@ test("refreshReadPlanOnce reports invalid values dropped by MetricStore ingest",
     }]);
 });
 
+test("requestSubscriberRefresh delegates subscriber id and reason to collector supervisor", async () => {
+    const subscriptionRegistry = new MetricSubscriptionRegistry();
+    const sourceRegistry = new FakeSourceRegistry([]);
+    const collectorGroupSupervisor = new RecordingCollectorGroupSupervisor({ status: "partial" });
+    const collection = new BackgroundMetricCollection({
+        subscriptionRegistry,
+        collectorGroupPlanner: new CollectorGroupPlanner(sourceRegistry),
+        collectorGroupSupervisor,
+        sourceMetadataRegistry: new SourcePlanningMetadataRegistry(),
+        sourceRegistry,
+    });
+
+    const result = await collection.requestSubscriberRefresh("action-1", "sourceNotification");
+
+    assert.deepEqual(result, { status: "partial" });
+    assert.deepEqual(collectorGroupSupervisor.requests, [{
+        subscriberId: "action-1",
+        reason: "sourceNotification",
+    }]);
+});
+
 test("readSourceMetricDescriptors does not register collection or read snapshots", async () => {
     const subscriptionRegistry = new MetricSubscriptionRegistry();
     const descriptorSnapshot = {
@@ -553,6 +578,30 @@ class RecordingMetricStoreIngestDiagnosticsLogWriter {
 
     write(entry: MetricStoreInvalidValuesLogEntry): void {
         this.entries.push(entry);
+    }
+}
+
+class RecordingCollectorGroupSupervisor extends CollectorGroupSupervisor {
+    readonly requests: {
+        readonly subscriberId: string;
+        readonly reason: MetricCollectionRefreshReason;
+    }[] = [];
+
+    constructor(private readonly result: MetricCollectionSubscriberRefreshResult) {
+        super({
+            sourceRegistry: new FakeSourceRegistry([]),
+            snapshotStore: { ingest: () => emptyMetricStoreIngestReport() },
+            createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+            timer: new FakeTimer(),
+        });
+    }
+
+    override async requestSubscriberRefresh(
+        subscriberId: string,
+        reason: MetricCollectionRefreshReason,
+    ): Promise<MetricCollectionSubscriberRefreshResult> {
+        this.requests.push({ subscriberId, reason });
+        return this.result;
     }
 }
 
