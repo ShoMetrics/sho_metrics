@@ -30,6 +30,7 @@ import {
     type MetricRenderedData,
     type SingleMetricRenderOptions,
 } from "./metric-view-frame";
+import type { MetricRefreshIndicator } from "./metric-refresh-indicator";
 import type { StackedMetricIndicator } from "./stacked-metric-indicator";
 
 test("single value-capable widget without data renders an N/A placeholder copy", () => {
@@ -865,6 +866,52 @@ test("stacked metric indicator renders as a bottom-right overlay", () => {
     assert.doesNotMatch(frame.svg, />2\/3<\/text>/);
 });
 
+test("refresh indicator is absent by default", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+        }),
+        renderTarget: "key",
+    });
+
+    assert.doesNotMatch(frame.svg, /class="metric-refresh-indicator"/);
+});
+
+test("refresh indicator renders as a bottom-left overlay", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            refreshIndicator: "visible",
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /class="metric-refresh-indicator"/);
+    assert.match(frame.svg, /<rect x="5\.00" y="123\.00"[\s\S]*width="42\.00" height="16\.00"/);
+    assert.match(frame.svg, /class="metric-refresh-indicator-icon"/);
+    assert.match(frame.svg, /class="metric-refresh-indicator-ellipsis"/);
+    assert.match(frame.svg, /<circle cx="32\.00"[\s\S]*r="1\.45"/);
+});
+
+test("refresh indicator can render beside stacked indicator", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            refreshIndicator: "visible",
+            stackedIndicator: {
+                currentIndex: 1,
+                totalCount: 2,
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /class="metric-refresh-indicator"/);
+    assert.match(frame.svg, /class="stacked-metric-indicator"/);
+    assert.match(frame.svg, /<rect x="5\.00" y="123\.00"[\s\S]*width="42\.00" height="16\.00"/);
+    assert.match(frame.svg, /<rect x="113\.20" y="124\.60"[\s\S]*width="25\.80" height="14\.40"/);
+});
+
 test("stacked metric indicator does not change the active body viewport", () => {
     const withoutIndicator = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
@@ -896,6 +943,34 @@ test("stacked metric indicator does not change the active body viewport", () => 
     assert.match(withIndicator.svg, /class="stacked-metric-indicator"/);
 });
 
+test("refresh indicator does not change the active body viewport", () => {
+    const withoutIndicator = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+    const withIndicator = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+            refreshIndicator: "visible",
+        }),
+        renderTarget: "key",
+    });
+
+    assert.deepEqual(withIndicator.renderPlan.bodyViewport, withoutIndicator.renderPlan.bodyViewport);
+    assert.deepEqual(withIndicator.renderPlan.bodyRenderSize, withoutIndicator.renderPlan.bodyRenderSize);
+    assert.match(withIndicator.svg, /class="metric-refresh-indicator"/);
+});
+
 test("stacked metric indicator uses touch strip coordinates", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
@@ -914,11 +989,25 @@ test("stacked metric indicator uses touch strip coordinates", () => {
     assert.doesNotMatch(frame.svg, />3\/3<\/text>/);
 });
 
+test("refresh indicator uses touch strip coordinates", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            refreshIndicator: "visible",
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.match(frame.svg, /<rect x="5\.00" y="79\.00"[\s\S]*width="42\.00" height="16\.00"/);
+});
+
 function buildSingleMetricRenderOptions(options: {
     widgetData: WidgetData;
     noticeText?: string;
     resolvedSettings?: ResolvedAppearanceSettingsOverride;
     stackedIndicator?: StackedMetricIndicator;
+    refreshIndicator?: MetricRefreshIndicator;
 }): SingleMetricRenderOptions {
     return {
         metricRenderKind: "singleMetric",
@@ -927,6 +1016,7 @@ function buildSingleMetricRenderOptions(options: {
         widgetData: options.widgetData,
         ...(options.noticeText === undefined ? {} : { noticeText: options.noticeText }),
         ...(options.stackedIndicator === undefined ? {} : { stackedIndicator: options.stackedIndicator }),
+        ...(options.refreshIndicator === undefined ? {} : { refreshIndicator: options.refreshIndicator }),
         resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
     };
 }

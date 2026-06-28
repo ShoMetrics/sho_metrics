@@ -25,6 +25,10 @@ import {
 import { MetricStoreIngestDiagnostics } from "./metric-store-ingest-diagnostics";
 import type { SourceMetadataInvalidation } from "../sources/source-planning-metadata";
 import { monotonicNowMilliseconds } from "../../shared/clock";
+import type {
+    MetricCollectionRefreshReason,
+    MetricCollectionSubscriberRefreshResult,
+} from "./metric-collection-refresh";
 
 const log = logger.for("BackgroundMetricCollection");
 const BACKOFF_RETRY_MILLISECONDS = 2000;
@@ -149,6 +153,20 @@ export class BackgroundMetricCollection {
         await Promise.all(Array.from(metricKeysBySourceId.entries()).map(([sourceId, metricKeys]) => (
             this.refreshSourceCandidateOnce({ sourceId }, Array.from(metricKeys).sort())
         )));
+    }
+
+    /**
+     * Requests one on-demand collection refresh for a live widget subscriber.
+     *
+     * This is the action-facing manual refresh entry point. It delegates to the
+     * collector supervisor so runner-owned pending, backoff, and generation
+     * guards remain the only source-read arbitration policy.
+     */
+    async requestSubscriberRefresh(
+        subscriberId: string,
+        reason: MetricCollectionRefreshReason,
+    ): Promise<MetricCollectionSubscriberRefreshResult> {
+        return await this.collectorGroupSupervisor.requestSubscriberRefresh(subscriberId, reason);
     }
 
     /** Reads source-owned runtime status without performing source I/O. */

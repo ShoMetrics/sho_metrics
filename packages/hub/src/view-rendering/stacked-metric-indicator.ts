@@ -1,7 +1,6 @@
 import type { MetricRenderAppearance } from "./render-appearance";
-import { buildSvgFilterAttributes } from "./render-svg-effects";
-import { parseHexColor, resolveReadableTextColor } from "../shared/color-utils";
 import type { KeySize } from "./widget-data";
+import { renderFrameBadge, type FrameBadgeBox } from "./frame-badge";
 
 export interface StackedMetricIndicator {
     /** 1-based active slot index. Renderers may display this as text or position. */
@@ -9,7 +8,6 @@ export interface StackedMetricIndicator {
     readonly totalCount: number;
 }
 
-const INDICATOR_MARGIN = 5;
 const DOT_RADIUS = 3.2;
 const DOT_GAP = 4;
 const INDICATOR_PADDING_X = 4.5;
@@ -33,27 +31,39 @@ export function renderStackedMetricIndicator(options: {
     const currentIndex = Math.min(Math.max(1, options.indicator.currentIndex), totalCount);
     const indicatorWidth = (INDICATOR_PADDING_X * 2) + (DOT_RADIUS * 2 * totalCount) + (DOT_GAP * (totalCount - 1));
     const indicatorHeight = (INDICATOR_PADDING_Y * 2) + (DOT_RADIUS * 2);
-    const xCoordinate = options.size.width - INDICATOR_MARGIN - indicatorWidth;
-    const yCoordinate = options.size.height - INDICATOR_MARGIN - indicatorHeight;
-    const backgroundColor = options.visual.paints.surface;
-    const dotColor = parseHexColor(backgroundColor) === undefined
-        ? options.visual.paints.primaryText
-        : resolveReadableTextColor(backgroundColor);
 
-    return `
-        <g class="stacked-metric-indicator">
-            <rect x="${xCoordinate.toFixed(2)}" y="${yCoordinate.toFixed(2)}"
-                width="${indicatorWidth.toFixed(2)}" height="${indicatorHeight.toFixed(2)}" rx="${INDICATOR_CORNER_RADIUS}"
-                fill="${backgroundColor}" stroke="${options.visual.paints.divider}" stroke-width="0.75"
-                ${buildSvgFilterAttributes(options.visual.themeEffects.subtleFilter).join(" ")} />
-            ${Array.from({ length: totalCount }, (_, index) => renderIndicatorDot({
-                centerXCoordinate: xCoordinate + INDICATOR_PADDING_X + DOT_RADIUS + (index * ((DOT_RADIUS * 2) + DOT_GAP)),
-                centerYCoordinate: yCoordinate + (indicatorHeight / 2),
-                color: dotColor,
-                isActive: index + 1 === currentIndex,
-            })).join("")}
-        </g>
-    `;
+    return renderFrameBadge({
+        className: "stacked-metric-indicator",
+        visual: options.visual,
+        size: options.size,
+        width: indicatorWidth,
+        height: indicatorHeight,
+        cornerRadius: INDICATOR_CORNER_RADIUS,
+        corner: "lowerRight",
+        renderContent: (dotColor, box) => renderIndicatorDots({
+            box,
+            dotColor,
+            totalCount,
+            currentIndex,
+        }),
+    });
+}
+
+function renderIndicatorDots(options: {
+    readonly box: FrameBadgeBox;
+    readonly dotColor: string;
+    readonly totalCount: number;
+    readonly currentIndex: number;
+}): string {
+    return Array.from({ length: options.totalCount }, (_, index) => renderIndicatorDot({
+        centerXCoordinate: options.box.xCoordinate
+            + INDICATOR_PADDING_X
+            + DOT_RADIUS
+            + (index * ((DOT_RADIUS * 2) + DOT_GAP)),
+        centerYCoordinate: options.box.yCoordinate + (options.box.height / 2),
+        color: options.dotColor,
+        isActive: index + 1 === options.currentIndex,
+    })).join("");
 }
 
 function renderIndicatorDot(options: {

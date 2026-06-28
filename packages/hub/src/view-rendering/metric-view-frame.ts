@@ -2,6 +2,10 @@ import type { ColorConfig } from "./color-resolver";
 import { renderDenseMetricBodyView } from "./dense-metric-view";
 import { renderDualMetricBodyView } from "./dual-metric-view";
 import { renderMetricFrame, resolveThemeBodyViewport, type MetricFrameBody } from "./metric-frame";
+import {
+    renderMetricRefreshIndicator,
+    type MetricRefreshIndicator,
+} from "./metric-refresh-indicator";
 import { renderMetricNoticeBody } from "./metric-notice-body";
 import type { MetricRenderAppearance } from "./render-appearance";
 import {
@@ -38,10 +42,10 @@ interface BaseMetricRenderOptions {
     circleVariantOverride?: MetricRenderAppearance["circleVariant"];
     appearanceOverride?: ResolvedAppearanceSettingsOverride;
     resolvedSettings: ResolvedAppearanceSettings;
-    // Stacked Metric is currently the only frame-level overlay. Keep this
-    // explicit until a second overlay exists; do not turn Base options into a
-    // generic overlay bag preemptively.
+    // Frame-level badges stay explicit because each one has its own lifecycle
+    // owner. Do not replace these named options with a generic overlay bag.
     stackedIndicator?: StackedMetricIndicator;
+    refreshIndicator?: MetricRefreshIndicator;
 }
 
 export interface SingleMetricRenderOptions extends BaseMetricRenderOptions {
@@ -152,18 +156,7 @@ export function composeMetricViewFrame(options: {
     return {
         svg: renderMetricFrame({
             bodies: body.bodies,
-            // Stacked's indicator is a transient frame badge, not part of the
-            // selected metric body. Keeping it here preserves every existing
-            // single/dual/dense body viewport.
-            overlays: options.viewOptions.stackedIndicator === undefined
-                ? []
-                : [
-                    renderStackedMetricIndicator({
-                        indicator: options.viewOptions.stackedIndicator,
-                        visual: renderPlan.renderAppearance,
-                        size: renderPlan.renderSize,
-                    }),
-                ],
+            overlays: renderMetricFrameOverlays(options.viewOptions, renderPlan),
             themePreset: renderPlan.renderAppearance.themePreset,
             themePaints: renderPlan.renderAppearance.paints,
             themeChromeOpacity: renderPlan.renderAppearance.transparentSurface.backgroundOpacity,
@@ -172,6 +165,30 @@ export function composeMetricViewFrame(options: {
         renderedMetricData: body.renderedMetricData,
         renderPlan,
     };
+}
+
+function renderMetricFrameOverlays(
+    viewOptions: MetricRenderOptions,
+    renderPlan: MetricViewRenderPlan,
+): readonly string[] {
+    const overlays: string[] = [];
+
+    if (viewOptions.refreshIndicator !== undefined) {
+        overlays.push(renderMetricRefreshIndicator({
+            visual: renderPlan.renderAppearance,
+            size: renderPlan.renderSize,
+        }));
+    }
+
+    if (viewOptions.stackedIndicator !== undefined) {
+        overlays.push(renderStackedMetricIndicator({
+            indicator: viewOptions.stackedIndicator,
+            visual: renderPlan.renderAppearance,
+            size: renderPlan.renderSize,
+        }));
+    }
+
+    return overlays;
 }
 
 export function buildMetricViewRenderPlan(options: {
