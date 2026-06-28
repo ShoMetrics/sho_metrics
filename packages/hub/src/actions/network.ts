@@ -83,7 +83,7 @@ export class Network extends MetricAction {
             });
         }
 
-        setMetricView(viewUpdate.viewOptions);
+        setMetricView(this.withManualRefreshIndicator(event, viewUpdate.viewOptions));
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {

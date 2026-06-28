@@ -3,6 +3,8 @@ import streamDeck, {
     WillAppearEvent,
     WillDisappearEvent,
     DidReceiveSettingsEvent,
+    type DialDownEvent,
+    KeyDownEvent,
     PropertyInspectorDidAppearEvent,
     type SendToPluginEvent,
 } from "@elgato/streamdeck";
@@ -16,6 +18,7 @@ import { buildMetricReadPlanFromSourcePolicy } from "../runtime/source-routing/m
 import {
     clearMetricViewState,
     setMetricViewPollingInterval,
+    type MetricViewOptions,
 } from "../view-updates/runner";
 import { logger } from "../logging/logger";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
@@ -69,10 +72,15 @@ interface ActiveActionState {
     /** Start point for suppressing no-data logs during the initial read gap. */
     appearedAtTimestampMilliseconds: number;
 }
+
 interface MetricActionOptions {
     readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
 }
 
+/** Opaque identity token for one visible manual-refresh badge lifecycle. */
+type ManualRefreshRenderToken = object;
+
+/** Live background collection subscription owned by one rendered action. */
 export interface MetricCollectionBinding {
     refresh(options: BackgroundCollectionBindingRefreshOptions): void;
     dispose(): void;
@@ -86,6 +94,7 @@ export interface MetricCollectionBinding {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private metricCollectionBindings = new Map<string, MetricCollectionBinding>();
+    private manualRefreshRenderTokens = new Map<string, ManualRefreshRenderToken>();
     private readonly displayedMetricNoDataObserver: DisplayedMetricNoDataObserver;
 
     protected abstract readonly actionKind: ActionKind;
@@ -168,10 +177,19 @@ export abstract class MetricAction extends SingletonAction {
         this.onActionWillDisappear(event);
         this.metricCollectionBindings.get(event.action.id)?.dispose();
         this.metricCollectionBindings.delete(event.action.id);
+        this.manualRefreshRenderTokens.delete(event.action.id);
         this.displayedMetricNoDataObserver.clearAction(event.action.id);
         this.activeActionStates.delete(event.action.id);
         clearColorCompensationActionPreview(event.action.id);
         clearMetricViewState(event.action.id);
+    }
+
+    override onKeyDown(event: KeyDownEvent): void {
+        this.requestManualRefreshFromInteraction(event.action.id);
+    }
+
+    override onDialDown(event: DialDownEvent): void {
+        this.requestManualRefreshFromInteraction(event.action.id);
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
@@ -210,6 +228,11 @@ export abstract class MetricAction extends SingletonAction {
     protected abstract onMetricsUpdate(event: WillAppearEvent): void;
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
+
+    /** Whether this action should bind the shared manual refresh gesture. */
+    protected shouldHandleManualRefreshInteraction(): boolean {
+        return true;
+    }
 
     /**
      * Runs after stored settings resolve but before subscriptions refresh.
@@ -390,6 +413,32 @@ export abstract class MetricAction extends SingletonAction {
         return process.platform;
     }
 
+    /** Adds the transient manual refresh badge to a render pass when needed. */
+    protected withManualRefreshIndicator<TOptions extends MetricViewOptions>(
+        event: WillAppearEvent,
+        viewOptions: TOptions,
+    ): TOptions {
+        if (this.manualRefreshRenderTokens.has(event.action.id)) {
+            return {
+                ...viewOptions,
+                refreshIndicator: "visible",
+            };
+        }
+
+        return viewOptions;
+    }
+
+    /** Whether the action is currently showing its manual refresh badge. */
+    protected isManualRefreshPending(actionId: string): boolean {
+        return this.manualRefreshRenderTokens.has(actionId);
+    }
+
+    /** Requests an immediate collection refresh for this action subscriber. */
+    protected requestSubscriberRefresh(actionId: string): Promise<void> {
+        return backgroundMetricCollection.requestSubscriberRefresh(actionId, "manualInteraction")
+            .then(() => undefined);
+    }
+
     protected refreshActiveMetricView(event: WillAppearEvent | PropertyInspectorDidAppearEvent): void {
         this.refreshMetricViewForAction(event.action.id);
     }
@@ -405,6 +454,39 @@ export abstract class MetricAction extends SingletonAction {
     private refreshMetricView(event: WillAppearEvent): void {
         this.onMetricsUpdate(event);
         this.publishDisplayedMetricReadTrace(event);
+    }
+
+    private requestManualRefreshFromInteraction(actionId: string): void {
+        if (!this.shouldHandleManualRefreshInteraction()) {
+            return;
+        }
+
+        if (!this.activeActionStates.has(actionId)) {
+            return;
+        }
+
+        if (this.manualRefreshRenderTokens.has(actionId)) {
+            return;
+        }
+
+        const requestPromise = this.requestSubscriberRefresh(actionId)
+            .catch(error => {
+                log.warn(() => `Manual refresh request failed: ${String(error)}`);
+            });
+        // Token identity prevents an older settled request from clearing a
+        // newer badge if the action disappears/reappears with the same id.
+        const refreshRenderToken: ManualRefreshRenderToken = {};
+
+        this.manualRefreshRenderTokens.set(actionId, refreshRenderToken);
+        this.refreshMetricViewForAction(actionId);
+        void requestPromise.finally(() => {
+            if (this.manualRefreshRenderTokens.get(actionId) !== refreshRenderToken) {
+                return;
+            }
+
+            this.manualRefreshRenderTokens.delete(actionId);
+            this.refreshMetricViewForAction(actionId);
+        });
     }
 
     private publishDisplayedMetricReadTrace(event: WillAppearEvent): void {

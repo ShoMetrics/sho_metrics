@@ -54,13 +54,13 @@ export class Gpu extends MetricAction {
 
         this.publishGpuPowerRuntimeMaximum(event, gpuTarget, metrics);
 
-        setMetricView(buildGpuViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildGpuViewOptions({
             event,
             settings,
             target: gpuTarget,
             metrics,
             helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
-        }));
+        })));
     }
 
     private publishGpuPowerRuntimeMaximum(

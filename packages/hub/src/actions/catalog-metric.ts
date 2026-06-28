@@ -69,17 +69,20 @@ export class CatalogMetric extends MetricAction {
 
         if (catalogTarget.metricId.length === 0) {
             logCatalogMetricNoSelectionRender(helperStatus, platform);
-            setMetricView(buildCatalogMetricNoSelectionViewOptions({ event, settings, helperStatus, platform }));
+            setMetricView(this.withManualRefreshIndicator(
+                event,
+                buildCatalogMetricNoSelectionViewOptions({ event, settings, helperStatus, platform }),
+            ));
             return;
         }
 
-        setMetricView(buildCatalogMetricSelectedViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildCatalogMetricSelectedViewOptions({
             event,
             settings,
             target: catalogTarget,
             metrics: this.getMetricReader(event),
             helperStatus,
-        }));
+        })));
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {

@@ -1,18 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type {
+    DialDownEvent,
     DidReceiveSettingsEvent,
+    KeyDownEvent,
     PropertyInspectorDidAppearEvent,
     SendToPluginEvent,
     WillAppearEvent,
     WillDisappearEvent,
 } from "@elgato/streamdeck";
 import { MetricAction, type MetricCollectionBinding } from "./metric-action";
+import type { SingleMetricViewOptions } from "../view-updates/runner";
 import type {
     DisplayedMetricNoDataObservation,
     DisplayedMetricNoDataObserver,
 } from "./shared/displayed-metric-no-data-observer";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import type { WidgetData } from "../view-rendering/widget-data";
 import { metricStore } from "../runtime/metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue } from "../runtime/sources/metric-source";
 import { buildMetricReadPlanKey, listMetricReadPlanKeys, type MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
@@ -240,6 +244,85 @@ test("metric collection uses action-owned render timer", () => {
     action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
 
     assert.equal(action.bindings[0].disposeCallCount, 1);
+});
+
+test("key down requests subscriber refresh and shows refresh indicator while pending", async () => {
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("manual-key-action");
+    const willAppearEvent = buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings());
+    const request = createDeferredPromise();
+    action.queueSubscriberRefreshRequestForTest(request.promise);
+
+    try {
+        action.onWillAppear(willAppearEvent);
+
+        assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), undefined);
+        action.onKeyDown(buildKeyDownEvent(streamDeckAction));
+
+        assert.deepEqual(action.subscriberRefreshActionIds, ["manual-key-action"]);
+        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+        assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), "visible");
+
+        request.resolve();
+        await request.promise;
+        await Promise.resolve();
+
+        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), false);
+        assert.equal(action.readManualRefreshIndicatorForTest(willAppearEvent), undefined);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("dial down requests subscriber refresh", () => {
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("manual-dial-action");
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        action.onDialDown(buildDialDownEvent(streamDeckAction));
+
+        assert.deepEqual(action.subscriberRefreshActionIds, ["manual-dial-action"]);
+        assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("repeated manual refresh interactions do not start duplicate action requests while pending", () => {
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("manual-repeat-action");
+    action.queueSubscriberRefreshRequestForTest(createDeferredPromise().promise);
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+        action.onKeyDown(buildKeyDownEvent(streamDeckAction));
+        action.onKeyDown(buildKeyDownEvent(streamDeckAction));
+        action.onDialDown(buildDialDownEvent(streamDeckAction));
+
+        assert.deepEqual(action.subscriberRefreshActionIds, ["manual-repeat-action"]);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("manual refresh state clears on disappear", async () => {
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("manual-disappear-action");
+    const request = createDeferredPromise();
+    action.queueSubscriberRefreshRequestForTest(request.promise);
+
+    action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
+    action.onKeyDown(buildKeyDownEvent(streamDeckAction));
+
+    assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), true);
+    action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    assert.equal(action.isManualRefreshPendingForTest(streamDeckAction.id), false);
+
+    request.resolve();
+    await request.promise;
+    await Promise.resolve();
+    assert.equal(action.metricsUpdateSnapshots.length, 2);
 });
 
 test("metric collection subscriptions preserve each metric route's source candidates", () => {
@@ -696,12 +779,14 @@ class TestMetricAction extends MetricAction {
     protected readonly actionKind = "network";
     readonly bindings: FakeMetricCollectionBinding[] = [];
     readonly runtimeCachePatchList: WidgetRuntimeCachePatch[] = [];
+    readonly subscriberRefreshActionIds: string[] = [];
     readonly metricsUpdateSnapshots: Array<{
         readonly selectedView: string;
         readonly pollingFrequencySeconds: number;
     }> = [];
 
     private readonly bindingFactory: () => FakeMetricCollectionBinding;
+    private readonly subscriberRefreshRequests: Promise<void>[] = [];
 
     constructor(
         bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
@@ -748,6 +833,18 @@ class TestMetricAction extends MetricAction {
         return networkTarget.reading.display.maximumDownloadSpeedMegabitsPerSecond;
     }
 
+    queueSubscriberRefreshRequestForTest(request: Promise<void>): void {
+        this.subscriberRefreshRequests.push(request);
+    }
+
+    isManualRefreshPendingForTest(actionId: string): boolean {
+        return this.isManualRefreshPending(actionId);
+    }
+
+    readManualRefreshIndicatorForTest(event: WillAppearEvent): "visible" | undefined {
+        return this.withManualRefreshIndicator(event, this.buildManualRefreshTestViewOptions(event)).refreshIndicator;
+    }
+
     protected override sendRuntimeCachePatchToPropertyInspector(
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         patch: WidgetRuntimeCachePatch,
@@ -765,6 +862,28 @@ class TestMetricAction extends MetricAction {
 
     protected override currentTimestampMilliseconds(): number {
         return TEST_CURRENT_TIMESTAMP_MILLISECONDS;
+    }
+
+    protected override requestSubscriberRefresh(actionId: string): Promise<void> {
+        this.subscriberRefreshActionIds.push(actionId);
+        return this.subscriberRefreshRequests.shift() ?? Promise.resolve();
+    }
+
+    private buildManualRefreshTestViewOptions(event: WillAppearEvent): SingleMetricViewOptions {
+        const settings = this.resolveSettings(event);
+
+        return {
+            event,
+            metricKey: "net.down",
+            metricRenderKind: "singleMetric",
+            centerIconFragment: "",
+            statusIcon: {
+                fragment: "",
+                viewBox: { x: 0, y: 0, width: 1, height: 1 },
+            },
+            widgetData: buildTestWidgetData(),
+            resolvedSettings: requireResolvedSingleMetricWidget(settings).slot.appearance,
+        };
     }
 }
 
@@ -924,6 +1043,14 @@ function buildDidReceiveSettingsEvent(action: FakeStreamDeckAction, settings: un
     } as unknown as DidReceiveSettingsEvent;
 }
 
+function buildKeyDownEvent(action: FakeStreamDeckAction): KeyDownEvent {
+    return { action } as unknown as KeyDownEvent;
+}
+
+function buildDialDownEvent(action: FakeStreamDeckAction): DialDownEvent {
+    return { action } as unknown as DialDownEvent;
+}
+
 function buildSendToPluginEvent(
     action: FakeStreamDeckAction,
     payload: unknown,
@@ -936,6 +1063,33 @@ function buildSendToPluginEvent(
 
 function buildWillDisappearEvent(action: FakeStreamDeckAction): WillDisappearEvent {
     return { action } as unknown as WillDisappearEvent;
+}
+
+function buildTestWidgetData(): WidgetData {
+    return {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: "%",
+        label: "NET",
+    };
+}
+
+function createDeferredPromise(): {
+    readonly promise: Promise<void>;
+    resolve(): void;
+} {
+    let resolvePromise = (): void => {
+        assert.fail("Deferred promise resolved before initialization.");
+    };
+    const promise = new Promise<void>(resolve => {
+        resolvePromise = resolve;
+    });
+
+    return {
+        promise,
+        resolve: resolvePromise,
+    };
 }
 
 function createQueuedBindingFactory(
@@ -951,4 +1105,3 @@ function createQueuedBindingFactory(
         return binding;
     };
 }
-

@@ -60,13 +60,13 @@ export class Disk extends MetricAction {
         this.publishDiskVolumeOptions(event);
         this.publishDiskThroughputRuntimeMaximum(event, diskTarget, volumeSelection, metrics);
 
-        setMetricView(buildDiskViewOptions({
+        setMetricView(this.withManualRefreshIndicator(event, buildDiskViewOptions({
             event,
             settings,
             target: diskTarget,
             metrics,
             volumeSelection,
-        }));
+        })));
     }
 
     protected override refreshRuntimeCacheForPropertyInspector(event: PropertyInspectorDidAppearEvent): void {
