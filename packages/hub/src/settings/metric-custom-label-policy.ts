@@ -11,6 +11,15 @@ export type MetricCustomLabelKeyShape = "square" | "touchStrip";
  */
 export const METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS = 128;
 
+/**
+ * Dense captures battery device names as row labels when the user selects a device.
+ *
+ * Keep this conservative because the dense PI editor does not know whether a
+ * touch strip will render one or two columns. Rendering can still fit text, but
+ * the stored default should be short enough for every dense shape.
+ */
+export const DENSE_BATTERY_PREFILL_LABEL_MAXIMUM_CHARACTERS = 4;
+
 /** Resolves the render target shape that controls label fitting width. */
 export function resolveMetricCustomLabelKeyShape(options: {
     readonly selectedView: MetricView;
@@ -97,6 +106,18 @@ export function limitMetricCustomLabelCharacters(
 /** Normalizes stored custom-label input using the PI commit-time limit. */
 export function normalizeMetricCustomLabelInput(label: string): string | undefined {
     return limitMetricCustomLabelCharacters(label, METRIC_CUSTOM_LABEL_INPUT_MAXIMUM_CHARACTERS);
+}
+
+/** Builds the short Dense row label captured when a battery device is selected. */
+export function resolveDenseBatteryPrefillLabel(label: string | undefined): string | undefined {
+    return label === undefined
+        ? undefined
+        : limitMetricCustomLabelCharacters(label, DENSE_BATTERY_PREFILL_LABEL_MAXIMUM_CHARACTERS);
+}
+
+/** Resolves the default Dense row label for a System battery target. */
+export function resolveDenseSystemBatteryRowDefaultLabel(detectedPeripheralDisplayName: string | undefined): string {
+    return resolveDenseBatteryPrefillLabel(detectedPeripheralDisplayName ?? "System") ?? "BATT";
 }
 
 function assertNever(value: never): never {

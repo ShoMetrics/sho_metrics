@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { commonMessages } from "../../i18n/message-groups/shell";
-import { multiMetricMessages } from "../../i18n/message-groups/widgets";
+import { multiMetricMessages, systemMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
-import type { ResolvedAppearanceSettings, ResolvedDenseMultiMetricWidget } from "../../settings/resolved-settings";
+import type { ResolvedAppearanceSettings, ResolvedDenseMultiMetricWidget, ResolvedMetricTarget } from "../../settings/resolved-settings";
+import { readSystemVendorHidPeripheralIdentity } from "../../settings/resolved-settings";
 import {
     buildColorFilledPaintAppearanceOverride,
     buildMetricAccentPaintAppearanceOverride,
@@ -28,6 +29,10 @@ import { DenseMetricRowsSettings } from "./DenseMetricRowsSettings";
 import { PollingSettings } from "./PollingSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
+import {
+    resolveBatteryPollingFrequencyOptionsForMinimum,
+    resolveMinimumBatteryPollingFrequencySeconds,
+} from "./battery-polling-options";
 
 export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps & {
     widget: ResolvedDenseMultiMetricWidget;
@@ -59,11 +64,52 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
                 <>
                     <DenseThemeSettings {...props} />
                     <DenseColorSettings {...props} />
-                    <PollingSettings {...props} note={t(multiMetricMessages.sharedPollingNote)} />
+                    <PollingSettings
+                        {...props}
+                        optionList={resolveDensePollingFrequencyOptions(widget)}
+                        note={resolveDensePollingNote(widget, t)}
+                    />
                 </>
             )}
         </>
     );
+}
+
+function resolveDensePollingFrequencyOptions(
+    widget: ResolvedDenseMultiMetricWidget,
+): readonly { readonly value: number; readonly label: string }[] | undefined {
+    return resolveBatteryPollingFrequencyOptionsForMinimum(resolveDenseMinimumPollingFrequencySeconds(widget));
+}
+
+function resolveDensePollingNote(
+    widget: ResolvedDenseMultiMetricWidget,
+    t: ReturnType<typeof useI18n>["t"],
+): string {
+    const sharedPollingNote = t(multiMetricMessages.sharedPollingNote);
+    return hasVendorHidBatteryRow(widget)
+        ? `${sharedPollingNote}\n${t(systemMessages.infrequentPollingNote)}`
+        : sharedPollingNote;
+}
+
+function resolveDenseMinimumPollingFrequencySeconds(widget: ResolvedDenseMultiMetricWidget): number {
+    return Math.max(
+        1,
+        ...widget.slots.map(slot => resolveDenseRowMinimumPollingFrequencySeconds(slot.slot.metric.target)),
+    );
+}
+
+function resolveDenseRowMinimumPollingFrequencySeconds(target: ResolvedMetricTarget): number {
+    return target.domain === "system"
+        ? resolveMinimumBatteryPollingFrequencySeconds(target.reading.peripheralIdentity)
+        : 1;
+}
+
+function hasVendorHidBatteryRow(widget: ResolvedDenseMultiMetricWidget): boolean {
+    return widget.slots.some(slot => {
+        const target = slot.slot.metric.target;
+        return target.domain === "system"
+            && readSystemVendorHidPeripheralIdentity(target.reading.peripheralIdentity) !== undefined;
+    });
 }
 
 function DenseThemeSettings({

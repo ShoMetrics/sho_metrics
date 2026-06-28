@@ -24,7 +24,10 @@ import { areBatteryPeripheralIdentitiesEquivalentForSelection } from "../runtime
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
 import { shouldEnableVendorHidBatterySupport } from "../runtime/source-capabilities/vendor-hid-battery-platform-capabilities";
 import { readBatteryDeviceDescriptorSnapshotForPropertyInspector } from "../runtime/sources/battery/battery-device-descriptor-snapshot";
-import { resolveBatteryDeviceCachePatchForPropertyInspector } from "../runtime/sources/battery/battery-device-cache-patch";
+import {
+    readBatteryCacheSuppressionIdentity,
+    resolveBatteryDeviceCachePatchForPropertyInspector,
+} from "../runtime/sources/battery/battery-device-cache-patch";
 import { SelectedBatteryRouteRegistrar } from "../runtime/sources/battery/selected-battery-route-registrar";
 import {
     buildStackedMetricReadPlan,
@@ -211,13 +214,14 @@ export class StackedMetric extends MetricAction {
         event: WillAppearEvent | PropertyInspectorDidAppearEvent,
         patch: WidgetRuntimeCachePatch,
     ): Promise<void> {
-        const selectedIdentity = readFirstSelectedSystemPeripheralIdentity(
-            requireResolvedStackedMetricWidget(this.resolveSettings(event)),
+        const widget = requireResolvedStackedMetricWidget(this.resolveSettings(event));
+        const cacheSuppressionIdentity = readBatteryCacheSuppressionIdentity(
+            widget.slots.map(slot => slot.widget.slot.metric.target),
         );
 
         return super.sendRuntimeCachePatchToPropertyInspector(
             event,
-            resolveBatteryDeviceCachePatchForPropertyInspector(patch, selectedIdentity),
+            resolveBatteryDeviceCachePatchForPropertyInspector(patch, cacheSuppressionIdentity),
         );
     }
 
@@ -484,19 +488,6 @@ function logStackedBatteryDeviceCacheRefresh(
             `selectedMetricKeys=${selectedRoutes.map(route => route.metricKey).join("|")}`,
             `descriptorMetricKeys=${availableBatteryDevices.map(device => device.metricKey).join("|")}`,
         ].join(" "));
-}
-
-function readFirstSelectedSystemPeripheralIdentity(
-    widget: ResolvedStackedMetricWidget,
-): ResolvedSystemPeripheralIdentity | undefined {
-    for (const slot of widget.slots) {
-        const target = slot.widget.slot.metric.target;
-        if (target.domain === "system" && target.reading.peripheralIdentity !== undefined) {
-            return target.reading.peripheralIdentity;
-        }
-    }
-
-    return undefined;
 }
 
 function resolveStackedCustomHttpMetricDefinitions(
