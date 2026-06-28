@@ -77,14 +77,20 @@ interface MetricActionOptions {
     readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
 }
 
-/** Opaque identity token for one visible manual-refresh badge lifecycle. */
-type ManualRefreshRenderToken = object;
+/** Tracks one manual refresh acknowledgement badge until the request settles and the badge is readable. */
+interface ManualRefreshFeedbackState {
+    minimumVisibleTimer: ReturnType<typeof setTimeout> | undefined;
+    requestSettled: boolean;
+    minimumVisibleElapsed: boolean;
+}
 
 /** Live background collection subscription owned by one rendered action. */
 export interface MetricCollectionBinding {
     refresh(options: BackgroundCollectionBindingRefreshOptions): void;
     dispose(): void;
 }
+
+const MANUAL_REFRESH_FEEDBACK_MINIMUM_VISIBLE_MILLISECONDS = 300;
 
 /**
  * Base class for all metric view actions.
@@ -94,7 +100,7 @@ export interface MetricCollectionBinding {
 export abstract class MetricAction extends SingletonAction {
     private activeActionStates = new Map<string, ActiveActionState>();
     private metricCollectionBindings = new Map<string, MetricCollectionBinding>();
-    private manualRefreshRenderTokens = new Map<string, ManualRefreshRenderToken>();
+    private manualRefreshFeedbackStates = new Map<string, ManualRefreshFeedbackState>();
     private readonly displayedMetricNoDataObserver: DisplayedMetricNoDataObserver;
 
     protected abstract readonly actionKind: ActionKind;
@@ -177,7 +183,7 @@ export abstract class MetricAction extends SingletonAction {
         this.onActionWillDisappear(event);
         this.metricCollectionBindings.get(event.action.id)?.dispose();
         this.metricCollectionBindings.delete(event.action.id);
-        this.manualRefreshRenderTokens.delete(event.action.id);
+        this.clearManualRefreshFeedback(event.action.id, { refreshMetricView: false });
         this.displayedMetricNoDataObserver.clearAction(event.action.id);
         this.activeActionStates.delete(event.action.id);
         clearColorCompensationActionPreview(event.action.id);
@@ -413,12 +419,18 @@ export abstract class MetricAction extends SingletonAction {
         return process.platform;
     }
 
-    /** Adds the transient manual refresh badge to a render pass when needed. */
+    /**
+     * Adds the transient manual refresh acknowledgement badge to a render pass.
+     *
+     * This badge means the interaction was accepted and a refresh request was
+     * sent. It is not a data freshness guarantee; the collector runner still
+     * owns pending/backoff/skip decisions.
+     */
     protected withManualRefreshIndicator<TOptions extends MetricViewOptions>(
         event: WillAppearEvent,
         viewOptions: TOptions,
     ): TOptions {
-        if (this.manualRefreshRenderTokens.has(event.action.id)) {
+        if (this.manualRefreshFeedbackStates.has(event.action.id)) {
             return {
                 ...viewOptions,
                 refreshIndicator: "visible",
@@ -428,9 +440,9 @@ export abstract class MetricAction extends SingletonAction {
         return viewOptions;
     }
 
-    /** Whether the action is currently showing its manual refresh badge. */
-    protected isManualRefreshPending(actionId: string): boolean {
-        return this.manualRefreshRenderTokens.has(actionId);
+    /** Whether the action is currently showing its manual refresh request feedback. */
+    protected isManualRefreshFeedbackVisible(actionId: string): boolean {
+        return this.manualRefreshFeedbackStates.has(actionId);
     }
 
     /** Requests an immediate collection refresh for this action subscriber. */
@@ -465,7 +477,7 @@ export abstract class MetricAction extends SingletonAction {
             return;
         }
 
-        if (this.manualRefreshRenderTokens.has(actionId)) {
+        if (this.manualRefreshFeedbackStates.has(actionId)) {
             return;
         }
 
@@ -473,20 +485,55 @@ export abstract class MetricAction extends SingletonAction {
             .catch(error => {
                 log.warn(() => `Manual refresh request failed: ${String(error)}`);
             });
-        // Token identity prevents an older settled request from clearing a
-        // newer badge if the action disappears/reappears with the same id.
-        const refreshRenderToken: ManualRefreshRenderToken = {};
+        const feedbackState: ManualRefreshFeedbackState = {
+            requestSettled: false,
+            minimumVisibleElapsed: false,
+            minimumVisibleTimer: undefined,
+        };
+        feedbackState.minimumVisibleTimer = setTimeout(() => {
+            feedbackState.minimumVisibleElapsed = true;
+            this.clearSettledManualRefreshFeedback(actionId, feedbackState);
+        }, MANUAL_REFRESH_FEEDBACK_MINIMUM_VISIBLE_MILLISECONDS);
 
-        this.manualRefreshRenderTokens.set(actionId, refreshRenderToken);
+        this.manualRefreshFeedbackStates.set(actionId, feedbackState);
         this.refreshMetricViewForAction(actionId);
         void requestPromise.finally(() => {
-            if (this.manualRefreshRenderTokens.get(actionId) !== refreshRenderToken) {
-                return;
-            }
-
-            this.manualRefreshRenderTokens.delete(actionId);
-            this.refreshMetricViewForAction(actionId);
+            feedbackState.requestSettled = true;
+            this.clearSettledManualRefreshFeedback(actionId, feedbackState);
         });
+    }
+
+    private clearSettledManualRefreshFeedback(
+        actionId: string,
+        feedbackState: ManualRefreshFeedbackState,
+    ): void {
+        if (this.manualRefreshFeedbackStates.get(actionId) !== feedbackState) {
+            return;
+        }
+
+        if (!feedbackState.requestSettled || !feedbackState.minimumVisibleElapsed) {
+            return;
+        }
+
+        this.clearManualRefreshFeedback(actionId, { refreshMetricView: true });
+    }
+
+    private clearManualRefreshFeedback(
+        actionId: string,
+        options: { readonly refreshMetricView: boolean },
+    ): void {
+        const feedbackState = this.manualRefreshFeedbackStates.get(actionId);
+        if (feedbackState === undefined) {
+            return;
+        }
+
+        if (feedbackState.minimumVisibleTimer !== undefined) {
+            clearTimeout(feedbackState.minimumVisibleTimer);
+        }
+        this.manualRefreshFeedbackStates.delete(actionId);
+        if (options.refreshMetricView) {
+            this.refreshMetricViewForAction(actionId);
+        }
     }
 
     private publishDisplayedMetricReadTrace(event: WillAppearEvent): void {

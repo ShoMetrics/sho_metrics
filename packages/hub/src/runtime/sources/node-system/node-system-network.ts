@@ -37,6 +37,7 @@ interface NetworkRateCalculationDebug {
     elapsedMilliseconds: number | null;
     computedBytesPerSecond: number;
     hadPreviousSample: boolean;
+    shouldPublishRate: boolean;
 }
 
 interface RawNetworkInterfaceDebug {
@@ -137,6 +138,7 @@ export function formatNetworkRateCalculationDebug(
         elapsedMilliseconds: rateCalculation.elapsedMilliseconds,
         computedBytesPerSecond: Math.round(rateCalculation.bytesPerSecond),
         hadPreviousSample: rateCalculation.hadPreviousSample,
+        shouldPublishRate: rateCalculation.shouldPublishRate,
     };
 }
 
@@ -157,6 +159,12 @@ export function formatRawNetworkInterfaceDebug(
     };
 }
 
+// Windows often reports unchanged network counters for manual refreshes that
+// arrive a few hundred milliseconds after the last poll. Publishing that delta
+// as a real zero makes traffic widgets flicker; the next normal poll still has
+// the full byte-counter delta because short samples are not recorded.
+const NETWORK_RATE_MINIMUM_SAMPLE_INTERVAL_MILLISECONDS = 500;
+
 export function calculateNetworkRate(options: {
     interfaceId: string;
     direction: NetworkMetricDirection;
@@ -176,10 +184,12 @@ export function calculateNetworkRate(options: {
                 : null,
             bytesPerSecond: 0,
             hadPreviousSample: options.previousSample != null,
+            shouldPublishRate: options.previousSample == null,
         };
     }
 
-    const elapsedSeconds = (options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds) / 1000;
+    const elapsedMilliseconds = options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds;
+    const elapsedSeconds = elapsedMilliseconds / 1000;
     const bytesDelta = options.currentBytes - options.previousSample.bytes;
 
     return {
@@ -188,8 +198,9 @@ export function calculateNetworkRate(options: {
         currentBytes: options.currentBytes,
         previousBytes: options.previousSample.bytes,
         bytesDelta,
-        elapsedMilliseconds: options.currentMonotonicMilliseconds - options.previousSample.monotonicMilliseconds,
+        elapsedMilliseconds,
         bytesPerSecond: Math.max(0, bytesDelta / elapsedSeconds),
         hadPreviousSample: true,
+        shouldPublishRate: elapsedMilliseconds >= NETWORK_RATE_MINIMUM_SAMPLE_INTERVAL_MILLISECONDS,
     };
 }

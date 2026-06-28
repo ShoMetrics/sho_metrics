@@ -1073,6 +1073,7 @@ test("first network counter sample produces a zero rate", () => {
         elapsedMilliseconds: null,
         bytesPerSecond: 0,
         hadPreviousSample: false,
+        shouldPublishRate: true,
     });
 });
 
@@ -1097,6 +1098,32 @@ test("network counter delta is converted to bytes per second", () => {
         elapsedMilliseconds: 2000,
         bytesPerSecond: 1000,
         hadPreviousSample: true,
+        shouldPublishRate: true,
+    });
+});
+
+test("network counter delta sampled too soon is not publishable", () => {
+    const networkRate = calculateNetworkRate({
+        interfaceId: "en0",
+        direction: "upload",
+        currentBytes: 3000,
+        currentMonotonicMilliseconds: 1200,
+        previousSample: {
+            bytes: 1000,
+            monotonicMilliseconds: 1000,
+        },
+    });
+
+    assert.deepEqual(networkRate, {
+        interfaceId: "en0",
+        direction: "upload",
+        currentBytes: 3000,
+        previousBytes: 1000,
+        bytesDelta: 2000,
+        elapsedMilliseconds: 200,
+        bytesPerSecond: 10000,
+        hadPreviousSample: true,
+        shouldPublishRate: false,
     });
 });
 
