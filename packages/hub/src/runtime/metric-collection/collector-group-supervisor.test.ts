@@ -164,6 +164,241 @@ test("reconcile retries missing sources on the next plan pass", async () => {
     assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
 });
 
+test("requestSubscriberRefresh returns missingSubscriber when no live runner matches", async () => {
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "missingSubscriber",
+    });
+});
+
+test("requestSubscriberRefresh refreshes the matching runner", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+    ]);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "refreshed",
+    });
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+});
+
+test("requestSubscriberRefresh refreshes every runner that backs the subscriber", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        buildSnapshot(1000, { "gpu.usage_percent": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+        }),
+        buildCollectorGroup({
+            pollingGroupId: "gpu",
+            metricKeys: ["gpu.usage_percent"],
+        }),
+    ]);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "refreshed",
+    });
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["gpu.usage_percent"],
+    ]);
+});
+
+test("requestSubscriberRefresh ignores runners for other subscribers", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+            subscriberIds: ["action-1"],
+        }),
+        buildCollectorGroup({
+            pollingGroupId: "gpu",
+            metricKeys: ["gpu.usage_percent"],
+            subscriberIds: ["action-2"],
+        }),
+    ]);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "refreshed",
+    });
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+});
+
+test("requestSubscriberRefresh aggregates mixed runner outcomes as partial", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        new Error("gpu failed"),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+        }),
+        buildCollectorGroup({
+            pollingGroupId: "gpu",
+            metricKeys: ["gpu.usage_percent"],
+        }),
+    ]);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "partial",
+    });
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["gpu.usage_percent"],
+    ]);
+});
+
+test("requestSubscriberRefresh aggregates failed-only outcomes as failed", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        new Error("source failed"),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+    ]);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "failed",
+    });
+});
+
+test("requestSubscriberRefresh prioritizes failed over pending when no runner refreshed", async () => {
+    const fakeTimer = new FakeTimer();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const pendingSourceClient = new FakeSourceClient("pending-source", [deferredSnapshot.promise]);
+    const failedSourceClient = new FakeSourceClient("failed-source", [
+        new Error("source failed"),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([pendingSourceClient, failedSourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: "pending-source",
+            pollingGroupId: "pending",
+            metricKeys: ["pending.metric"],
+        }),
+        buildCollectorGroup({
+            sourceId: "failed-source",
+            pollingGroupId: "failed",
+            metricKeys: ["failed.metric"],
+        }),
+    ]);
+    await fakeTimer.runNextWithDelay(0);
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "failed",
+    });
+
+    deferredSnapshot.resolve(buildSnapshot(1000, { "pending.metric": 42 }));
+    await fakeTimer.drainMicrotasks();
+});
+
+test("requestSubscriberRefresh aggregates pending-only outcomes as pending", async () => {
+    const fakeTimer = new FakeTimer();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const sourceClient = new FakeSourceClient("node-system", [deferredSnapshot.promise]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+    ]);
+    await fakeTimer.runNext();
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "pending",
+    });
+
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 42 }));
+    await fakeTimer.drainMicrotasks();
+});
+
+test("requestSubscriberRefresh aggregates backoff-only outcomes as backoff", async () => {
+    const fakeTimer = new FakeTimer();
+    let currentTimestampMilliseconds = 0;
+    const sourceClient = new FakeSourceClient("node-system", [
+        new Error("source failed"),
+        buildSnapshot(2000, { "cpu.usage_percent": 42 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => currentTimestampMilliseconds, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({ metricKeys: ["cpu.usage_percent"] }),
+    ]);
+    await fakeTimer.runNext();
+
+    assert.deepEqual(await supervisor.requestSubscriberRefresh("action-1", "manualInteraction"), {
+        status: "backoff",
+    });
+
+    currentTimestampMilliseconds = 1000;
+    await fakeTimer.runNextWithDelay(1000);
+});
+
 test("stopAll stops every active runner", async () => {
     const fakeTimer = new FakeTimer();
     const sourceClient = new FakeSourceClient("node-system", [
@@ -666,6 +901,7 @@ function buildCollectorGroup(options: {
     readonly intervalMilliseconds?: number;
     readonly sourceId?: string;
     readonly pollingGroupId?: string;
+    readonly subscriberIds?: readonly string[];
 }): PlannedCollectorGroup {
     const sourceId = options.sourceId ?? "node-system";
     const pollingGroupId = options.pollingGroupId ?? "cpu";
@@ -678,7 +914,7 @@ function buildCollectorGroup(options: {
         pollingGroupId,
         metricKeys: options.metricKeys,
         intervalMilliseconds: options.intervalMilliseconds ?? 1000,
-        subscriberIds: ["action-1"],
+        subscriberIds: options.subscriberIds ?? ["action-1"],
     };
 }
 

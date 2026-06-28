@@ -13,12 +13,18 @@ import {
     type CollectorGroupRunnerTimer,
     type CollectorGroupSnapshotStore,
 } from "./collector-group-runner";
+import type {
+    MetricCollectionRefreshReason,
+    MetricCollectionSubscriberRefreshResult,
+    MetricCollectionSubscriberRefreshStatus,
+} from "./metric-collection-refresh";
 
 const log = logger.for("CollectorGroupSupervisor");
 const MISSING_SOURCE_LOG_INTERVAL_MILLISECONDS = 30000;
 const REFRESH_DEMAND_SEND_WARNING_INTERVAL_MILLISECONDS = 30000;
 const DEMAND_RENEW_INTERVAL_MILLISECONDS = 8000;
 const DEMAND_RENEW_RETRY_DELAY_MILLISECONDS = 2000;
+const SUBSCRIBER_REFRESH_LOG_INTERVAL_MILLISECONDS = 5000;
 const LHM_HARDWARE_POLLING_GROUP_PATTERN = /^lhm:hardware:\/([^/]+)/u;
 
 export type CollectorGroupBackoffPolicyFactory = (collectorGroup: PlannedCollectorGroup) => BackoffPolicy;
@@ -117,6 +123,40 @@ export class CollectorGroupSupervisor {
         this.shouldResendRefreshDemandAfterRecovery = false;
     }
 
+    /**
+     * Requests an immediate pull for every live runner that backs a subscriber.
+     *
+     * This is subscriber fan-out only. It must not re-plan groups or resolve
+     * sources; live runner ownership is established by `reconcile()`.
+     */
+    async requestSubscriberRefresh(
+        subscriberId: string,
+        reason: MetricCollectionRefreshReason,
+    ): Promise<MetricCollectionSubscriberRefreshResult> {
+        const matchingRunners: CollectorGroupRunner[] = [];
+
+        for (const runner of this.runnersByCollectorGroupKey.values()) {
+            if (runner.hasSubscriber(subscriberId)) {
+                matchingRunners.push(runner);
+            }
+        }
+
+        if (matchingRunners.length === 0) {
+            const result = { status: "missingSubscriber" as const };
+            this.recordSubscriberRefreshResult(reason, result.status, 0);
+            return result;
+        }
+
+        const runnerResults = await Promise.all(
+            matchingRunners.map(runner => runner.requestOnDemandRefresh()),
+        );
+        const result = {
+            status: aggregateSubscriberRefreshStatus(runnerResults),
+        };
+        this.recordSubscriberRefreshResult(reason, result.status, matchingRunners.length);
+        return result;
+    }
+
     private startRunner(collectorGroup: PlannedCollectorGroup): void {
         const sourceClient = this.sourceRegistry.resolveSourceClient(collectorGroup.sourceId);
 
@@ -146,6 +186,24 @@ export class CollectorGroupSupervisor {
 
         this.runnersByCollectorGroupKey.set(collectorGroup.collectorGroupKey, runner);
         runner.start();
+    }
+
+    private recordSubscriberRefreshResult(
+        reason: MetricCollectionRefreshReason,
+        status: MetricCollectionSubscriberRefreshStatus,
+        runnerCount: number,
+    ): void {
+        log.atDebug()
+            .everyMs(
+                `subscriber-refresh:${reason}:${status}`,
+                SUBSCRIBER_REFRESH_LOG_INTERVAL_MILLISECONDS,
+            )
+            .log(() => [
+                "subscriberRefresh",
+                `reason=${reason}`,
+                `status=${status}`,
+                `runnerCount=${runnerCount}`,
+            ].join(" "));
     }
 
     private reconcileWindowsHelperRefreshDemand(
@@ -318,6 +376,53 @@ export class CollectorGroupSupervisor {
 
         this.timer.clear(this.refreshDemandTimerHandle);
         this.refreshDemandTimerHandle = null;
+    }
+}
+
+function aggregateSubscriberRefreshStatus(
+    runnerResults: readonly CollectorGroupRefreshResult[],
+): MetricCollectionSubscriberRefreshStatus {
+    const runnerStatuses = runnerResults.map(result => readSubscriberRefreshStatusComponent(result.status));
+    const refreshedCount = runnerStatuses.filter(status => status === "refreshed").length;
+
+    if (refreshedCount === runnerResults.length) {
+        return "refreshed";
+    }
+
+    if (refreshedCount > 0) {
+        return "partial";
+    }
+
+    if (runnerStatuses.some(status => status === "failed")) {
+        return "failed";
+    }
+
+    if (runnerStatuses.some(status => status === "pending")) {
+        return "pending";
+    }
+
+    if (runnerStatuses.some(status => status === "backoff")) {
+        return "backoff";
+    }
+
+    return "skipped";
+}
+
+function readSubscriberRefreshStatusComponent(
+    status: CollectorGroupRefreshResult["status"],
+): MetricCollectionSubscriberRefreshStatus {
+    switch (status) {
+        case "refreshed":
+            return "refreshed";
+        case "failed":
+            return "failed";
+        case "skippedPending":
+            return "pending";
+        case "skippedBackoff":
+            return "backoff";
+        case "skippedSuperseded":
+        case "stopped":
+            return "skipped";
     }
 }
 
