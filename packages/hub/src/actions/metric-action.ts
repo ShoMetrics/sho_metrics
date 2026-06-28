@@ -235,11 +235,6 @@ export abstract class MetricAction extends SingletonAction {
 
     protected abstract getMetricKeys(event: WillAppearEvent): readonly string[];
 
-    /** Whether this action should bind the shared manual refresh gesture. */
-    protected shouldHandleManualRefreshInteraction(): boolean {
-        return true;
-    }
-
     /**
      * Runs after stored settings resolve but before subscriptions refresh.
      *
@@ -469,10 +464,6 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private requestManualRefreshFromInteraction(actionId: string): void {
-        if (!this.shouldHandleManualRefreshInteraction()) {
-            return;
-        }
-
         if (!this.activeActionStates.has(actionId)) {
             return;
         }

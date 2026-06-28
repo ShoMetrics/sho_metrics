@@ -63,7 +63,7 @@ test("stacked metric subscribes all slots and schedules default auto rotate", ()
     }
 });
 
-test("stacked metric key press switches to the next slot and resets timers", () => {
+test("stacked metric key press switches to the next slot and requests collection refresh", () => {
     const timers = new FakeTimerScheduler();
     const action = new TestStackedMetric(timers);
     const streamDeckAction = new FakeStreamDeckAction("stacked-key-action");
@@ -76,7 +76,7 @@ test("stacked metric key press switches to the next slot and resets timers", () 
 
         assert.equal(action.activeSlotId(streamDeckAction.id), "slot-2");
         assert.equal(action.indicatorVisible(streamDeckAction.id), true);
-        assert.deepEqual(action.subscriberRefreshActionIds, []);
+        assert.deepEqual(action.subscriberRefreshActionIds, ["stacked-key-action"]);
         assert.deepEqual(timers.clearedHandles, [firstAutoTimer]);
         assert.equal(timers.scheduledTimers.at(-2)?.delayMilliseconds, 1000);
         assert.equal(timers.scheduledTimers.at(-1)?.delayMilliseconds, 3000);
@@ -85,7 +85,7 @@ test("stacked metric key press switches to the next slot and resets timers", () 
     }
 });
 
-test("stacked metric dial down does not request manual collection refresh", () => {
+test("stacked metric dial down requests collection refresh without switching slots", () => {
     const timers = new FakeTimerScheduler();
     const action = new TestStackedMetric(timers);
     const streamDeckAction = new FakeStreamDeckAction("stacked-dial-down-action");
@@ -94,7 +94,7 @@ test("stacked metric dial down does not request manual collection refresh", () =
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildStackedWidgetSettings()));
         action.onDialDown(buildDialDownEvent(streamDeckAction));
 
-        assert.deepEqual(action.subscriberRefreshActionIds, []);
+        assert.deepEqual(action.subscriberRefreshActionIds, ["stacked-dial-down-action"]);
         assert.equal(action.activeSlotId(streamDeckAction.id), "slot-1");
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));

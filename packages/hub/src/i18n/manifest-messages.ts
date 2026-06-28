@@ -135,6 +135,11 @@ export const manifestMessages = {
             },
             encoder: {
                 triggerDescription: {
+                    Push: {
+                        en: "Refresh",
+                        zh_CN: "刷新",
+                        ja: "更新",
+                    },
                     Rotate: {
                         en: "Switch metric",
                         zh_CN: "切换指标",
