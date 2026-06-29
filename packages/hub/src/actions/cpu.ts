@@ -1,6 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
+import type { MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { setMetricView } from "../view-updates/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildPowerWidgetData } from "../metrics/power-widget-data";
@@ -18,6 +19,7 @@ import {
 import type { SourceClientStatus } from "../runtime/sources/source-client";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     requireResolvedSingleMetricWidget,
     type ResolvedCpuMetricTarget,
@@ -29,6 +31,13 @@ import {
 } from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
+import { readHardwareSummaryWidget } from "./hardware-summary/action-widget";
+import {
+    buildHardwareSummaryReadPlan,
+    readPrimaryHardwareSummaryMetricKey,
+    resolveHardwareSummaryMetricKeys,
+} from "./hardware-summary/read-plan";
+import { buildHardwareSummaryViewOptions } from "./hardware-summary/view-options";
 
 /** CPU action with full theming support. */
 @action({ UUID: STREAM_DECK_ACTION_UUID_BY_KIND.cpu })
@@ -37,22 +46,65 @@ export class Cpu extends MetricAction {
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return resolveHardwareSummaryMetricKeys(readHardwareSummaryWidget(settings, "cpu"));
+        }
+
         const cpuTarget = readResolvedMetricTarget(settings, "cpu");
         return resolveCpuMetricSubscriptionKeys(cpuTarget);
     }
 
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
+        const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return readPrimaryHardwareSummaryMetricKey(readHardwareSummaryWidget(settings, "cpu"));
+        }
+
+        return super.getSourceDiagnosticMetricKey(event);
+    }
+
+    protected override buildMetricCollectionReadPlan(
+        event: WillAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
+        const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return buildHardwareSummaryReadPlan({
+                widget: readHardwareSummaryWidget(settings, "cpu"),
+                defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+                platform: this.currentPlatform(),
+            });
+        }
+
+        return super.buildMetricCollectionReadPlan(event, metricKeys);
+    }
+
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const cpuTarget = readResolvedMetricTarget(settings, "cpu");
         const metrics = this.getMetricReader(event);
 
-        setMetricView(this.withManualRefreshIndicator(event, buildCpuViewOptions({
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            setMetricView(this.withManualRefreshIndicator(event, buildHardwareSummaryViewOptions({
+                event,
+                widget: readHardwareSummaryWidget(settings, "cpu"),
+                metrics,
+                helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+            })));
+            return;
+        }
+
+        const cpuTarget = readResolvedMetricTarget(settings, "cpu");
+
+        setMetricView(this.withManualRefreshIndicator(
             event,
-            settings,
-            target: cpuTarget,
-            metrics,
-            helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
-        })));
+            buildCpuViewOptions({
+                event,
+                settings,
+                target: cpuTarget,
+                metrics,
+                helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+            }),
+        ));
     }
 }
 

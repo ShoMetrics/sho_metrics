@@ -850,7 +850,7 @@ class TestMetricAction extends MetricAction {
         });
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
         void event;
         return undefined;
     }
@@ -944,7 +944,7 @@ class TestDisplayedReadTraceAction extends TestMetricAction {
         super(bindingFactory, displayedMetricNoDataObserver);
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string {
         void event;
         return "net.down";
     }
@@ -955,7 +955,7 @@ class TestMissingDisplayedMetricAction extends TestMetricAction {
         super(undefined, displayedMetricNoDataObserver);
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string {
         void event;
         return "net.missing";
     }

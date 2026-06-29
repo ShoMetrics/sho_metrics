@@ -1058,7 +1058,7 @@ function buildDenseMetricRenderOptions(options: {
 }
 
 function readSingleRenderedMetricData(metricData: MetricRenderedData): WidgetData {
-    if ("rows" in metricData || "positive" in metricData) {
+    if ("rows" in metricData || "positive" in metricData || "primary" in metricData) {
         throw new Error("Expected single metric render data.");
     }
 

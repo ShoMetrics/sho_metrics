@@ -252,13 +252,12 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     /**
-     * Returns the primary metric used for PI source diagnostics.
+     * Returns the metric key used for no-data and source diagnostics.
      *
-     * The default treats the first subscribed metric as the widget's displayed
-     * value. Multi-metric actions should keep their displayed value first or
-     * override this method.
+     * The default uses the first subscribed metric. Multi-metric actions should
+     * return the primary diagnostic key, not every rendered metric.
      */
-    protected getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+    protected getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
         return this.getMetricKeys(event)[0];
     }
 
@@ -528,30 +527,30 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     private publishDisplayedMetricReadTrace(event: WillAppearEvent): void {
-        const displayedMetricKey = this.getDisplayedMetricKey(event);
-        if (displayedMetricKey === undefined) {
-            // Actions without a displayed metric should not retain older
+        const sourceDiagnosticMetricKey = this.getSourceDiagnosticMetricKey(event);
+        if (sourceDiagnosticMetricKey === undefined) {
+            // Actions without a diagnostic metric should not retain older
             // diagnostics from a previous configuration of the same instance.
             this.displayedMetricNoDataObserver.clearAction(event.action.id);
             return;
         }
 
         const readPlan = this.resolveMetricReadPlan(event);
-        const displayedMetric = normalizeMetricReadPlan(readPlan).metrics
-            .find(metric => metric.metricKey === displayedMetricKey);
-        if (displayedMetric === undefined) {
-            // A displayed key outside the normalized read plan is not a valid
+        const sourceDiagnosticMetric = normalizeMetricReadPlan(readPlan).metrics
+            .find(metric => metric.metricKey === sourceDiagnosticMetricKey);
+        if (sourceDiagnosticMetric === undefined) {
+            // A diagnostic key outside the normalized read plan is not a valid
             // source diagnostic target for this tick.
             this.displayedMetricNoDataObserver.clearAction(event.action.id);
             return;
         }
 
-        const preferredSourceId = selectMetricReadRouteSourceCandidates(displayedMetric)[0]?.sourceId;
+        const preferredSourceId = selectMetricReadRouteSourceCandidates(sourceDiagnosticMetric)[0]?.sourceId;
         const preferredSourceStatus = preferredSourceId === undefined
             ? undefined
             : this.readCachedSourceStatus(preferredSourceId);
         const readResult = this.getMetricReader(event).getWidgetDataReadResult(
-            displayedMetricKey,
+            sourceDiagnosticMetricKey,
             "",
             "",
         );
@@ -568,7 +567,7 @@ export abstract class MetricAction extends SingletonAction {
             // recovery logs depend on this path continuing to run for N/A keys.
             this.displayedMetricNoDataObserver.observe({
                 actionId: event.action.id,
-                metricKey: displayedMetricKey,
+                metricKey: sourceDiagnosticMetricKey,
                 preferredSourceId,
                 selectedSourceId: readResult.selectedSourceId,
                 preferredSourceStatus,
@@ -581,7 +580,7 @@ export abstract class MetricAction extends SingletonAction {
 
         this.updateRuntimeCache(event, {
             displayedMetricReadTrace: {
-                metricKey: displayedMetricKey,
+                metricKey: sourceDiagnosticMetricKey,
                 routing: {
                     preferredSourceId,
                     selectedSourceId: readResult.selectedSourceId,

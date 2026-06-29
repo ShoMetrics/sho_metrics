@@ -138,7 +138,7 @@ export class StackedMetric extends MetricAction {
         return listStackedMetricReadPlanKeys(this.buildStackedReadPlan(event));
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
         const activeSlot = this.reconcileAndReadActiveSlot(event);
 
         return activeSlot === undefined

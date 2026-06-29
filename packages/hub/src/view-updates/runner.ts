@@ -6,6 +6,7 @@ import {
     resolveMetricViewLogValue,
     resolveMetricViewSampleTimestampMilliseconds,
     type DualMetricRenderOptions,
+    type HardwareSummaryRenderOptions,
     type MetricRenderOptions,
     type SingleMetricRenderOptions,
 } from "../view-rendering/metric-view-frame";
@@ -49,6 +50,8 @@ interface MetricViewEvent {
 
 export type SingleMetricViewOptions = SingleMetricRenderOptions & MetricViewEvent;
 export type DualMetricViewOptions = DualMetricRenderOptions & MetricViewEvent;
+/** Action event plus render contract for the hardware summary view. */
+export type HardwareSummaryViewOptions = HardwareSummaryRenderOptions & MetricViewEvent;
 export type MetricViewOptions = MetricRenderOptions & MetricViewEvent;
 
 export interface MetricViewUpdateRunnerOptions {

@@ -667,7 +667,7 @@ class TestCatalogMetric extends CatalogMetric {
         this.metricsUpdateCallCount += 1;
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
         void event;
         return undefined;
     }

@@ -41,6 +41,16 @@ export function resolveHardwareSummaryMetricKeys(widget: ResolvedHardwareSummary
     return [...new Set(metricKeys)];
 }
 
+/** Reads the metric key for the primary summary reading used by diagnostics and view updates. */
+export function readPrimaryHardwareSummaryMetricKey(widget: ResolvedHardwareSummaryWidget): string {
+    const primaryMetricKey = resolveHardwareSummaryMetricKeys(widget)[0];
+    if (primaryMetricKey === undefined) {
+        throw new Error("Hardware summary widget resolved with no metric keys.");
+    }
+
+    return primaryMetricKey;
+}
+
 function resolveHardwareSummaryTargetMetricKeys(
     target: ResolvedHardwareSummaryWidget["target"],
 ): readonly string[] {

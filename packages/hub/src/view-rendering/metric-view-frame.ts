@@ -31,6 +31,7 @@ import {
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import type { DenseMetricWidgetData } from "../actions/dense-multi-metric/row-data";
+import type { HardwareSummaryWidgetData } from "../actions/hardware-summary/widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import type { ThemeBodyViewport } from "../widgets/styles/theme-style";
 
@@ -78,7 +79,17 @@ export interface DenseMetricRenderOptions extends BaseMetricRenderOptions {
     widgetData: DenseMetricWidgetData;
 }
 
-export type MetricRenderOptions = SingleMetricRenderOptions | DualMetricRenderOptions | DenseMetricRenderOptions;
+/** Render contract for the fixed CPU/GPU three-reading hardware summary view. */
+export interface HardwareSummaryRenderOptions extends BaseMetricRenderOptions {
+    readonly metricRenderKind: "hardwareSummary";
+    widgetData: HardwareSummaryWidgetData;
+}
+
+export type MetricRenderOptions =
+    | SingleMetricRenderOptions
+    | DualMetricRenderOptions
+    | DenseMetricRenderOptions
+    | HardwareSummaryRenderOptions;
 export type MetricRenderTarget = "key" | "touch-strip";
 
 export type TouchStripMetricLayoutKind = "wide" | "wide-frame-square-body" | "wide-frame-two-square-bodies";
@@ -115,7 +126,11 @@ interface RenderedMetricBodies {
     readonly renderedMetricData: MetricRenderedData;
 }
 
-export type MetricRenderedData = WidgetData | DualChannelWidgetData | DenseMetricWidgetData;
+export type MetricRenderedData =
+    | WidgetData
+    | DualChannelWidgetData
+    | DenseMetricWidgetData
+    | HardwareSummaryWidgetData;
 
 interface BodyArea {
     readonly xCoordinate: number;
@@ -270,6 +285,8 @@ function composeMetricBody(
             return composeDualMetricBody(viewOptions, renderPlan);
         case "denseMetric":
             return composeDenseMetricBody(viewOptions, renderPlan);
+        case "hardwareSummary":
+            throw new Error("Hardware summary rendering is implemented in Step 6.");
     }
 }
 
@@ -345,6 +362,9 @@ export function hasMetricViewData(options: MetricRenderOptions): boolean {
                 || options.widgetData.negative.sampleTimestampMilliseconds != null;
         case "denseMetric":
             return options.widgetData.rows.some(row => row.widgetData.sampleTimestampMilliseconds != null);
+        case "hardwareSummary":
+            return options.widgetData.primary.sampleTimestampMilliseconds != null
+                || options.widgetData.secondary.some(reading => reading.sampleTimestampMilliseconds != null);
     }
 }
 
@@ -356,6 +376,10 @@ export function resolveMetricViewLogValue(widgetData: MetricRenderedData): numbe
     if (isDenseMetricWidgetData(widgetData)) {
         const firstConfiguredRow = widgetData.rows.find(row => row.rowKind === "configured");
         return firstConfiguredRow?.widgetData.current ?? 0;
+    }
+
+    if (isHardwareSummaryWidgetData(widgetData)) {
+        return widgetData.primary.diagnosticValue;
     }
 
     return widgetData.current;
@@ -372,6 +396,12 @@ export function resolveMetricViewSampleTimestampMilliseconds(widgetData: MetricR
             ?.widgetData.sampleTimestampMilliseconds;
     }
 
+    if (isHardwareSummaryWidgetData(widgetData)) {
+        return widgetData.primary.sampleTimestampMilliseconds
+            ?? widgetData.secondary.find(reading => reading.sampleTimestampMilliseconds != null)
+                ?.sampleTimestampMilliseconds;
+    }
+
     return widgetData.sampleTimestampMilliseconds;
 }
 
@@ -383,6 +413,10 @@ export function resolveTouchStripMetricLayout(options: {
     if (options.metricRenderKind === "denseMetric") {
         // Dense owns its row layout inside the body renderer, including the
         // two-column touch-strip case. The frame only needs the full wide body.
+        return TOUCH_STRIP_METRIC_LAYOUTS.wide;
+    }
+
+    if (options.metricRenderKind === "hardwareSummary") {
         return TOUCH_STRIP_METRIC_LAYOUTS.wide;
     }
 
@@ -443,6 +477,10 @@ function shouldUsePixelWindowFullBodyViewport(options: {
     }
 
     if (options.metricRenderKind === "denseMetric") {
+        return true;
+    }
+
+    if (options.metricRenderKind === "hardwareSummary") {
         return true;
     }
 
@@ -853,4 +891,8 @@ function isDualChannelWidgetData(widgetData: MetricRenderedData): widgetData is 
 
 function isDenseMetricWidgetData(widgetData: MetricRenderedData): widgetData is DenseMetricWidgetData {
     return "rows" in widgetData;
+}
+
+function isHardwareSummaryWidgetData(widgetData: MetricRenderedData): widgetData is HardwareSummaryWidgetData {
+    return "primary" in widgetData && "secondary" in widgetData;
 }

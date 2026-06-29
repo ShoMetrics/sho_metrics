@@ -2,11 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import type { MetricStoreReader, MetricWidgetDataReadResult } from "../runtime/metric-store";
+import { listMetricReadPlanKeys } from "../runtime/source-routing/metric-read-plan";
 import {
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     type WidgetData,
 } from "../view-rendering/widget-data";
-import type { ResolvedGpuMetricTarget, ResolvedGpuReading } from "../settings/resolved-settings";
+import type {
+    ResolvedGpuHardwareSummaryReadings,
+    ResolvedGpuMetricTarget,
+    ResolvedGpuReading,
+} from "../settings/resolved-settings";
 import {
     GPU_MODEL_METRIC_KEY,
     GPU_POWER_LIMIT_METRIC_KEY,
@@ -16,8 +21,11 @@ import {
     GPU_VRAM_TOTAL_METRIC_KEY,
     GPU_VRAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
+import type { MetricCollectionBinding } from "./metric-action";
 import { resolveInitialActionSettings } from "./settings/action-settings-resolver";
+import { writeStoredWidgetSettingsPatch } from "../settings/storage/patch/widget-settings-patch";
 import {
+    Gpu,
     buildGpuUsageWidgetData,
     buildGpuViewOptions,
     buildGpuVramWidgetData,
@@ -68,6 +76,62 @@ test("GPU action subscribes to the active GPU reading metrics", () => {
     for (const testCase of testCases) {
         assert.deepEqual(resolveGpuMetricSubscriptionKeys(buildGpuTarget(testCase.reading)), testCase.metricKeys);
     }
+});
+
+test("GPU summary action subscribes to default usage, temperature, and VRAM readings", () => {
+    const action = new TestGpuAction();
+    const event = buildWillAppearEvent(buildGpuSummaryWidgetSettings());
+
+    action.onWillAppear(event);
+
+    assert.deepEqual(action.readMetricKeysForTest(event), [
+        GPU_USAGE_METRIC_KEY,
+        GPU_TEMP_METRIC_KEY,
+        GPU_VRAM_USED_METRIC_KEY,
+        GPU_VRAM_TOTAL_METRIC_KEY,
+    ]);
+    assert.deepEqual(listMetricReadPlanKeys(action.readPlans[0] ?? { metrics: [] }), [
+        GPU_TEMP_METRIC_KEY,
+        GPU_USAGE_METRIC_KEY,
+        GPU_VRAM_TOTAL_METRIC_KEY,
+        GPU_VRAM_USED_METRIC_KEY,
+    ]);
+});
+
+test("GPU summary action subscribes to power limit when power is selected", () => {
+    const action = new TestGpuAction();
+    const event = buildWillAppearEvent(buildGpuSummaryWidgetSettings([
+        { kind: "usage" },
+        { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
+        { kind: "power", maximumWatts: 300 },
+    ]));
+
+    action.onWillAppear(event);
+
+    assert.deepEqual(action.readMetricKeysForTest(event), [
+        GPU_USAGE_METRIC_KEY,
+        GPU_TEMP_METRIC_KEY,
+        GPU_POWER_METRIC_KEY,
+        GPU_POWER_LIMIT_METRIC_KEY,
+    ]);
+    assert.deepEqual(listMetricReadPlanKeys(action.readPlans[0] ?? { metrics: [] }), [
+        GPU_POWER_METRIC_KEY,
+        GPU_POWER_LIMIT_METRIC_KEY,
+        GPU_TEMP_METRIC_KEY,
+        GPU_USAGE_METRIC_KEY,
+    ]);
+});
+
+test("GPU single metric action keeps single-reading subscription behavior", () => {
+    const action = new TestGpuAction();
+    const event = buildWillAppearEvent();
+
+    action.onWillAppear(event);
+
+    assert.deepEqual(action.readMetricKeysForTest(event), [
+        GPU_USAGE_METRIC_KEY,
+        GPU_MODEL_METRIC_KEY,
+    ]);
 });
 
 test("GPU VRAM widget data preserves helper-backed no-data copy", () => {
@@ -154,8 +218,27 @@ function buildMetricReader(widgetDataByMetricKey: Readonly<Record<string, Widget
     };
 }
 
-function buildWillAppearEvent(): WillAppearEvent {
-    return { action: { id: "gpu-test-action", isDial: () => false } } as unknown as WillAppearEvent;
+function buildWillAppearEvent(settings?: unknown): WillAppearEvent {
+    return {
+        action: {
+            id: "gpu-test-action",
+            isDial: () => false,
+            isKey: () => true,
+            setSettings: () => Promise.resolve(),
+        },
+        payload: { settings },
+    } as unknown as WillAppearEvent;
+}
+
+function buildGpuSummaryWidgetSettings(
+    orderedReadings?: ResolvedGpuHardwareSummaryReadings,
+): unknown {
+    return writeStoredWidgetSettingsPatch(undefined, {
+        hardwareSummary: {
+            switchTo: { widgetKind: "hardwareSummary", domain: "gpu" },
+            ...(orderedReadings === undefined ? {} : { orderedReadings }),
+        },
+    });
 }
 
 function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
@@ -168,4 +251,25 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
         unavailableDisplayValue: options.unavailableDisplayValue,
     };
+}
+
+class TestGpuAction extends Gpu {
+    readonly readPlans: Parameters<MetricCollectionBinding["refresh"]>[0]["readPlan"][] = [];
+
+    readMetricKeysForTest(event: WillAppearEvent): readonly string[] {
+        return this.getMetricKeys(event);
+    }
+
+    protected override onMetricsUpdate(event: WillAppearEvent): void {
+        void event;
+    }
+
+    protected override createMetricCollectionBinding(): MetricCollectionBinding {
+        return {
+            refresh: options => {
+                this.readPlans.push(options.readPlan);
+            },
+            dispose: () => undefined,
+        };
+    }
 }
