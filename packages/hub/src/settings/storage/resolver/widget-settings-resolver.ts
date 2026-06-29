@@ -1,6 +1,11 @@
 import {
+    type CpuHardwareSummaryReading as StoredCpuHardwareSummaryReading,
+    type CpuHardwareSummaryTarget as StoredCpuHardwareSummaryTarget,
     type DenseMetricSlot as StoredDenseMetricSlot,
     type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
+    type GpuHardwareSummaryReading as StoredGpuHardwareSummaryReading,
+    type GpuHardwareSummaryTarget as StoredGpuHardwareSummaryTarget,
+    type HardwareSummaryWidget as StoredHardwareSummaryWidget,
     type MetricSlot as StoredMetricSlot,
     type SingleMetricWidget as StoredSingleMetricWidget,
     type StackedMetricSlot as StoredStackedMetricSlot,
@@ -11,6 +16,10 @@ import type {
     ResolvedDenseMetricSlot,
     ResolvedDenseMultiMetricWidget,
     ResolvedGlobalSettings,
+    ResolvedCpuHardwareSummaryReadings,
+    ResolvedGpuHardwareSummaryReadings,
+    ResolvedHardwareSummaryTarget,
+    ResolvedHardwareSummaryWidget,
     ResolvedMetricSlot,
     ResolvedMetricTarget,
     ResolvedSingleMetricWidget,
@@ -45,7 +54,14 @@ import {
     resolveDefaultAppearanceSettings,
     resolveDenseAppearanceSettings,
 } from "./appearance-resolver";
-import { resolveMetricSelection } from "./metric-target-resolver";
+import {
+    resolveCpuHardwareSummaryReading,
+    resolveDefaultCpuHardwareSummaryReading,
+    resolveDefaultGpuHardwareSummaryReading,
+    resolveGpuHardwareSummaryReading,
+    resolveMetricSelection,
+    resolveMetricSourcePolicy,
+} from "./metric-target-resolver";
 import { resolveStoredGlobalSettings } from "./global-settings-resolver";
 import type { ResolveStoredSettingsRuntimeContext, ResolveStoredWidgetSettingsOptions } from "./resolver-types";
 import {
@@ -62,6 +78,8 @@ const DEFAULT_CUSTOM_METRIC_POLLING_FREQUENCY_SECONDS = 3;
 const DEFAULT_SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS = 60;
 const DEFAULT_BLUETOOTH_BATTERY_POLLING_FREQUENCY_SECONDS = 300;
 const DEFAULT_PERIPHERAL_BATTERY_POLLING_FREQUENCY_SECONDS = 3600;
+const DEFAULT_CPU_HARDWARE_SUMMARY_READING_KINDS = ["usage", "temperature", "power"] as const;
+const DEFAULT_GPU_HARDWARE_SUMMARY_READING_KINDS = ["usage", "temperature", "vram"] as const;
 
 export function resolveStoredWidgetSettings(
     options: ResolveStoredWidgetSettingsOptions,
@@ -69,6 +87,15 @@ export function resolveStoredWidgetSettings(
     const globalSettings = resolveStoredGlobalSettings(options.storedGlobalSettings);
 
     switch (options.storedWidgetSettings.widget.case) {
+        case "hardwareSummary":
+            return {
+                widget: resolveHardwareSummaryWidget(
+                    options.storedWidgetSettings.widget.value,
+                    globalSettings,
+                    options.runtime,
+                ),
+                preferences: resolveWidgetPreferences(options.storedWidgetSettings),
+            };
         case "denseMultiMetric":
             return {
                 widget: resolveDenseMultiMetricWidget(
@@ -167,6 +194,138 @@ function resolveSingleMetricWidget(
         widgetKind: "singleMetric",
         slot: resolveMetricSlot(storedWidget?.slot, globalSettings, runtime),
     };
+}
+
+function resolveHardwareSummaryWidget(
+    storedWidget: StoredHardwareSummaryWidget,
+    globalSettings: ResolvedGlobalSettings,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedHardwareSummaryWidget {
+    return {
+        widgetKind: "hardwareSummary",
+        source: resolveMetricSourcePolicy(storedWidget.sourcePolicy),
+        target: resolveHardwareSummaryTarget(storedWidget, runtime),
+        appearance: resolveDenseAppearanceSettings(storedWidget.appearance, globalSettings),
+    };
+}
+
+function resolveHardwareSummaryTarget(
+    storedWidget: StoredHardwareSummaryWidget,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedHardwareSummaryTarget {
+    switch (storedWidget.target.case) {
+        case "gpu":
+            return resolveGpuHardwareSummaryTarget(storedWidget.target.value, runtime);
+        case "cpu":
+            return resolveCpuHardwareSummaryTarget(storedWidget.target.value);
+        case undefined:
+            return resolveCpuHardwareSummaryTarget(undefined);
+    }
+}
+
+function resolveCpuHardwareSummaryTarget(
+    storedTarget: StoredCpuHardwareSummaryTarget | undefined,
+): ResolvedHardwareSummaryTarget {
+    return {
+        domain: "cpu",
+        orderedReadings: resolveCpuHardwareSummaryReadings(storedTarget?.orderedReadings ?? []),
+    };
+}
+
+function resolveCpuHardwareSummaryReadings(
+    storedReadings: readonly StoredCpuHardwareSummaryReading[],
+): ResolvedCpuHardwareSummaryReadings {
+    return resolveHardwareSummaryReadings(
+        storedReadings,
+        DEFAULT_CPU_HARDWARE_SUMMARY_READING_KINDS,
+        resolveCpuHardwareSummaryReading,
+        resolveDefaultCpuHardwareSummaryReading,
+        "CPU",
+    );
+}
+
+function resolveGpuHardwareSummaryTarget(
+    storedTarget: StoredGpuHardwareSummaryTarget,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedHardwareSummaryTarget {
+    return {
+        domain: "gpu",
+        gpuId: storedTarget.gpuId,
+        orderedReadings: resolveGpuHardwareSummaryReadings(storedTarget.orderedReadings, runtime),
+    };
+}
+
+function resolveGpuHardwareSummaryReadings(
+    storedReadings: readonly StoredGpuHardwareSummaryReading[],
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedGpuHardwareSummaryReadings {
+    return resolveHardwareSummaryReadings(
+        storedReadings,
+        DEFAULT_GPU_HARDWARE_SUMMARY_READING_KINDS,
+        (storedReading) => resolveGpuHardwareSummaryReading(storedReading, runtime),
+        (kind) => resolveDefaultGpuHardwareSummaryReading(kind, runtime),
+        "GPU",
+    );
+}
+
+type HardwareSummaryReadingTriple<TReading> = readonly [TReading, TReading, TReading];
+
+function resolveHardwareSummaryReadings<
+    TStoredReading,
+    TReading extends { readonly kind: string },
+    TKind extends TReading["kind"],
+>(
+    storedReadings: readonly TStoredReading[],
+    defaultKinds: readonly TKind[],
+    resolveStoredReading: (storedReading: TStoredReading) => TReading | undefined,
+    resolveDefaultReading: (kind: TKind) => TReading,
+    summaryDomainLabel: string,
+): HardwareSummaryReadingTriple<TReading> {
+    const resolvedReadings: TReading[] = [];
+    const resolvedKinds = new Set<TReading["kind"]>();
+
+    for (const storedReading of storedReadings) {
+        const resolvedReading = resolveStoredReading(storedReading);
+        if (resolvedReading === undefined || resolvedKinds.has(resolvedReading.kind)) {
+            continue;
+        }
+
+        resolvedReadings.push(resolvedReading);
+        resolvedKinds.add(resolvedReading.kind);
+        if (resolvedReadings.length === defaultKinds.length) {
+            return toHardwareSummaryReadingTriple(resolvedReadings, summaryDomainLabel);
+        }
+    }
+
+    for (const kind of defaultKinds) {
+        if (resolvedKinds.has(kind)) {
+            continue;
+        }
+
+        resolvedReadings.push(resolveDefaultReading(kind));
+        resolvedKinds.add(kind);
+        if (resolvedReadings.length === defaultKinds.length) {
+            return toHardwareSummaryReadingTriple(resolvedReadings, summaryDomainLabel);
+        }
+    }
+
+    return toHardwareSummaryReadingTriple(resolvedReadings, summaryDomainLabel);
+}
+
+function toHardwareSummaryReadingTriple<TReading>(
+    resolvedReadings: readonly TReading[],
+    summaryDomainLabel: string,
+): HardwareSummaryReadingTriple<TReading> {
+    const firstReading = resolvedReadings[0];
+    const secondReading = resolvedReadings[1];
+    const thirdReading = resolvedReadings[2];
+    if (firstReading === undefined || secondReading === undefined || thirdReading === undefined) {
+        return throwUnexpectedStoredSettingsState(
+            `${summaryDomainLabel} hardware summary must resolve to exactly 3 readings.`,
+        );
+    }
+
+    return [firstReading, secondReading, thirdReading];
 }
 
 function resolveDenseMultiMetricWidget(
