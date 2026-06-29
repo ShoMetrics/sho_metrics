@@ -36,6 +36,24 @@ export const multiMetricMessages = {
     },
 } as const satisfies LocalizedMessages;
 
+export const hardwareSummaryMessages = {
+    primaryMetricLabel: {
+        en: "Primary",
+        zh_CN: "主要指标",
+        ja: "メイン",
+    },
+    secondaryMetricOneLabel: {
+        en: "Secondary 1",
+        zh_CN: "次要指标 1",
+        ja: "サブ 1",
+    },
+    secondaryMetricTwoLabel: {
+        en: "Secondary 2",
+        zh_CN: "次要指标 2",
+        ja: "サブ 2",
+    },
+} as const satisfies LocalizedMessages;
+
 export const cpuMessages = {
     cpuMetricLabel: {
         en: "CPU Metric",

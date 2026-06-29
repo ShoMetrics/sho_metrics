@@ -16,13 +16,16 @@ import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     buildCpuMetricKindOptionList,
+    isSummaryMetricKind,
     resolveCpuMetricKindMetricKey,
+    summaryMetricKindOption,
     temperatureUnitOptionList,
 } from "./setting-options";
 import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing/metric-source-preferences";
 
 type CpuTemperatureReading = Extract<ResolvedCpuReading, { readonly kind: "temperature" }>;
 type CpuPowerReading = Extract<ResolvedCpuReading, { readonly kind: "power" }>;
+type CpuMetricChoice = ResolvedCpuReading["kind"] | "summary";
 
 type CpuWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedCpuMetricTarget;
@@ -57,7 +60,10 @@ function CpuMetricSettings({
     const i18n = useI18n();
     const { t } = i18n;
     const reading = target.reading;
-    const optionList = buildCpuMetricKindOptionList(context.platform, reading.kind);
+    const optionList = [
+        ...buildCpuMetricKindOptionList(context.platform, reading.kind),
+        summaryMetricKindOption,
+    ] as const satisfies readonly { readonly value: CpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isBuiltInMetricSupportedOnPlatform(
         resolveCpuMetricKindMetricKey(reading.kind),
         context.platform,
@@ -75,9 +81,23 @@ function CpuMetricSettings({
                 label={t(cpuMessages.cpuMetricLabel)}
                 value={reading.kind}
                 optionList={localizeOptionList(t, optionList, cpuMetricKindMessageByValue)}
-                onValueChange={(kind) => onSettingsPatch({
-                    cpu: { kind },
-                })}
+                onValueChange={(kind) => {
+                    if (isSummaryMetricKind(kind)) {
+                        onSettingsPatch({
+                            hardwareSummary: {
+                                switchTo: {
+                                    widgetKind: "hardwareSummary",
+                                    domain: "cpu",
+                                },
+                            },
+                        });
+                        return;
+                    }
+
+                    onSettingsPatch({
+                        cpu: { kind },
+                    });
+                }}
             />
             {!isSelectedReadingSupported && (
                 <InspectorItem className="note-item note-item-caption">
@@ -154,6 +174,7 @@ const cpuMetricKindMessageByValue = {
     usage: optionMessages.usageOption,
     temperature: optionMessages.temperatureOption,
     power: optionMessages.powerOption,
+    summary: optionMessages.summaryOption,
 } as const;
 
 const temperatureUnitMessageByValue = {

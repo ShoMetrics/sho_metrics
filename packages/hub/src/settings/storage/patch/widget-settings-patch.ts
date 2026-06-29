@@ -3,6 +3,8 @@ import {
     AppearanceSettingsSchema,
     CatalogMetricTargetSchema,
     CustomMetricTargetSchema,
+    CpuHardwareSummaryReadingSchema,
+    CpuHardwareSummaryTargetSchema,
     CpuMetricTarget_PowerSchema,
     CpuMetricTarget_TemperatureSchema,
     CpuMetricTarget_UsageSchema,
@@ -11,11 +13,14 @@ import {
     DiskMetricTargetSchema,
     DiskMetricTarget_ThroughputSchema,
     DiskMetricTarget_UsageSchema,
+    GpuHardwareSummaryReadingSchema,
+    GpuHardwareSummaryTargetSchema,
     GpuMetricTarget_PowerSchema,
     GpuMetricTarget_TemperatureSchema,
     GpuMetricTarget_UsageSchema,
     GpuMetricTarget_VramSchema,
     GpuMetricTargetSchema,
+    HardwareSummaryWidgetSchema,
     MemoryMetricTarget_UsageSchema,
     MemoryMetricTargetSchema,
     MetricSelectionSchema,
@@ -39,12 +44,17 @@ import {
     SystemPeripheralIdentitySchema,
     WidgetPreferencesSchema,
     type CatalogMetricTarget as StoredCatalogMetricTarget,
+    type CpuHardwareSummaryReading as StoredCpuHardwareSummaryReading,
+    type CpuHardwareSummaryTarget as StoredCpuHardwareSummaryTarget,
     type CustomMetricTarget as StoredCustomMetricTarget,
     type DenseMetricSlot as StoredDenseMetricSlot,
     type DenseMultiMetricWidget as StoredDenseMultiMetricWidget,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
+    type GpuHardwareSummaryReading as StoredGpuHardwareSummaryReading,
+    type GpuHardwareSummaryTarget as StoredGpuHardwareSummaryTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
+    type HardwareSummaryWidget as StoredHardwareSummaryWidget,
     type MetricSelection as StoredMetricSelection,
     type MetricSlot as StoredMetricSlot,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
@@ -91,6 +101,7 @@ import type {
     DenseMetricSlotPatch,
     DenseMetricTargetPatch,
     DenseWidgetSettingsPatch,
+    HardwareSummaryWidgetSettingsPatch,
     SingleMetricWidgetSettingsPatch,
     StackedMetricSlotPatch,
     StackedWidgetSettingsPatch,
@@ -108,14 +119,17 @@ import {
     storedCatalogMetricReadingKindByResolved,
     storedDiskThroughputDirectionByResolved,
     storedNetworkDirectionByResolved,
+    storedSourceFailureModeByResolved,
     storedSystemPeripheralBindingTransportByResolved,
     storedSystemPeripheralReceiverKindByResolved,
+    storedTemperatureUnitByResolved,
 } from "../resolved-to-stored-enum-maps";
 
 export type {
     DenseMetricSlotPatch,
     DenseMetricTargetPatch,
     DenseWidgetSettingsPatch,
+    HardwareSummaryWidgetSettingsPatch,
     SingleMetricWidgetSettingsPatch,
     StackedMetricSlotPatch,
     StackedWidgetSettingsPatch,
@@ -155,6 +169,10 @@ function applyPatch(
 
     if (patch.stacked) {
         applyStackedPatch(requireStackedMetricWidget(settings), patch.stacked, createSlotId);
+    }
+
+    if (patch.hardwareSummary) {
+        applyHardwareSummaryPatch(settings, patch.hardwareSummary);
     }
 
     if (patch.appearance) {
@@ -264,6 +282,373 @@ function applyStackedPatch(
 
         widget.slots.splice(slotIndex, 1);
     }
+}
+
+function applyHardwareSummaryPatch(
+    settings: StoredWidgetSettings,
+    patch: HardwareSummaryWidgetSettingsPatch,
+): void {
+    if (patch.switchTo !== undefined) {
+        applyHardwareSummaryModePatch(settings, patch.switchTo);
+    }
+
+    if (settings.widget.case !== "hardwareSummary") {
+        return;
+    }
+
+    const widget = settings.widget.value;
+    if (patch.appearance !== undefined) {
+        applyAppearancePatch(widget.appearance ??= create(AppearanceSettingsSchema), patch.appearance);
+    }
+    if (patch.source !== undefined) {
+        widget.sourcePolicy = buildStoredMetricSourcePolicy(patch.source);
+    }
+    if (patch.orderedReadings !== undefined) {
+        applyHardwareSummaryOrderedReadingsPatch(widget, patch.orderedReadings);
+    }
+    if (patch.cpu !== undefined) {
+        applyCpuHardwareSummaryPatch(requireCpuHardwareSummaryTarget(widget), patch.cpu);
+    }
+    if (patch.gpu !== undefined) {
+        applyGpuHardwareSummaryPatch(requireGpuHardwareSummaryTarget(widget), patch.gpu);
+    }
+}
+
+function applyHardwareSummaryModePatch(
+    settings: StoredWidgetSettings,
+    patch: NonNullable<HardwareSummaryWidgetSettingsPatch["switchTo"]>,
+): void {
+    switch (patch.widgetKind) {
+        case "hardwareSummary":
+            settings.widget = {
+                case: "hardwareSummary",
+                value: buildDefaultHardwareSummaryWidget(settings, patch.domain),
+            };
+            return;
+        case "singleMetric":
+            settings.widget = {
+                case: "singleMetric",
+                value: buildDefaultSingleMetricWidgetFromCurrentSettings(settings, patch),
+            };
+            return;
+    }
+}
+
+function buildDefaultHardwareSummaryWidget(
+    settings: StoredWidgetSettings,
+    domain: "cpu" | "gpu",
+): StoredHardwareSummaryWidget {
+    const singleMetric = settings.widget.case === "singleMetric" ? settings.widget.value : undefined;
+    const summary = create(HardwareSummaryWidgetSchema, {
+        sourcePolicy: singleMetric?.slot?.metric?.sourcePolicy,
+        appearance: singleMetric?.slot?.overrides?.appearance === undefined
+            ? undefined
+            : create(AppearanceSettingsSchema, singleMetric.slot.overrides.appearance),
+        target: buildDefaultHardwareSummaryTarget(domain),
+    });
+
+    return summary;
+}
+
+function buildDefaultSingleMetricWidgetFromCurrentSettings(
+    settings: StoredWidgetSettings,
+    patch: Extract<
+        NonNullable<HardwareSummaryWidgetSettingsPatch["switchTo"]>,
+        { readonly widgetKind: "singleMetric" }
+    >,
+): StoredSingleMetricWidget {
+    const summary = settings.widget.case === "hardwareSummary" ? settings.widget.value : undefined;
+    const widget = buildDefaultSingleMetricWidget(patch.domain);
+    const metric = widget.slot?.metric;
+    if (metric === undefined) {
+        return throwPatchTargetMismatch("Cannot build a single metric widget without a metric selection.");
+    }
+
+    metric.sourcePolicy = summary?.sourcePolicy;
+    switch (patch.domain) {
+        case "cpu":
+            metric.target = {
+                case: "cpu",
+                value: create(CpuMetricTargetSchema, {
+                    reading: readCpuSummaryPrimaryReading(summary, patch.kind) ?? buildDenseCpuReading(patch.kind),
+                }),
+            };
+            break;
+        case "gpu":
+            metric.target = {
+                case: "gpu",
+                value: create(GpuMetricTargetSchema, {
+                    reading: readGpuSummaryPrimaryReading(summary, patch.kind) ?? buildDenseGpuReading(patch.kind),
+                }),
+            };
+            break;
+    }
+
+    if (summary?.appearance !== undefined && widget.slot !== undefined) {
+        const overrides = ensureSlotOverrides(widget.slot);
+        overrides.appearance = create(AppearanceSettingsSchema, summary.appearance);
+    }
+
+    return widget;
+}
+
+function readCpuSummaryPrimaryReading(
+    summary: StoredHardwareSummaryWidget | undefined,
+    kind: StoredCpuReadingCase,
+): StoredCpuMetricTarget["reading"] | undefined {
+    if (summary?.target.case !== "cpu") {
+        return undefined;
+    }
+
+    const reading = summary.target.value.orderedReadings.find(candidateReading => candidateReading.reading.case === kind)
+        ?.reading;
+    if (reading?.case !== kind) {
+        return undefined;
+    }
+
+    switch (reading.case) {
+        case "usage":
+            return { case: "usage", value: create(CpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return {
+                case: "temperature",
+                value: create(CpuMetricTarget_TemperatureSchema, reading.value),
+            };
+        case "power":
+            return {
+                case: "power",
+                value: create(CpuMetricTarget_PowerSchema, reading.value),
+            };
+    }
+}
+
+function readGpuSummaryPrimaryReading(
+    summary: StoredHardwareSummaryWidget | undefined,
+    kind: StoredGpuReadingCase,
+): StoredGpuMetricTarget["reading"] | undefined {
+    if (summary?.target.case !== "gpu") {
+        return undefined;
+    }
+
+    const reading = summary.target.value.orderedReadings.find(candidateReading => candidateReading.reading.case === kind)
+        ?.reading;
+    if (reading?.case !== kind) {
+        return undefined;
+    }
+
+    switch (reading.case) {
+        case "usage":
+            return { case: "usage", value: create(GpuMetricTarget_UsageSchema) };
+        case "temperature":
+            return {
+                case: "temperature",
+                value: create(GpuMetricTarget_TemperatureSchema, reading.value),
+            };
+        case "vram":
+            return { case: "vram", value: create(GpuMetricTarget_VramSchema) };
+        case "power":
+            return {
+                case: "power",
+                value: create(GpuMetricTarget_PowerSchema, reading.value),
+            };
+    }
+}
+
+function buildDefaultHardwareSummaryTarget(domain: "cpu" | "gpu"): StoredHardwareSummaryWidget["target"] {
+    switch (domain) {
+        case "cpu":
+            return {
+                case: "cpu",
+                value: create(CpuHardwareSummaryTargetSchema, {
+                    orderedReadings: [
+                        create(CpuHardwareSummaryReadingSchema, { reading: buildDenseCpuReading("usage") }),
+                        create(CpuHardwareSummaryReadingSchema, { reading: buildDenseCpuReading("temperature") }),
+                        create(CpuHardwareSummaryReadingSchema, { reading: buildDenseCpuReading("power") }),
+                    ],
+                }),
+            };
+        case "gpu":
+            return {
+                case: "gpu",
+                value: create(GpuHardwareSummaryTargetSchema, {
+                    orderedReadings: [
+                        create(GpuHardwareSummaryReadingSchema, { reading: buildDenseGpuReading("usage") }),
+                        create(GpuHardwareSummaryReadingSchema, { reading: buildDenseGpuReading("temperature") }),
+                        create(GpuHardwareSummaryReadingSchema, { reading: buildDenseGpuReading("vram") }),
+                    ],
+                }),
+            };
+    }
+}
+
+function applyHardwareSummaryOrderedReadingsPatch(
+    widget: StoredHardwareSummaryWidget,
+    orderedReadings: NonNullable<HardwareSummaryWidgetSettingsPatch["orderedReadings"]>,
+): void {
+    switch (widget.target.case) {
+        case "cpu":
+            widget.target.value.orderedReadings = orderedReadings.map(buildCpuHardwareSummaryReading);
+            return;
+        case "gpu":
+            widget.target.value.orderedReadings = orderedReadings.map(buildGpuHardwareSummaryReading);
+            return;
+        case undefined:
+            return throwPatchTargetMismatch("Cannot update summary readings before choosing CPU or GPU.");
+    }
+}
+
+function buildCpuHardwareSummaryReading(
+    reading: NonNullable<HardwareSummaryWidgetSettingsPatch["orderedReadings"]>[number],
+): StoredCpuHardwareSummaryReading {
+    switch (reading.kind) {
+        case "usage":
+            return create(CpuHardwareSummaryReadingSchema, {
+                reading: { case: "usage", value: create(CpuMetricTarget_UsageSchema) },
+            });
+        case "temperature":
+            return create(CpuHardwareSummaryReadingSchema, {
+                reading: {
+                    case: "temperature",
+                    value: create(CpuMetricTarget_TemperatureSchema, {
+                        maximumTemperatureCelsius: reading.maximumCelsius,
+                        temperatureUnit: storedTemperatureUnitByResolved[reading.unit],
+                    }),
+                },
+            });
+        case "power":
+            return create(CpuHardwareSummaryReadingSchema, {
+                reading: {
+                    case: "power",
+                    value: create(CpuMetricTarget_PowerSchema, {
+                        maximumPowerWatts: reading.maximumWatts,
+                    }),
+                },
+            });
+        case "vram":
+            return throwPatchTargetMismatch("CPU hardware summary cannot use VRAM.");
+    }
+}
+
+function buildGpuHardwareSummaryReading(
+    reading: NonNullable<HardwareSummaryWidgetSettingsPatch["orderedReadings"]>[number],
+): StoredGpuHardwareSummaryReading {
+    switch (reading.kind) {
+        case "usage":
+            return create(GpuHardwareSummaryReadingSchema, {
+                reading: { case: "usage", value: create(GpuMetricTarget_UsageSchema) },
+            });
+        case "temperature":
+            return create(GpuHardwareSummaryReadingSchema, {
+                reading: {
+                    case: "temperature",
+                    value: create(GpuMetricTarget_TemperatureSchema, {
+                        maximumTemperatureCelsius: reading.maximumCelsius,
+                        temperatureUnit: storedTemperatureUnitByResolved[reading.unit],
+                    }),
+                },
+            });
+        case "vram":
+            return create(GpuHardwareSummaryReadingSchema, {
+                reading: { case: "vram", value: create(GpuMetricTarget_VramSchema) },
+            });
+        case "power":
+            return create(GpuHardwareSummaryReadingSchema, {
+                reading: {
+                    case: "power",
+                    value: create(GpuMetricTarget_PowerSchema, {
+                        maximumPowerWatts: reading.maximumWatts,
+                    }),
+                },
+            });
+    }
+}
+
+function applyCpuHardwareSummaryPatch(
+    target: StoredCpuHardwareSummaryTarget,
+    patch: NonNullable<HardwareSummaryWidgetSettingsPatch["cpu"]>,
+): void {
+    if (patch.temperatureUnit !== undefined) {
+        ensureCpuHardwareSummaryTemperatureReading(target).temperatureUnit =
+            storedTemperatureUnitByResolved[patch.temperatureUnit];
+    }
+    if (patch.maximumTemperatureCelsius !== undefined) {
+        ensureCpuHardwareSummaryTemperatureReading(target).maximumTemperatureCelsius =
+            patch.maximumTemperatureCelsius;
+    }
+    if ("maximumPowerWatts" in patch) {
+        ensureCpuHardwareSummaryPowerReading(target).maximumPowerWatts = patch.maximumPowerWatts;
+    }
+}
+
+function applyGpuHardwareSummaryPatch(
+    target: StoredGpuHardwareSummaryTarget,
+    patch: NonNullable<HardwareSummaryWidgetSettingsPatch["gpu"]>,
+): void {
+    if (patch.temperatureUnit !== undefined) {
+        ensureGpuHardwareSummaryTemperatureReading(target).temperatureUnit =
+            storedTemperatureUnitByResolved[patch.temperatureUnit];
+    }
+    if (patch.maximumTemperatureCelsius !== undefined) {
+        ensureGpuHardwareSummaryTemperatureReading(target).maximumTemperatureCelsius =
+            patch.maximumTemperatureCelsius;
+    }
+    if ("maximumPowerWatts" in patch) {
+        ensureGpuHardwareSummaryPowerReading(target).maximumPowerWatts = patch.maximumPowerWatts;
+    }
+}
+
+function ensureCpuHardwareSummaryTemperatureReading(
+    target: StoredCpuHardwareSummaryTarget,
+) {
+    const reading = target.orderedReadings.find((candidateReading) => candidateReading.reading.case === "temperature");
+    if (reading?.reading.case !== "temperature") {
+        return throwPatchTargetMismatch("Cannot patch CPU summary temperature settings when temperature is not selected.");
+    }
+
+    return reading.reading.value;
+}
+
+function ensureCpuHardwareSummaryPowerReading(
+    target: StoredCpuHardwareSummaryTarget,
+) {
+    const reading = target.orderedReadings.find((candidateReading) => candidateReading.reading.case === "power");
+    if (reading?.reading.case !== "power") {
+        return throwPatchTargetMismatch("Cannot patch CPU summary power settings when power is not selected.");
+    }
+
+    return reading.reading.value;
+}
+
+function ensureGpuHardwareSummaryTemperatureReading(
+    target: StoredGpuHardwareSummaryTarget,
+) {
+    const reading = target.orderedReadings.find((candidateReading) => candidateReading.reading.case === "temperature");
+    if (reading?.reading.case !== "temperature") {
+        return throwPatchTargetMismatch("Cannot patch GPU summary temperature settings when temperature is not selected.");
+    }
+
+    return reading.reading.value;
+}
+
+function ensureGpuHardwareSummaryPowerReading(
+    target: StoredGpuHardwareSummaryTarget,
+) {
+    const reading = target.orderedReadings.find((candidateReading) => candidateReading.reading.case === "power");
+    if (reading?.reading.case !== "power") {
+        return throwPatchTargetMismatch("Cannot patch GPU summary power settings when power is not selected.");
+    }
+
+    return reading.reading.value;
+}
+
+function buildStoredMetricSourcePolicy(
+    patch: NonNullable<StoredWidgetSettingsPatch["source"]>,
+): StoredMetricSelection["sourcePolicy"] {
+    const sourcePolicy = create(MetricSourcePolicySchema);
+    sourcePolicy.primarySourceProfileId = patch.primarySourceProfileId;
+    sourcePolicy.fallbackSourceProfileIds = [...patch.fallbackSourceProfileIds];
+    sourcePolicy.failureMode = storedSourceFailureModeByResolved[patch.failureMode];
+    return sourcePolicy;
 }
 
 function applyStackedRotationPatch(
@@ -786,6 +1171,22 @@ function requireStackedMetricWidget(settings: StoredWidgetSettings): StoredStack
     }
 
     return settings.widget.value;
+}
+
+function requireCpuHardwareSummaryTarget(widget: StoredHardwareSummaryWidget): StoredCpuHardwareSummaryTarget {
+    if (widget.target.case !== "cpu") {
+        return throwPatchTargetMismatch("Cannot apply a CPU summary patch to a non-CPU summary widget.");
+    }
+
+    return widget.target.value;
+}
+
+function requireGpuHardwareSummaryTarget(widget: StoredHardwareSummaryWidget): StoredGpuHardwareSummaryTarget {
+    if (widget.target.case !== "gpu") {
+        return throwPatchTargetMismatch("Cannot apply a GPU summary patch to a non-GPU summary widget.");
+    }
+
+    return widget.target.value;
 }
 
 function requireDenseMetricSlot(

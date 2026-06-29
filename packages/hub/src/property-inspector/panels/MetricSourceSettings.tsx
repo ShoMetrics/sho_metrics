@@ -15,7 +15,7 @@ type LocalMetricSourcePreference = "auto" | "windows-helper" | "node-system" | "
 
 interface MetricSourceSettingsProps {
     readonly sourcePolicy: ResolvedMetricSourcePolicy;
-    readonly onSettingsPatch: (patch: StoredWidgetSettingsPatch) => void;
+    readonly onSourcePatch: (patch: NonNullable<StoredWidgetSettingsPatch["source"]>) => void;
 }
 
 const sourcePreferenceOptionList = [
@@ -31,7 +31,7 @@ const customSourcePreferenceOption = {
 
 export function MetricSourceSettings({
     sourcePolicy,
-    onSettingsPatch,
+    onSourcePatch,
 }: MetricSourceSettingsProps): React.JSX.Element {
     const { t } = useI18n();
     const sourcePreference = resolveLocalMetricSourcePreference(sourcePolicy);
@@ -49,9 +49,7 @@ export function MetricSourceSettings({
                     return;
                 }
 
-                onSettingsPatch({
-                    source: buildLocalMetricSourcePreferencePatch(nextSourcePreference),
-                });
+                onSourcePatch(buildLocalMetricSourcePreferencePatch(nextSourcePreference));
             }}
         />
     );

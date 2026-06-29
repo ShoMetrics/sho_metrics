@@ -10,6 +10,7 @@ import type { VisibilityContext } from "../inspector/types";
 import type { ColorCompensationProfile } from "../../color-compensation/types";
 import { ColorCompensationControls } from "./ColorCompensationControls";
 import { DenseMultiMetricWidgetSettings } from "./DenseMultiMetricWidgetSettings";
+import { HardwareSummaryWidgetSettings } from "./HardwareSummaryWidgetSettings";
 import { MetricSourceDiagnostic } from "./MetricSourceDiagnostic";
 import { SettingsSection } from "./SettingsSection";
 import { SingleMetricWidgetSettings } from "./SingleMetricWidgetSettings";
@@ -157,6 +158,13 @@ function renderMetricPanel(
     if (panelProps.context.resolved.widget.widgetKind === "stackedMetric") {
         return actionKind === "stackedMetric"
             ? <StackedMetricWidgetSettings {...panelProps} widget={panelProps.context.resolved.widget} />
+            : <DomainMismatchNotice />;
+    }
+
+    if (panelProps.context.resolved.widget.widgetKind === "hardwareSummary") {
+        const target = panelProps.context.resolved.widget.target;
+        return actionKind === target.domain
+            ? <HardwareSummaryWidgetSettings {...panelProps} widget={panelProps.context.resolved.widget} />
             : <DomainMismatchNotice />;
     }
 

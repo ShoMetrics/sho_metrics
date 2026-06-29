@@ -157,6 +157,17 @@ export const gpuMetricKindOptionList = [
     { value: "power", label: "Power" },
 ] as const satisfies readonly SelectOption<ResolvedGpuReading["kind"]>[];
 
+export const summaryMetricKindOption = {
+    value: "summary",
+    label: "Summary",
+} as const satisfies SelectOption<"summary">;
+
+export type SummaryMetricKind = typeof summaryMetricKindOption.value;
+
+export function isSummaryMetricKind(value: string): value is SummaryMetricKind {
+    return value === summaryMetricKindOption.value;
+}
+
 export const temperatureUnitOptionList = [
     { value: "celsius", label: "Celsius" },
     { value: "fahrenheit", label: "Fahrenheit" },
