@@ -157,13 +157,16 @@ export const gpuMetricKindOptionList = [
     { value: "power", label: "Power" },
 ] as const satisfies readonly SelectOption<ResolvedGpuReading["kind"]>[];
 
+/** Stable PI sentinel for switching a CPU/GPU metric selector into hardware summary mode. */
 export const summaryMetricKindOption = {
     value: "summary",
     label: "Summary",
 } as const satisfies SelectOption<"summary">;
 
+/** Stable string value used by metric selectors for the hardware summary choice. */
 export type SummaryMetricKind = typeof summaryMetricKindOption.value;
 
+/** Checks whether a metric selector value is the hardware summary sentinel. */
 export function isSummaryMetricKind(value: string): value is SummaryMetricKind {
     return value === summaryMetricKindOption.value;
 }

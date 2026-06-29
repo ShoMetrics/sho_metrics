@@ -4,6 +4,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { test } from "vitest";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../color-compensation/types";
+import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
+import { NODE_SYSTEM_SOURCE_ID } from "../../runtime/sources/source-ids";
+import { wallClockNowMilliseconds } from "../../shared/clock";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import {
     writeStoredWidgetSettingsPatch,
@@ -24,7 +27,7 @@ test("CPU metric selector can switch to hardware summary", async () => {
     />);
 
     await user.click(screen.getByRole("combobox", { name: /^CPU Metric:/ }));
-    await user.click(screen.getByRole("option", { name: "Summary" }));
+    await user.click(screen.getByRole("option", { name: "Triple: Load, Temp, Power..." }));
 
     await waitFor(() => {
         assert.notEqual(screen.queryByRole("combobox", { name: /^Primary:/ }), null);
@@ -80,13 +83,49 @@ test("hardware summary metric selector switches back to a single metric", async 
     });
 });
 
+test("hardware summary keeps widget polling controls", () => {
+    render(<HardwareSummarySettingsHarness
+        actionKind="cpu"
+        settings={buildCpuHardwareSummarySettings()}
+        onPatch={() => undefined}
+    />);
+
+    assert.notEqual(screen.queryByRole("combobox", { name: /^Polling Frequency:/ }), null);
+});
+
+test("hardware summary advanced controls render current metric read trace", async () => {
+    render(<HardwareSummarySettingsHarness
+        actionKind="cpu"
+        settings={buildCpuHardwareSummarySettings()}
+        runtimeCache={{
+            displayedMetricReadTrace: {
+                metricKey: "cpu.usage_percent",
+                routing: {
+                    preferredSourceId: NODE_SYSTEM_SOURCE_ID,
+                    selectedSourceId: NODE_SYSTEM_SOURCE_ID,
+                },
+                outcome: {
+                    kind: "value",
+                    valueTimestampMilliseconds: wallClockNowMilliseconds(),
+                    freshness: "fresh",
+                },
+            },
+        }}
+        onPatch={() => undefined}
+    />);
+
+    assert.notEqual(await screen.findByText(/Current source: Built-in/), null);
+});
+
 function HardwareSummarySettingsHarness({
     actionKind,
     settings: initialSettings,
+    runtimeCache,
     onPatch,
 }: {
     readonly actionKind: "cpu" | "gpu";
     readonly settings: InspectorTestSettings;
+    readonly runtimeCache?: WidgetRuntimeCachePatch;
     readonly onPatch: (patch: StoredWidgetSettingsPatch) => void;
 }): React.JSX.Element {
     const [settings, setSettings] = useState<InspectorTestSettings>(initialSettings);
@@ -97,6 +136,7 @@ function HardwareSummarySettingsHarness({
                 actionKind,
                 isWindows: true,
                 settings,
+                runtimeCache,
             })}
             isGlobalViewOverrideEnabled={false}
             isGlobalThemeOverrideEnabled={false}

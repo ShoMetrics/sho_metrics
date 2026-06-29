@@ -23,6 +23,7 @@ import { buildDefaultAppearanceSettings } from "../../src/settings/default-appea
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-resolver";
 import type { DenseMetricWidgetData } from "../../src/actions/dense-multi-metric/row-data";
+import type { HardwareSummaryWidgetData } from "../../src/actions/hardware-summary/widget-data";
 import type { StackedMetricIndicator } from "../../src/view-rendering/stacked-metric-indicator";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
@@ -208,6 +209,13 @@ export interface DenseMetricVisualTestCase {
     readonly snapshotName: string;
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: DenseMetricWidgetData;
+    readonly renderTarget?: MetricRenderTarget;
+}
+
+export interface HardwareSummaryVisualTestCase {
+    readonly snapshotName: string;
+    readonly appearance: ResolvedAppearanceSettingsOverride;
+    readonly data: HardwareSummaryWidgetData;
     readonly renderTarget?: MetricRenderTarget;
 }
 
@@ -400,6 +408,23 @@ export function renderDenseMetricWidgetPngBuffer(testCase: DenseMetricVisualTest
             resolvedSettings,
             widgetData: testCase.data,
             centerIconFragment: "",
+            statusIcon: getMetricStatusIcon("percentage"),
+            circleVariantOverride: resolvedSettings.view.circleVariant,
+        },
+    });
+
+    return renderSvgToPngBuffer(frame.svg, frame.renderPlan.pngSize);
+}
+
+export function renderHardwareSummaryWidgetPngBuffer(testCase: HardwareSummaryVisualTestCase): Buffer {
+    const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
+    const frame = composeMetricViewFrame({
+        renderTarget: testCase.renderTarget ?? "key",
+        viewOptions: {
+            metricRenderKind: "hardwareSummary",
+            resolvedSettings,
+            widgetData: testCase.data,
+            centerIconFragment: getHardwareIconFragment(testCase.data.domain),
             statusIcon: getMetricStatusIcon("percentage"),
             circleVariantOverride: resolvedSettings.view.circleVariant,
         },

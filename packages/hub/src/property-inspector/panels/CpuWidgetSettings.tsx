@@ -174,7 +174,7 @@ const cpuMetricKindMessageByValue = {
     usage: optionMessages.usageOption,
     temperature: optionMessages.temperatureOption,
     power: optionMessages.powerOption,
-    summary: optionMessages.summaryOption,
+    summary: optionMessages.cpuHardwareSummaryOption,
 } as const;
 
 const temperatureUnitMessageByValue = {

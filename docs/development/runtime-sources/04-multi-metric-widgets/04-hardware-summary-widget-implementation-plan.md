@@ -464,7 +464,7 @@ Files:
 
 - `packages/hub/src/view-rendering/metric-view-frame.ts`
 - `packages/hub/src/view-rendering/hardware-summary-view.ts`
-- `packages/hub/src/widgets/primitives/hardware-summary.ts`
+- `packages/hub/src/widgets/primitives/semi-circle-gauge-panel.ts`
 - `packages/hub/src/view-rendering/metric-view-frame.test.ts`
 - visual tests under `packages/hub/tests/visual`
 
