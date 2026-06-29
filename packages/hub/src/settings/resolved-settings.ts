@@ -59,7 +59,8 @@ export interface ResolvedWidgetSettings {
 export type ResolvedWidget =
     | ResolvedSingleMetricWidget
     | ResolvedDenseMultiMetricWidget
-    | ResolvedStackedMetricWidget;
+    | ResolvedStackedMetricWidget
+    | ResolvedHardwareSummaryWidget;
 
 export interface ResolvedSingleMetricWidget {
     readonly widgetKind: "singleMetric";
@@ -94,6 +95,45 @@ export interface ResolvedStackedMetricRotationSettings {
     readonly autoRotateEnabled: boolean;
     readonly intervalSeconds: number;
 }
+
+export interface ResolvedHardwareSummaryWidget {
+    readonly widgetKind: "hardwareSummary";
+    readonly source: ResolvedMetricSourcePolicy;
+    readonly target: ResolvedHardwareSummaryTarget;
+    readonly appearance: ResolvedAppearanceSettings;
+}
+
+export type ResolvedHardwareSummaryTarget =
+    | ResolvedCpuHardwareSummaryTarget
+    | ResolvedGpuHardwareSummaryTarget;
+
+export interface ResolvedCpuHardwareSummaryTarget {
+    readonly domain: "cpu";
+    readonly orderedReadings: ResolvedCpuHardwareSummaryReadings;
+}
+
+export interface ResolvedGpuHardwareSummaryTarget {
+    readonly domain: "gpu";
+    readonly gpuId: string | undefined;
+    readonly orderedReadings: ResolvedGpuHardwareSummaryReadings;
+}
+
+export type ResolvedHardwareSummaryReading =
+    | ResolvedCpuHardwareSummaryReading
+    | ResolvedGpuHardwareSummaryReading;
+
+export type ResolvedCpuHardwareSummaryReading = ResolvedCpuReading;
+export type ResolvedGpuHardwareSummaryReading = ResolvedGpuReading;
+export type ResolvedCpuHardwareSummaryReadings = readonly [
+    ResolvedCpuHardwareSummaryReading,
+    ResolvedCpuHardwareSummaryReading,
+    ResolvedCpuHardwareSummaryReading,
+];
+export type ResolvedGpuHardwareSummaryReadings = readonly [
+    ResolvedGpuHardwareSummaryReading,
+    ResolvedGpuHardwareSummaryReading,
+    ResolvedGpuHardwareSummaryReading,
+];
 
 export interface ResolvedMetricSlot {
     readonly metric: ResolvedMetric;
@@ -135,6 +175,17 @@ export function requireResolvedStackedMetricWidget(
 ): ResolvedStackedMetricWidget {
     if (settings.widget.widgetKind !== "stackedMetric") {
         throw new Error(`Expected stacked metric widget, received ${settings.widget.widgetKind}.`);
+    }
+
+    return settings.widget;
+}
+
+/** Narrows resolved settings for hardware summary action callers. */
+export function requireResolvedHardwareSummaryWidget(
+    settings: ResolvedWidgetSettings,
+): ResolvedHardwareSummaryWidget {
+    if (settings.widget.widgetKind !== "hardwareSummary") {
+        throw new Error(`Expected hardware summary widget, received ${settings.widget.widgetKind}.`);
     }
 
     return settings.widget;

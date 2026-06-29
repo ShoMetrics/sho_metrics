@@ -763,5 +763,7 @@ function formatResolvedWidgetForLog(settings: ResolvedWidgetSettings): string {
             return `denseMultiMetric:${settings.widget.slots.length}`;
         case "stackedMetric":
             return `stackedMetric:${settings.widget.slots.length}`;
+        case "hardwareSummary":
+            return `hardwareSummary:${settings.widget.target.domain}`;
     }
 }

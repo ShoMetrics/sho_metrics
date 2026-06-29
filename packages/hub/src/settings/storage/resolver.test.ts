@@ -11,13 +11,17 @@ import {
 } from "./resolver";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
+    CpuHardwareSummaryReadingSchema,
+    GpuHardwareSummaryReadingSchema,
     DenseMultiMetricWidgetSchema,
+    HardwareSummaryWidgetSchema,
     SingleMetricWidgetSchema,
     StackedMetricSlotSchema,
     StackedMetricWidgetSchema,
     StoredWidgetSettingsSchema,
 } from "../../generated/proto/shometrics/v1/settings_pb.js";
 import type {
+    ResolvedHardwareSummaryWidget,
     ResolvedSingleMetricWidget,
     ResolvedWidgetSettings,
 } from "../resolved-settings";
@@ -1653,6 +1657,200 @@ describe("stored settings proto resolver", () => {
         }
     });
 
+    it("resolves absent CPU hardware summary readings to default order", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "hardwareSummary",
+                value: create(HardwareSummaryWidgetSchema, {
+                    target: {
+                        case: "cpu",
+                        value: {},
+                    },
+                }),
+            },
+        });
+
+        const settings = resolveHardwareSummaryWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.target.domain, "cpu");
+        if (settings.widget.target.domain === "cpu") {
+            assert.deepEqual(settings.widget.target.orderedReadings.map((reading) => reading.kind), [
+                "usage",
+                "temperature",
+                "power",
+            ]);
+        }
+    });
+
+    it("resolves absent GPU hardware summary readings to default order", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "hardwareSummary",
+                value: create(HardwareSummaryWidgetSchema, {
+                    target: {
+                        case: "gpu",
+                        value: {},
+                    },
+                }),
+            },
+        });
+
+        const settings = resolveHardwareSummaryWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.target.domain, "gpu");
+        if (settings.widget.target.domain === "gpu") {
+            assert.deepEqual(settings.widget.target.orderedReadings.map((reading) => reading.kind), [
+                "usage",
+                "temperature",
+                "vram",
+            ]);
+        }
+    });
+
+    it("repairs duplicated and incomplete CPU hardware summary readings", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "hardwareSummary",
+                value: create(HardwareSummaryWidgetSchema, {
+                    target: {
+                        case: "cpu",
+                        value: {
+                            orderedReadings: [
+                                create(CpuHardwareSummaryReadingSchema, {
+                                    reading: { case: "usage", value: {} },
+                                }),
+                                create(CpuHardwareSummaryReadingSchema, {
+                                    reading: {
+                                        case: "temperature",
+                                        value: { maximumTemperatureCelsius: 90 },
+                                    },
+                                }),
+                                create(CpuHardwareSummaryReadingSchema, {
+                                    reading: {
+                                        case: "temperature",
+                                        value: { maximumTemperatureCelsius: 95 },
+                                    },
+                                }),
+                                create(CpuHardwareSummaryReadingSchema, {
+                                    reading: { case: "usage", value: {} },
+                                }),
+                                create(CpuHardwareSummaryReadingSchema),
+                            ],
+                        },
+                    },
+                }),
+            },
+        });
+
+        const settings = resolveHardwareSummaryWidgetSettings({ storedWidgetSettings });
+
+        assert.equal(settings.widget.target.domain, "cpu");
+        if (settings.widget.target.domain === "cpu") {
+            assert.deepEqual(settings.widget.target.orderedReadings.map((reading) => reading.kind), [
+                "usage",
+                "temperature",
+                "power",
+            ]);
+            assert.deepEqual(settings.widget.target.orderedReadings[1], {
+                kind: "temperature",
+                maximumCelsius: 90,
+                unit: "celsius",
+            });
+            assert.deepEqual(settings.widget.target.orderedReadings[2], {
+                kind: "power",
+                maximumWatts: 150,
+            });
+        }
+    });
+
+    it("resolves GPU hardware summary reading defaults from single GPU rules", () => {
+        const storedWidgetSettings = create(StoredWidgetSettingsSchema, {
+            widget: {
+                case: "hardwareSummary",
+                value: create(HardwareSummaryWidgetSchema, {
+                    target: {
+                        case: "gpu",
+                        value: {
+                            gpuId: "gpu-1",
+                            orderedReadings: [
+                                create(GpuHardwareSummaryReadingSchema, {
+                                    reading: { case: "power", value: {} },
+                                }),
+                                create(GpuHardwareSummaryReadingSchema, {
+                                    reading: { case: "temperature", value: {} },
+                                }),
+                                create(GpuHardwareSummaryReadingSchema, {
+                                    reading: { case: "vram", value: {} },
+                                }),
+                            ],
+                        },
+                    },
+                }),
+            },
+        });
+
+        const settings = resolveHardwareSummaryWidgetSettings({
+            storedWidgetSettings,
+            runtime: {
+                runtimeMaximumGpuPowerWatts: 450,
+            },
+        });
+
+        assert.equal(settings.widget.target.domain, "gpu");
+        if (settings.widget.target.domain === "gpu") {
+            assert.equal(settings.widget.target.gpuId, "gpu-1");
+            assert.deepEqual(settings.widget.target.orderedReadings, [
+                { kind: "power", maximumWatts: 450 },
+                { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
+                { kind: "vram" },
+            ]);
+        }
+    });
+
+    it("resolves hardware summary source policy and shared appearance", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            hardwareSummary: {
+                sourcePolicy: {
+                    primarySourceProfileId: "remote",
+                    fallbackSourceProfileIds: ["local"],
+                    failureMode: "FAILURE_MODE_USE_FALLBACK",
+                },
+                cpu: {
+                    orderedReadings: [
+                        { usage: {} },
+                        { temperature: {} },
+                        { power: {} },
+                    ],
+                },
+                appearance: {
+                    theme: {
+                        selectedTheme: "METRIC_THEME_CUPERTINO_GLASS",
+                    },
+                    transparentSurface: {
+                        enabled: true,
+                        backgroundOpacityPercent: 30,
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveHardwareSummaryWidgetSettings({ storedWidgetSettings });
+
+        assert.deepEqual(settings.widget.source, {
+            primarySourceProfileId: "remote",
+            fallbackSourceProfileIds: ["local"],
+            failureMode: "useFallback",
+        });
+        assert.equal(settings.widget.appearance.view.selectedView, "circle");
+        assert.equal(settings.widget.appearance.theme.selectedTheme, "cupertino-glass");
+        assert.deepEqual(settings.widget.appearance.transparentSurface, {
+            enabled: true,
+            backgroundOpacityPercent: 30,
+            textOutlinePercent: 0,
+            shapeOutlinePercent: 0,
+        });
+    });
+
     it("resolves dense multi metric rows and shared appearance", () => {
         const storedWidgetSettings = readStoredWidgetSettings({
             denseMultiMetric: {
@@ -1977,6 +2175,20 @@ function resolveSingleMetricWidgetSettings(
     const settings = resolveStoredWidgetSettings(options);
     if (settings.widget.widgetKind !== "singleMetric") {
         assert.fail(`Expected singleMetric widget, received ${settings.widget.widgetKind}`);
+    }
+
+    return {
+        ...settings,
+        widget: settings.widget,
+    };
+}
+
+function resolveHardwareSummaryWidgetSettings(
+    options: Parameters<typeof resolveStoredWidgetSettings>[0],
+): ResolvedWidgetSettings & { readonly widget: ResolvedHardwareSummaryWidget } {
+    const settings = resolveStoredWidgetSettings(options);
+    if (settings.widget.widgetKind !== "hardwareSummary") {
+        assert.fail(`Expected hardwareSummary widget, received ${settings.widget.widgetKind}`);
     }
 
     return {

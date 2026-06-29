@@ -2,8 +2,10 @@ import {
     type CatalogMetricTarget as StoredCatalogMetricTarget,
     type CustomHttpMetricSource as StoredCustomHttpMetricSource,
     type CustomMetricTarget as StoredCustomMetricTarget,
+    type CpuHardwareSummaryReading as StoredCpuHardwareSummaryReading,
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
+    type GpuHardwareSummaryReading as StoredGpuHardwareSummaryReading,
     type GpuMetricTarget as StoredGpuMetricTarget,
     type MemoryMetricTarget as StoredMemoryMetricTarget,
     type MetricSelection as StoredMetricSelection,
@@ -15,6 +17,7 @@ import {
     type SystemPeripheralIdentity_VendorHidIdentity as StoredVendorHidIdentity,
     type SystemMetricTarget as StoredSystemMetricTarget,
     type SystemPeripheralIdentity as StoredSystemPeripheralIdentity,
+    TemperatureUnit as StoredTemperatureUnit,
 } from "../../../generated/proto/shometrics/v1/settings_pb.js";
 import {
     resolveCustomHttpFetchPolicy,
@@ -30,9 +33,12 @@ import type {
     ResolvedCatalogMetricTarget,
     ResolvedCustomMetricSource,
     ResolvedCustomMetricTarget,
+    ResolvedCpuHardwareSummaryReading,
+    ResolvedCpuReading,
     ResolvedSingleCustomHttpRequest,
     ResolvedDiskReading,
     ResolvedDiskThroughputDisplaySettings,
+    ResolvedGpuHardwareSummaryReading,
     ResolvedGpuReading,
     ResolvedMemoryReading,
     ResolvedMetric,
@@ -232,37 +238,82 @@ function resolveCpuMetricTarget(
         };
     }
 
-    const { reading } = storedTarget;
+    return {
+        domain: "cpu",
+        reading: resolveCpuMetricReading(storedTarget.reading),
+    };
+}
+
+export function resolveCpuHardwareSummaryReading(
+    storedReading: StoredCpuHardwareSummaryReading,
+): ResolvedCpuHardwareSummaryReading | undefined {
+    switch (storedReading.reading.case) {
+        case "usage":
+            return { kind: "usage" };
+        case "temperature":
+            return resolveCpuTemperatureReading(
+                storedReading.reading.value.maximumTemperatureCelsius,
+                storedReading.reading.value.temperatureUnit,
+            );
+        case "power":
+            return resolveCpuPowerReading(storedReading.reading.value.maximumPowerWatts);
+        case undefined:
+            return undefined;
+    }
+
+    return assertNever(storedReading.reading);
+}
+
+export function resolveDefaultCpuHardwareSummaryReading(
+    kind: ResolvedCpuHardwareSummaryReading["kind"],
+): ResolvedCpuHardwareSummaryReading {
+    switch (kind) {
+        case "usage":
+            return { kind: "usage" };
+        case "temperature":
+            return resolveCpuTemperatureReading(undefined, undefined);
+        case "power":
+            return resolveCpuPowerReading(undefined);
+    }
+}
+
+function resolveCpuMetricReading(
+    reading: StoredCpuMetricTarget["reading"],
+): ResolvedCpuReading {
     const readingCase = reading.case;
 
     switch (readingCase) {
         case "temperature":
-            return {
-                domain: "cpu",
-                reading: {
-                    kind: "temperature",
-                    maximumCelsius: reading.value.maximumTemperatureCelsius
-                        ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
-                    unit: resolveProtoEnum(reading.value.temperatureUnit, temperatureUnitByProto, "celsius"),
-                },
-            };
+            return resolveCpuTemperatureReading(
+                reading.value.maximumTemperatureCelsius,
+                reading.value.temperatureUnit,
+            );
         case "power":
-            return {
-                domain: "cpu",
-                reading: {
-                    kind: "power",
-                    maximumWatts: reading.value.maximumPowerWatts ?? DEFAULT_CPU_POWER_WATTS,
-                },
-            };
+            return resolveCpuPowerReading(reading.value.maximumPowerWatts);
         case "usage":
         case undefined:
-            return {
-                domain: "cpu",
-                reading: { kind: "usage" },
-            };
+            return { kind: "usage" };
     }
 
     return assertNever(readingCase);
+}
+
+function resolveCpuTemperatureReading(
+    maximumTemperatureCelsius: number | undefined,
+    temperatureUnit: StoredTemperatureUnit | undefined,
+): ResolvedCpuReading {
+    return {
+        kind: "temperature",
+        maximumCelsius: maximumTemperatureCelsius ?? DEFAULT_CPU_TEMPERATURE_CELSIUS,
+        unit: resolveProtoEnum(temperatureUnit, temperatureUnitByProto, "celsius"),
+    };
+}
+
+function resolveCpuPowerReading(maximumPowerWatts: number | undefined): ResolvedCpuReading {
+    return {
+        kind: "power",
+        maximumWatts: maximumPowerWatts ?? DEFAULT_CPU_POWER_WATTS,
+    };
 }
 
 function resolveMemoryMetricTarget(storedTarget: StoredMemoryMetricTarget): ResolvedMetricTarget {
@@ -402,27 +453,83 @@ function resolveGpuReading(
 
     switch (readingCase) {
         case "temperature":
-            return {
-                kind: "temperature",
-                maximumCelsius: reading.value.maximumTemperatureCelsius ?? DEFAULT_GPU_TEMPERATURE_CELSIUS,
-                unit: resolveProtoEnum(reading.value.temperatureUnit, temperatureUnitByProto, "celsius"),
-            };
+            return resolveGpuTemperatureReading(
+                reading.value.maximumTemperatureCelsius,
+                reading.value.temperatureUnit,
+            );
         case "vram":
             return { kind: "vram" };
         case "power":
-            return {
-                kind: "power",
-                maximumWatts: resolveGpuPowerMaximumWatts(
-                    reading.value.maximumPowerWatts,
-                    runtime?.runtimeMaximumGpuPowerWatts,
-                ),
-            };
+            return resolveGpuPowerReading(reading.value.maximumPowerWatts, runtime);
         case "usage":
         case undefined:
             return { kind: "usage" };
     }
 
     return assertNever(readingCase);
+}
+
+function resolveGpuTemperatureReading(
+    maximumTemperatureCelsius: number | undefined,
+    temperatureUnit: StoredTemperatureUnit | undefined,
+): ResolvedGpuReading {
+    return {
+        kind: "temperature",
+        maximumCelsius: maximumTemperatureCelsius ?? DEFAULT_GPU_TEMPERATURE_CELSIUS,
+        unit: resolveProtoEnum(temperatureUnit, temperatureUnitByProto, "celsius"),
+    };
+}
+
+function resolveGpuPowerReading(
+    maximumPowerWatts: number | undefined,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedGpuReading {
+    return {
+        kind: "power",
+        maximumWatts: resolveGpuPowerMaximumWatts(
+            maximumPowerWatts,
+            runtime?.runtimeMaximumGpuPowerWatts,
+        ),
+    };
+}
+
+export function resolveGpuHardwareSummaryReading(
+    storedReading: StoredGpuHardwareSummaryReading,
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedGpuHardwareSummaryReading | undefined {
+    switch (storedReading.reading.case) {
+        case "usage":
+            return { kind: "usage" };
+        case "temperature":
+            return resolveGpuTemperatureReading(
+                storedReading.reading.value.maximumTemperatureCelsius,
+                storedReading.reading.value.temperatureUnit,
+            );
+        case "vram":
+            return { kind: "vram" };
+        case "power":
+            return resolveGpuPowerReading(storedReading.reading.value.maximumPowerWatts, runtime);
+        case undefined:
+            return undefined;
+    }
+
+    return assertNever(storedReading.reading);
+}
+
+export function resolveDefaultGpuHardwareSummaryReading(
+    kind: ResolvedGpuHardwareSummaryReading["kind"],
+    runtime: ResolveStoredSettingsRuntimeContext | undefined,
+): ResolvedGpuHardwareSummaryReading {
+    switch (kind) {
+        case "usage":
+            return { kind: "usage" };
+        case "temperature":
+            return resolveGpuTemperatureReading(undefined, undefined);
+        case "vram":
+            return { kind: "vram" };
+        case "power":
+            return resolveGpuPowerReading(undefined, runtime);
+    }
 }
 
 function resolveCatalogMetricTarget(storedTarget: StoredCatalogMetricTarget): ResolvedCatalogMetricTarget {
@@ -572,7 +679,7 @@ function assertNever(value: never): never {
     throw new Error(`Unexpected Custom Metric stored settings branch: ${JSON.stringify(value)}`);
 }
 
-function resolveMetricSourcePolicy(
+export function resolveMetricSourcePolicy(
     storedSourcePolicy: StoredMetricSourcePolicy | undefined,
 ): ResolvedMetricSourcePolicy {
     return {
