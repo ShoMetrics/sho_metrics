@@ -33,6 +33,7 @@ message StoredWidgetSettings {
     SingleMetricWidget single_metric = 1;
     DenseMultiMetricWidget dense_multi_metric = 2;
     StackedMetricWidget stacked_metric = 3;
+    HardwareSummaryWidget hardware_summary = 4;
   }
 
   WidgetPreferences preferences = 10;
@@ -40,6 +41,74 @@ message StoredWidgetSettings {
 
 message SingleMetricWidget {
   optional MetricSlot slot = 1;
+}
+
+message HardwareSummaryWidget {
+  // Shared source routing for every reading in this summary. V1 summaries are
+  // curated views of one hardware target; per-reading source policies would
+  // turn the widget into Dense under another name.
+  MetricSourcePolicy source_policy = 1;
+
+  // CPU/GPU are the only curated hardware summary targets in v1. Add future
+  // hardware domains as explicit arms instead of accepting arbitrary MetricSlot
+  // rows.
+  oneof target {
+    CpuHardwareSummaryTarget cpu = 10;
+    GpuHardwareSummaryTarget gpu = 11;
+  }
+
+  // Shared appearance for the summary view. Hardware Summary consumes theme,
+  // paint, and widget-owned transparent surface settings. It ignores view and
+  // line settings in v1.
+  AppearanceSettings appearance = 20;
+}
+
+message CpuHardwareSummaryTarget {
+  // Ordered reading slots rendered by the fixed 3-reading summary. The first
+  // item is the primary semicircle gauge; the second and third items are the
+  // secondary readings in display order. Stored reading kinds should be unique;
+  // the resolver repairs duplicates because user selection swaps positions
+  // instead of rejecting normal UI interactions.
+  repeated CpuHardwareSummaryReading ordered_readings = 1 [(buf.validate.field).repeated = {
+    min_items: 3
+    max_items: 3
+  }];
+}
+
+message CpuHardwareSummaryReading {
+  // Reuse the single CPU target reading payloads so temperature/power options
+  // have one schema owner. This wrapper only adds summary ordering.
+  oneof reading {
+    CpuMetricTarget.Usage usage = 1;
+    CpuMetricTarget.Temperature temperature = 2;
+    CpuMetricTarget.Power power = 3;
+  }
+}
+
+message GpuHardwareSummaryTarget {
+  // Ordered reading slots rendered by the fixed 3-reading summary. The first
+  // item is the primary semicircle gauge; the second and third items are the
+  // secondary readings in display order. Stored reading kinds should be unique;
+  // the resolver repairs duplicates because user selection swaps positions
+  // instead of rejecting normal UI interactions.
+  repeated GpuHardwareSummaryReading ordered_readings = 1 [(buf.validate.field).repeated = {
+    min_items: 3
+    max_items: 3
+  }];
+
+  optional string gpu_id = 2 [(buf.validate.field).string.max_len = 256];
+}
+
+message GpuHardwareSummaryReading {
+  // Reuse the single GPU target reading payloads so temperature/power options
+  // have one schema owner. GPU identity stays on the summary target because all
+  // readings must describe the same physical GPU.
+  oneof reading {
+    GpuMetricTarget.Usage usage = 1;
+    GpuMetricTarget.Temperature temperature = 2;
+    GpuMetricTarget.Vram vram = 3;
+    GpuMetricTarget.Power power = 4;
+  }
 }
 
 message DenseMultiMetricWidget {
