@@ -4,6 +4,7 @@ import type { MetricStoreReader } from "../runtime/metric-store";
 import { setMetricView } from "../view-updates/runner";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildPowerWidgetData } from "../metrics/power-widget-data";
+import { buildPercentageWidgetData } from "../metrics/percentage-widget-data";
 import { buildTemperatureWidgetData } from "../metrics/temperature-widget-data";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
@@ -165,13 +166,5 @@ export function buildCpuViewOptions(options: {
 }
 
 export function buildCpuUsageWidgetData(widgetData: WidgetData): WidgetData {
-    return {
-        ...widgetData,
-        displayValue: widgetData.current.toFixed(0),
-        sparklineScale: {
-            mode: "fixed",
-            minimumValue: 0,
-            maximumValue: 100,
-        },
-    };
+    return buildPercentageWidgetData(widgetData);
 }
