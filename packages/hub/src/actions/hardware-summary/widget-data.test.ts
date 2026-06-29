@@ -40,6 +40,7 @@ test("primary VRAM progress uses used over total memory", () => {
     });
 
     assert.equal(widgetData.primary.kind, "vram");
+    assert.equal(widgetData.primary.diagnosticValue, 50);
     assert.equal(widgetData.primary.displayValue, "50");
     assert.equal(widgetData.primary.unit, "%");
     assert.equal(widgetData.primary.progress, 0.5);

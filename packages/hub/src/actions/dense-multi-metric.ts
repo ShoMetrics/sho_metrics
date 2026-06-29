@@ -81,7 +81,7 @@ export class DenseMultiMetric extends MetricAction {
         return listMetricReadPlanKeys(this.buildDenseReadPlan(widget, event.action.id).readPlan);
     }
 
-    protected override getDisplayedMetricKey(event: WillAppearEvent): string | undefined {
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
         const widget = requireResolvedDenseMultiMetricWidget(this.resolveSettings(event));
 
         return this.buildDenseReadPlan(widget, event.action.id).rows

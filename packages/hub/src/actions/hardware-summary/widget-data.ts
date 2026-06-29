@@ -40,6 +40,8 @@ export interface HardwareSummaryWidgetData {
 export interface HardwareSummaryReadingWidgetData {
     readonly kind: HardwareSummaryReadingKind;
     readonly label: string;
+    /** Unformatted numeric value for render-runner diagnostics; display text remains renderer-facing. */
+    readonly diagnosticValue: number;
     readonly displayValue: string;
     readonly unit: string;
     readonly sampleTimestampMilliseconds: number | undefined;
@@ -248,6 +250,7 @@ function buildBaseReadingWidgetData(
     return {
         kind,
         label: resolveHardwareSummaryReadingLabel(kind),
+        diagnosticValue: widgetData.current,
         displayValue: resolveHardwareSummaryDisplayValue(widgetData),
         unit: widgetData.unit,
         sampleTimestampMilliseconds: widgetData.sampleTimestampMilliseconds,

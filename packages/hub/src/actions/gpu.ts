@@ -1,6 +1,7 @@
 import { action, WillAppearEvent } from "@elgato/streamdeck";
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
+import type { MetricReadPlan } from "../runtime/source-routing/metric-read-plan";
 import { setMetricView } from "../view-updates/runner";
 import type { WidgetData } from "../view-rendering/widget-data";
 import { buildGpuPowerWidgetData } from "../metrics/gpu-power-widget-data";
@@ -21,9 +22,11 @@ import {
     GPU_VRAM_USED_METRIC_KEY,
 } from "../runtime/metric-keys";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
+import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     requireResolvedSingleMetricWidget,
     type ResolvedGpuMetricTarget,
+    type ResolvedHardwareSummaryWidget,
     type ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
 import type { SourceClientStatus } from "../runtime/sources/source-client";
@@ -34,6 +37,13 @@ import {
 } from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
+import { readHardwareSummaryWidget } from "./hardware-summary/action-widget";
+import {
+    buildHardwareSummaryReadPlan,
+    readPrimaryHardwareSummaryMetricKey,
+    resolveHardwareSummaryMetricKeys,
+} from "./hardware-summary/read-plan";
+import { buildHardwareSummaryViewOptions } from "./hardware-summary/view-options";
 
 const log = logger.for("Action:GPU");
 
@@ -44,24 +54,82 @@ export class Gpu extends MetricAction {
 
     protected override getMetricKeys(event: WillAppearEvent): readonly string[] {
         const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return resolveHardwareSummaryMetricKeys(readHardwareSummaryWidget(settings, "gpu"));
+        }
+
         const gpuTarget = readResolvedMetricTarget(settings, "gpu");
         return resolveGpuMetricSubscriptionKeys(gpuTarget);
     }
 
+    protected override getSourceDiagnosticMetricKey(event: WillAppearEvent): string | undefined {
+        const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return readPrimaryHardwareSummaryMetricKey(readHardwareSummaryWidget(settings, "gpu"));
+        }
+
+        return super.getSourceDiagnosticMetricKey(event);
+    }
+
+    protected override buildMetricCollectionReadPlan(
+        event: WillAppearEvent,
+        metricKeys: readonly string[],
+    ): MetricReadPlan {
+        const settings = this.resolveSettings(event);
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            return buildHardwareSummaryReadPlan({
+                widget: readHardwareSummaryWidget(settings, "gpu"),
+                defaultSourceProfileId: pluginGlobalSettingsStore.getResolved().defaultSourceProfileId,
+                platform: this.currentPlatform(),
+            });
+        }
+
+        return super.buildMetricCollectionReadPlan(event, metricKeys);
+    }
+
     protected onMetricsUpdate(event: WillAppearEvent): void {
         const settings = this.resolveSettings(event);
-        const gpuTarget = readResolvedMetricTarget(settings, "gpu");
         const metrics = this.getMetricReader(event);
+
+        if (settings.widget.widgetKind === "hardwareSummary") {
+            const widget = readHardwareSummaryWidget(settings, "gpu");
+            this.publishGpuSummaryPowerRuntimeMaximum(event, widget, metrics);
+
+            setMetricView(this.withManualRefreshIndicator(event, buildHardwareSummaryViewOptions({
+                event,
+                widget,
+                metrics,
+                helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+            })));
+            return;
+        }
+
+        const gpuTarget = readResolvedMetricTarget(settings, "gpu");
 
         this.publishGpuPowerRuntimeMaximum(event, gpuTarget, metrics);
 
-        setMetricView(this.withManualRefreshIndicator(event, buildGpuViewOptions({
+        setMetricView(this.withManualRefreshIndicator(
             event,
-            settings,
-            target: gpuTarget,
-            metrics,
-            helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
-        })));
+            buildGpuViewOptions({
+                event,
+                settings,
+                target: gpuTarget,
+                metrics,
+                helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+            }),
+        ));
+    }
+
+    private publishGpuSummaryPowerRuntimeMaximum(
+        event: WillAppearEvent,
+        widget: ResolvedHardwareSummaryWidget,
+        metrics: MetricStoreReader,
+    ): void {
+        if (!widget.target.orderedReadings.some(reading => reading.kind === "power")) {
+            return;
+        }
+
+        this.publishRuntimeGpuPowerMaximum(event, metrics);
     }
 
     private publishGpuPowerRuntimeMaximum(
@@ -73,6 +141,13 @@ export class Gpu extends MetricAction {
             return;
         }
 
+        this.publishRuntimeGpuPowerMaximum(event, metrics);
+    }
+
+    private publishRuntimeGpuPowerMaximum(
+        event: WillAppearEvent,
+        metrics: MetricStoreReader,
+    ): void {
         const nextMaximum = resolveRuntimeGpuPowerMaximumWatts(metrics);
         if (nextMaximum === undefined) {
             return;
