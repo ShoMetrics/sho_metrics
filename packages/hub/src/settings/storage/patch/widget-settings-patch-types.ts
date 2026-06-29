@@ -10,6 +10,8 @@ import type {
     NetworkUnitBase,
     ResolvedCpuReading,
     ResolvedGpuReading,
+    ResolvedCpuHardwareSummaryReadings,
+    ResolvedGpuHardwareSummaryReadings,
     ResolvedMetricTarget,
     ResolvedNetworkReading,
     ResolvedSystemPeripheralIdentity,
@@ -92,6 +94,7 @@ export interface StoredWidgetSettingsPatch {
     }>;
     readonly dense?: DenseWidgetSettingsPatch | undefined;
     readonly stacked?: StackedWidgetSettingsPatch | undefined;
+    readonly hardwareSummary?: HardwareSummaryWidgetSettingsPatch | undefined;
 }
 
 export type SingleMetricWidgetSettingsPatch = Omit<
@@ -171,6 +174,28 @@ export interface StackedMetricSlotPatch {
     readonly metricDomain?: ResolvedMetricTarget["domain"] | undefined;
     readonly singleMetric?: SingleMetricWidgetSettingsPatch | undefined;
 }
+
+export interface HardwareSummaryWidgetSettingsPatch {
+    readonly switchTo?: HardwareSummaryWidgetModePatch | undefined;
+    readonly appearance?: ResolvedAppearanceSettingsOverride | undefined;
+    readonly source?: StoredWidgetSettingsPatch["source"] | undefined;
+    readonly orderedReadings?: ResolvedCpuHardwareSummaryReadings | ResolvedGpuHardwareSummaryReadings | undefined;
+    readonly cpu?: Partial<{
+        readonly temperatureUnit: TemperatureUnit;
+        readonly maximumTemperatureCelsius: number;
+        readonly maximumPowerWatts: number | undefined;
+    }> | undefined;
+    readonly gpu?: Partial<{
+        readonly temperatureUnit: TemperatureUnit;
+        readonly maximumTemperatureCelsius: number;
+        readonly maximumPowerWatts: number | undefined;
+    }> | undefined;
+}
+
+export type HardwareSummaryWidgetModePatch =
+    | { readonly widgetKind: "hardwareSummary"; readonly domain: "cpu" | "gpu" }
+    | { readonly widgetKind: "singleMetric"; readonly domain: "cpu"; readonly kind: ResolvedCpuReading["kind"] }
+    | { readonly widgetKind: "singleMetric"; readonly domain: "gpu"; readonly kind: ResolvedGpuReading["kind"] };
 
 export interface WriteStoredWidgetSettingsPatchOptions {
     readonly createSlotId?: SlotIdGenerator;

@@ -161,6 +161,11 @@ export const optionMessages = {
         zh_CN: "折线",
         ja: "ライン",
     },
+    summaryOption: {
+        en: "Summary",
+        zh_CN: "摘要",
+        ja: "サマリー",
+    },
     fullRingOption: {
         en: "Full Ring",
         zh_CN: "完整圆环",

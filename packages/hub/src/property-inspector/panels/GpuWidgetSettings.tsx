@@ -23,12 +23,15 @@ import { PowerMaximumSetting, TemperatureMaximumSetting } from "./MetricMaximumS
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     buildGpuMetricKindOptionList,
+    isSummaryMetricKind,
     resolveGpuMetricKindMetricKeys,
+    summaryMetricKindOption,
     temperatureUnitOptionList,
 } from "./setting-options";
 
 type GpuTemperatureReading = Extract<ResolvedGpuReading, { readonly kind: "temperature" }>;
 type GpuPowerReading = Extract<ResolvedGpuReading, { readonly kind: "power" }>;
+type GpuMetricChoice = ResolvedGpuReading["kind"] | "summary";
 
 type GpuWidgetSettingsProps = WidgetSettingsPanelProps & {
     target: ResolvedGpuMetricTarget;
@@ -60,7 +63,10 @@ function GpuMetricSettings({
     onSettingsPatch,
 }: GpuWidgetSettingsProps): React.JSX.Element {
     const { t } = useI18n();
-    const optionList = buildGpuMetricKindOptionList(context.platform, target.reading.kind);
+    const optionList = [
+        ...buildGpuMetricKindOptionList(context.platform, target.reading.kind),
+        summaryMetricKindOption,
+    ] as const satisfies readonly { readonly value: GpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isGpuReadingSupportedOnCurrentPlatform(context.platform, target);
     const shouldShowNoValueGuidance = shouldShowGpuNoValueGuidance(
         context.isWindows,
@@ -73,9 +79,23 @@ function GpuMetricSettings({
                 label={t(gpuMessages.gpuMetricLabel)}
                 value={target.reading.kind}
                 optionList={localizeOptionList(t, optionList, gpuMetricKindMessageByValue)}
-                onValueChange={(kind) => onSettingsPatch({
-                    gpu: { kind },
-                })}
+                onValueChange={(kind) => {
+                    if (isSummaryMetricKind(kind)) {
+                        onSettingsPatch({
+                            hardwareSummary: {
+                                switchTo: {
+                                    widgetKind: "hardwareSummary",
+                                    domain: "gpu",
+                                },
+                            },
+                        });
+                        return;
+                    }
+
+                    onSettingsPatch({
+                        gpu: { kind },
+                    });
+                }}
             />
             {!isSelectedReadingSupported && (
                 <InspectorItem className="note-item note-item-caption">
@@ -87,7 +107,7 @@ function GpuMetricSettings({
             {context.isWindows && (
                 <MetricSourceSettings
                     sourcePolicy={requireResolvedSingleMetricWidget(context.resolved).slot.metric.source}
-                    onSettingsPatch={onSettingsPatch}
+                    onSourcePatch={(source) => onSettingsPatch({ source })}
                 />
             )}
             {shouldShowNoValueGuidance && (
@@ -167,6 +187,7 @@ const gpuMetricKindMessageByValue = {
     temperature: optionMessages.temperatureOption,
     vram: optionMessages.vramOption,
     power: optionMessages.powerOption,
+    summary: optionMessages.summaryOption,
 } as const;
 
 const temperatureUnitMessageByValue = {
