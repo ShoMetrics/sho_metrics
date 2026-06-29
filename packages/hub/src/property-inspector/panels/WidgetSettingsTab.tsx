@@ -96,7 +96,8 @@ export function WidgetSettingsTab({
         || isGlobalThemeOverrideEnabled
         || isGlobalTransparentSurfaceOverrideEnabled
         || isGlobalPaintOverrideEnabled;
-    const canShowMetricSourceDiagnostic = context.resolved.widget.widgetKind === "singleMetric";
+    const canShowMetricSourceDiagnostic = context.resolved.widget.widgetKind === "singleMetric"
+        || context.resolved.widget.widgetKind === "hardwareSummary";
 
     return (
         <>

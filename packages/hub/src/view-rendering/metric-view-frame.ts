@@ -7,6 +7,7 @@ import {
     type MetricRefreshIndicator,
 } from "./metric-refresh-indicator";
 import { renderMetricNoticeBody } from "./metric-notice-body";
+import { renderHardwareSummaryBodyView } from "./hardware-summary-view";
 import type { MetricRenderAppearance } from "./render-appearance";
 import {
     renderStackedMetricIndicator,
@@ -31,7 +32,12 @@ import {
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import type { DenseMetricWidgetData } from "../actions/dense-multi-metric/row-data";
-import type { HardwareSummaryWidgetData } from "../actions/hardware-summary/widget-data";
+import type {
+    HardwareSummaryPrimaryReadingWidgetData,
+    HardwareSummaryReadingWidgetData,
+    HardwareSummarySecondaryReadingWidgetData,
+    HardwareSummaryWidgetData,
+} from "../actions/hardware-summary/widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
 import type { ThemeBodyViewport } from "../widgets/styles/theme-style";
 
@@ -286,7 +292,7 @@ function composeMetricBody(
         case "denseMetric":
             return composeDenseMetricBody(viewOptions, renderPlan);
         case "hardwareSummary":
-            throw new Error("Hardware summary rendering is implemented in Step 6.");
+            return composeHardwareSummaryBody(viewOptions, renderPlan);
     }
 }
 
@@ -350,6 +356,18 @@ export function buildRenderDualChannelWidgetData(options: {
     return {
         positive: formatRenderWidgetDataUnit(positiveWidgetData),
         negative: formatRenderWidgetDataUnit(negativeWidgetData),
+    };
+}
+
+/** Converts missing summary readings into N/A placeholders and formats render-only unit text. */
+export function buildRenderHardwareSummaryWidgetData(widgetData: HardwareSummaryWidgetData): HardwareSummaryWidgetData {
+    return {
+        ...widgetData,
+        primary: buildRenderHardwareSummaryPrimaryReading(widgetData.primary),
+        secondary: [
+            buildRenderHardwareSummarySecondaryReading(widgetData.secondary[0]),
+            buildRenderHardwareSummarySecondaryReading(widgetData.secondary[1]),
+        ],
     };
 }
 
@@ -720,6 +738,29 @@ function composeDenseMetricBody(
     };
 }
 
+function composeHardwareSummaryBody(
+    options: HardwareSummaryRenderOptions,
+    renderPlan: MetricViewRenderPlan,
+): RenderedMetricBodies {
+    const renderedMetricData = buildRenderHardwareSummaryWidgetData(options.widgetData);
+
+    return {
+        bodies: [
+            {
+                svg: renderHardwareSummaryBodyView({
+                    data: renderedMetricData,
+                    visual: renderPlan.renderAppearance,
+                    renderSize: renderPlan.bodyRenderSize,
+                    domainIconFragment: options.centerIconFragment,
+                }),
+                bodyViewport: renderPlan.bodyViewport,
+                muted: false,
+            },
+        ],
+        renderedMetricData,
+    };
+}
+
 function composeDualTouchStripCircleBodies(options: {
     viewOptions: DualMetricRenderOptions;
     renderedMetricData: DualChannelWidgetData;
@@ -864,6 +905,50 @@ function buildRenderDenseMetricWidgetData(widgetData: DenseMetricWidgetData): De
                 : formatDenseRenderWidgetDataUnit(row.widgetData),
         })),
     };
+}
+
+function buildRenderHardwareSummaryPrimaryReading(
+    reading: HardwareSummaryPrimaryReadingWidgetData,
+): HardwareSummaryPrimaryReadingWidgetData {
+    const renderedReading = buildRenderHardwareSummaryReading(reading);
+
+    return reading.sampleTimestampMilliseconds == null
+        ? { ...renderedReading, progress: 0 }
+        : { ...renderedReading, progress: reading.progress };
+}
+
+function buildRenderHardwareSummarySecondaryReading(
+    reading: HardwareSummarySecondaryReadingWidgetData,
+): HardwareSummarySecondaryReadingWidgetData {
+    return buildRenderHardwareSummaryReading(reading);
+}
+
+function buildRenderHardwareSummaryReading<TReading extends HardwareSummaryReadingWidgetData>(
+    reading: TReading,
+): TReading {
+    if (reading.sampleTimestampMilliseconds == null) {
+        return {
+            ...reading,
+            diagnosticValue: 0,
+            displayValue: resolveHardwareSummaryUnavailableRenderDisplayValue(reading),
+            unit: "",
+        };
+    }
+
+    const formattedUnit = formatRenderUnitText(reading.unit);
+
+    return formattedUnit === reading.unit
+        ? reading
+        : { ...reading, unit: formattedUnit };
+}
+
+function resolveHardwareSummaryUnavailableRenderDisplayValue(reading: HardwareSummaryReadingWidgetData): string {
+    switch (reading.unavailableDisplayValue) {
+        case PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE:
+            return PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE;
+        default:
+            return "N/A";
+    }
 }
 
 function formatDenseRenderWidgetDataUnit(widgetData: WidgetData): WidgetData {

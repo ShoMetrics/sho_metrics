@@ -38,6 +38,7 @@ import {
 } from "./ColorSettings";
 import { MetricSourceSettings } from "./MetricSourceSettings";
 import { PowerMaximumSetting, TemperatureMaximumSetting } from "./MetricMaximumSettings";
+import { PollingSettings } from "./PollingSettings";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import type { StoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
@@ -67,6 +68,7 @@ const cpuMetricKindMessageByValue = {
     usage: optionMessages.usageOption,
     temperature: optionMessages.temperatureOption,
     power: optionMessages.powerOption,
+    summary: optionMessages.cpuHardwareSummaryOption,
 } as const;
 
 const gpuMetricKindMessageByValue = {
@@ -74,6 +76,7 @@ const gpuMetricKindMessageByValue = {
     temperature: optionMessages.temperatureOption,
     vram: optionMessages.vramOption,
     power: optionMessages.powerOption,
+    summary: optionMessages.gpuHardwareSummaryOption,
 } as const;
 
 const temperatureUnitMessageByValue = {
@@ -95,6 +98,7 @@ export function HardwareSummaryWidgetSettings({
             <HardwareSummaryThemeSettings {...panelProps} widget={widget} />
             <HardwareSummaryScaleSettings {...panelProps} widget={widget} />
             <HardwareSummaryColorSettings {...panelProps} widget={widget} />
+            {panelProps.showPolling !== false && <PollingSettings {...panelProps} />}
         </>
     );
 }

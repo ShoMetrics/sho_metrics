@@ -166,6 +166,16 @@ export const optionMessages = {
         zh_CN: "摘要",
         ja: "サマリー",
     },
+    cpuHardwareSummaryOption: {
+        en: "Triple: Load, Temp, Power...",
+        zh_CN: "三指标：负载、温度、功耗...",
+        ja: "3指標: 負荷、温度、電力...",
+    },
+    gpuHardwareSummaryOption: {
+        en: "Triple: Load, Temp, VRAM...",
+        zh_CN: "三指标：负载、温度、显存...",
+        ja: "3指標: 負荷、温度、VRAM...",
+    },
     fullRingOption: {
         en: "Full Ring",
         zh_CN: "完整圆环",

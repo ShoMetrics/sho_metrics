@@ -187,7 +187,7 @@ const gpuMetricKindMessageByValue = {
     temperature: optionMessages.temperatureOption,
     vram: optionMessages.vramOption,
     power: optionMessages.powerOption,
-    summary: optionMessages.summaryOption,
+    summary: optionMessages.gpuHardwareSummaryOption,
 } as const;
 
 const temperatureUnitMessageByValue = {

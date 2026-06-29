@@ -6,6 +6,7 @@ import {
 import type { ResolvedAppearanceSettingsOverride } from "../settings/appearance-overrides";
 import { buildMetricRenderAppearance } from "../settings/render-appearance-builder";
 import type { DenseMetricWidgetData } from "../actions/dense-multi-metric/row-data";
+import type { HardwareSummaryWidgetData } from "../actions/hardware-summary/widget-data";
 import {
     KEYPAD_PNG_SIZE,
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
@@ -16,8 +17,10 @@ import {
     type WidgetData,
 } from "../view-rendering/widget-data";
 import type { ProgressCircleStatusIcon } from "../widgets/primitives/progress-circle";
+import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
 import {
     buildMetricViewRenderPlan,
+    buildRenderHardwareSummaryWidgetData,
     buildRenderDualChannelWidgetData,
     buildRenderWidgetData,
     composeMetricViewFrame,
@@ -27,6 +30,7 @@ import {
     resolveMetricViewSampleTimestampMilliseconds,
     resolveTouchStripMetricLayout,
     type DualMetricRenderOptions,
+    type HardwareSummaryRenderOptions,
     type MetricRenderedData,
     type SingleMetricRenderOptions,
 } from "./metric-view-frame";
@@ -848,6 +852,87 @@ test("dense metric frame compacts data-rate units", () => {
     assert.equal(renderedMetricData.rows[1]?.widgetData.unit, "K");
 });
 
+test("hardware summary render data formats units and isolates missing readings", () => {
+    const widgetData = buildHardwareSummaryWidgetData({
+        primary: {
+            ...buildHardwareSummaryReading({ kind: "usage", unit: "%", sampleTimestampMilliseconds: 1000 }),
+            progress: 0.73,
+        },
+        secondary: [
+            buildHardwareSummaryReading({ kind: "temperature", unit: "C", sampleTimestampMilliseconds: 1000 }),
+            buildHardwareSummaryReading({
+                kind: "power",
+                unit: "W",
+                sampleTimestampMilliseconds: undefined,
+                unavailableDisplayValue: PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+            }),
+        ],
+    });
+
+    const renderedWidgetData = buildRenderHardwareSummaryWidgetData(widgetData);
+
+    assert.equal(renderedWidgetData.primary.unit, "%");
+    assert.equal(renderedWidgetData.primary.progress, 0.73);
+    assert.equal(renderedWidgetData.secondary[0].unit, "°C");
+    assert.equal(renderedWidgetData.secondary[1].displayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
+    assert.equal(renderedWidgetData.secondary[1].unit, "");
+    assert.equal(renderedWidgetData.secondary[1].diagnosticValue, 0);
+});
+
+test("hardware summary key frame renders a semicircle gauge and three readings", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildHardwareSummaryRenderOptions({
+            widgetData: buildHardwareSummaryWidgetData(),
+        }),
+        renderTarget: "key",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout, null);
+    assert.match(frame.svg, /class="hardware-summary-view"/);
+    assert.match(frame.svg, /class="hardware-summary-gauge-track"/);
+    assert.match(frame.svg, /class="hardware-summary-gauge-fill"/);
+    assert.match(frame.svg, />GPU<\/text>/);
+    assert.match(frame.svg, />TEMP<\/text>/);
+    assert.match(frame.svg, />PWR<\/text>/);
+    assert.match(frame.svg, />73<\/tspan>/);
+    assert.doesNotMatch(frame.svg, /hardware-summary-secondary-icon/);
+    assert.doesNotMatch(frame.svg, />LOAD<\/text>/);
+});
+
+test("hardware summary touch strip frame uses wide summary layout", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildHardwareSummaryRenderOptions({
+            widgetData: buildHardwareSummaryWidgetData(),
+        }),
+        renderTarget: "touch-strip",
+    });
+
+    assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide");
+    assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
+    assert.match(frame.svg, /width="200" height="100"/);
+    assert.match(frame.svg, /class="hardware-summary-view"/);
+    assert.match(frame.svg, />TEMP<\/text>/);
+    assert.doesNotMatch(frame.svg, /hardware-summary-secondary-icon/);
+});
+
+test("hardware summary frame can render refresh and stacked overlays above the body", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildHardwareSummaryRenderOptions({
+            widgetData: buildHardwareSummaryWidgetData(),
+            refreshIndicator: "visible",
+            stackedIndicator: {
+                currentIndex: 1,
+                totalCount: 3,
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /class="hardware-summary-view"/);
+    assert.match(frame.svg, /class="metric-refresh-indicator"/);
+    assert.match(frame.svg, /class="stacked-metric-indicator"/);
+});
+
 test("stacked metric indicator renders as a bottom-right overlay", () => {
     const frame = composeMetricViewFrame({
         viewOptions: buildSingleMetricRenderOptions({
@@ -1057,6 +1142,23 @@ function buildDenseMetricRenderOptions(options: {
     };
 }
 
+function buildHardwareSummaryRenderOptions(options: {
+    widgetData: HardwareSummaryWidgetData;
+    resolvedSettings?: ResolvedAppearanceSettingsOverride;
+    stackedIndicator?: StackedMetricIndicator;
+    refreshIndicator?: MetricRefreshIndicator;
+}): HardwareSummaryRenderOptions {
+    return {
+        metricRenderKind: "hardwareSummary",
+        centerIconFragment: getHardwareIconFragment(options.widgetData.domain),
+        statusIcon: buildStatusIcon(),
+        widgetData: options.widgetData,
+        ...(options.stackedIndicator === undefined ? {} : { stackedIndicator: options.stackedIndicator }),
+        ...(options.refreshIndicator === undefined ? {} : { refreshIndicator: options.refreshIndicator }),
+        resolvedSettings: buildDefaultAppearanceSettings(options.resolvedSettings),
+    };
+}
+
 function readSingleRenderedMetricData(metricData: MetricRenderedData): WidgetData {
     if ("rows" in metricData || "positive" in metricData || "primary" in metricData) {
         throw new Error("Expected single metric render data.");
@@ -1128,6 +1230,35 @@ function buildDenseMetricRow(options: {
         widgetData: "sampleTimestampMilliseconds" in options
             ? { ...widgetData, sampleTimestampMilliseconds: options.sampleTimestampMilliseconds }
             : widgetData,
+    };
+}
+
+function buildHardwareSummaryWidgetData(options: Partial<HardwareSummaryWidgetData> = {}): HardwareSummaryWidgetData {
+    return {
+        domain: options.domain ?? "gpu",
+        primary: options.primary ?? {
+            ...buildHardwareSummaryReading({ kind: "usage", label: "LOAD", unit: "%", displayValue: "73" }),
+            progress: 0.73,
+        },
+        secondary: options.secondary ?? [
+            buildHardwareSummaryReading({ kind: "temperature", label: "TEMP", unit: "C", displayValue: "84" }),
+            buildHardwareSummaryReading({ kind: "power", label: "PWR", unit: "W", displayValue: "112" }),
+        ],
+    };
+}
+
+function buildHardwareSummaryReading(options: Partial<HardwareSummaryWidgetData["primary"]> = {}): HardwareSummaryWidgetData["primary"] {
+    return {
+        kind: options.kind ?? "usage",
+        label: options.label ?? "LOAD",
+        diagnosticValue: options.diagnosticValue ?? 73,
+        displayValue: options.displayValue ?? "73",
+        unit: options.unit ?? "%",
+        sampleTimestampMilliseconds: "sampleTimestampMilliseconds" in options
+            ? options.sampleTimestampMilliseconds
+            : 1000,
+        unavailableDisplayValue: options.unavailableDisplayValue,
+        progress: options.progress ?? 0.73,
     };
 }
 
