@@ -53,6 +53,7 @@ test("disk usage automatic volume reads default usage keys after registry select
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "available", volume: buildDiskVolumeOption("C:") },
+        currentTimestampMilliseconds: 1000,
     });
 
     assert.equal(viewOptions.metricKey, getDefaultDiskUsageMetricKey("used"));
@@ -100,6 +101,7 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
+        currentTimestampMilliseconds: 1000,
     });
 
     assert.equal(viewOptions.metricKey, getDiskVolumeMetricKey("used", "E:\\"));
@@ -155,6 +157,7 @@ test("disk compact center icon label uses theme label font family", () => {
         target,
         metrics: new MetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "unavailable", volumeId: "E:\\" },
+        currentTimestampMilliseconds: 1000,
     });
 
     assert.match(viewOptions.centerIconFragment, /Share Tech Mono/);
@@ -194,6 +197,7 @@ test("disk throughput view ignores selected volume identity", () => {
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+        currentTimestampMilliseconds: 1000,
     });
 
     assert.equal(viewOptions.metricKey, getDiskThroughputMetricKey("read"));
@@ -245,6 +249,7 @@ test("disk throughput bar both mode renders read and write channels", () => {
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+        currentTimestampMilliseconds: 1000,
     });
     const widgetData = viewOptions.widgetData;
 
@@ -296,6 +301,7 @@ test("disk throughput bar single direction renders direction icon value row", ()
         target,
         metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
         volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+        currentTimestampMilliseconds: 1000,
     });
     const widgetData = viewOptions.widgetData;
 
@@ -322,4 +328,3 @@ function buildDiskVolumeOption(id: string): DiskVolumeOption {
         volumeLabel: "Test",
     };
 }
-

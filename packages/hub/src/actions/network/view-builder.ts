@@ -19,6 +19,7 @@ import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-da
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
+    resolveNetworkSampleFreshnessBudgetMilliseconds,
 } from "../../metrics/network-speed-widget-data";
 import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
@@ -88,10 +89,6 @@ type BuildTrafficNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & 
 type BuildPingNetworkViewOptions = Omit<BuildNetworkViewOptions, "target"> & {
     readonly target: ResolvedNetworkPingMetricTarget;
 };
-
-// Network throughput is a 1 Hz hot reading. Keep a last-good value through a few
-// missed ticks, then let the renderer show N/A instead of a misleading old rate.
-export const NETWORK_SAMPLE_STALE_MS = 5000;
 
 export function buildNetworkViewUpdate(options: BuildNetworkViewOptions): NetworkViewUpdate {
     const networkReading = options.target.reading;
@@ -164,6 +161,7 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
         direction: networkDirection,
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const circleVariant = appearance.view.circleVariant;
     const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
@@ -219,6 +217,9 @@ function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): Netwo
     const appearance = readSingleMetricAppearance(options.settings);
     const targetHost = options.target.reading.targetHost;
     const networkMetricKey = getNetworkPingLatencyMetricKey(targetHost);
+    const sampleFreshnessBudgetMilliseconds = resolveNetworkSampleFreshnessBudgetMilliseconds(
+        options.settings.preferences.pollingFrequencySeconds,
+    );
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
         "PING",
@@ -228,6 +229,7 @@ function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): Netwo
     const freshSourceWidgetData = isFreshNetworkWidgetData(
         sourceWidgetData,
         options.currentTimestampMilliseconds,
+        sampleFreshnessBudgetMilliseconds,
     )
         ? sourceWidgetData
         : {
@@ -309,6 +311,7 @@ function buildDualNetworkCircleOrTextViewOptions(
         direction: "upload",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -319,6 +322,7 @@ function buildDualNetworkCircleOrTextViewOptions(
         direction: "download",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
@@ -393,6 +397,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
         direction: "upload",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -403,6 +408,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
         direction: "download",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
@@ -462,6 +468,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
         direction: "upload",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
@@ -472,6 +479,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
         direction: "download",
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const downloadColor = resolveNetworkWidgetChannelColor("download", options.settings, downloadWidgetData);
     const uploadColor = resolveNetworkWidgetChannelColor("upload", options.settings, uploadWidgetData);
@@ -558,6 +566,7 @@ function buildSingleBarNetworkViewOptions(
         direction: networkDirection,
         target: options.target,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const color = resolveNetworkWidgetChannelColor(networkDirection, options.settings, widgetData);
     const appearance = readSingleMetricAppearance(options.settings);
@@ -607,40 +616,31 @@ function buildNetworkWidgetData(options: {
     direction: NetworkMetricDirection;
     target: ResolvedNetworkTrafficMetricTarget;
     currentTimestampMilliseconds: number;
+    pollingFrequencySeconds: number;
 }): WidgetData {
-    const sourceWidgetData = isFreshNetworkWidgetData(
-        options.sourceWidgetData,
-        options.currentTimestampMilliseconds,
-    )
-        ? options.sourceWidgetData
-        : {
-            ...options.sourceWidgetData,
-            current: 0,
-            progress: 0,
-            history: [],
-            sampleTimestampMilliseconds: undefined,
-        };
-
     return buildNetworkSpeedWidgetData({
-        bytesPerSecond: sourceWidgetData.current,
-        historyBytesPerSecond: sourceWidgetData.history,
+        bytesPerSecond: options.sourceWidgetData.current,
+        historyBytesPerSecond: options.sourceWidgetData.history,
         maximumBytesPerSecond: resolveNetworkMaximumBytesPerSecond(options.direction, options.target),
         label: getNetworkDirectionLabel(options.direction),
         unitBase: options.target.reading.display.unitBase,
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
-        sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
+        sampleTimestampMilliseconds: options.sourceWidgetData.sampleTimestampMilliseconds,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.pollingFrequencySeconds,
     });
 }
 
 function isFreshNetworkWidgetData(
     widgetData: WidgetData,
     currentTimestampMilliseconds: number,
+    sampleFreshnessBudgetMilliseconds: number,
 ): boolean {
     if (widgetData.sampleTimestampMilliseconds == null) {
         return false;
     }
 
-    return currentTimestampMilliseconds - widgetData.sampleTimestampMilliseconds <= NETWORK_SAMPLE_STALE_MS;
+    return currentTimestampMilliseconds - widgetData.sampleTimestampMilliseconds <= sampleFreshnessBudgetMilliseconds;
 }
 
 function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {
@@ -698,4 +698,3 @@ const NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS = 3;
 const NETWORK_CENTER_ICON_SIZE = 58;
 const NETWORK_TOP_ICON_SIZE = 30;
 const NETWORK_FOOTER_ICON_SIZE = 21;
-

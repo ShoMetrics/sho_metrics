@@ -61,6 +61,7 @@ export interface HardwareSummaryWidgetDataOptions {
     readonly widget: ResolvedHardwareSummaryWidget;
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly helperSampleFreshnessBudgetMilliseconds: number;
 }
 
 type HardwareSummaryReadingTriple<TReading> = readonly [TReading, TReading, TReading];
@@ -75,6 +76,7 @@ export function buildHardwareSummaryWidgetData(options: HardwareSummaryWidgetDat
                 reading,
                 metrics: options.metrics,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.helperSampleFreshnessBudgetMilliseconds,
             }),
         });
     }
@@ -86,6 +88,7 @@ export function buildHardwareSummaryWidgetData(options: HardwareSummaryWidgetDat
             reading,
             metrics: options.metrics,
             helperStatus: options.helperStatus,
+            sampleFreshnessBudgetMilliseconds: options.helperSampleFreshnessBudgetMilliseconds,
         }),
     });
 }
@@ -114,6 +117,7 @@ function readCpuHardwareSummaryWidgetData(options: {
     readonly reading: ResolvedCpuHardwareSummaryReading;
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly sampleFreshnessBudgetMilliseconds: number;
 }): WidgetData {
     switch (options.reading.kind) {
         case "usage":
@@ -131,6 +135,7 @@ function readCpuHardwareSummaryWidgetData(options: {
                 unit: "C",
                 maxValue: options.reading.maximumCelsius,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildTemperatureWidgetData({
@@ -147,6 +152,7 @@ function readCpuHardwareSummaryWidgetData(options: {
                 unit: "W",
                 maxValue: options.reading.maximumWatts,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildPowerWidgetData({
@@ -161,6 +167,7 @@ function readGpuHardwareSummaryWidgetData(options: {
     readonly reading: ResolvedGpuHardwareSummaryReading;
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly sampleFreshnessBudgetMilliseconds: number;
 }): WidgetData {
     switch (options.reading.kind) {
         case "usage": {
@@ -170,6 +177,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 label: resolveHardwareSummaryReadingLabel(options.reading.kind),
                 unit: "%",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildPercentageWidgetData(widgetData);
@@ -182,6 +190,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 unit: "C",
                 maxValue: options.reading.maximumCelsius,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildTemperatureWidgetData({
@@ -197,6 +206,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 label: resolveHardwareSummaryReadingLabel(options.reading.kind),
                 unit: "MB",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
             const totalWidgetData = readHelperBackedWidgetData({
                 metrics: options.metrics,
@@ -204,6 +214,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 label: resolveHardwareSummaryReadingLabel(options.reading.kind),
                 unit: "MB",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildGpuVramWidgetData(usedWidgetData, totalWidgetData.current);
@@ -216,6 +227,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 unit: "W",
                 maxValue: options.reading.maximumWatts,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
             return buildGpuPowerWidgetData({

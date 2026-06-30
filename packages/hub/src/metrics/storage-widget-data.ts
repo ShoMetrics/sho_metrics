@@ -1,5 +1,6 @@
 import type { WidgetData } from "../view-rendering/widget-data";
 import { formatByteCount, formatBytesPerSecond } from "./byte-format";
+import { isPollingBackedRateSampleFresh } from "./rate-sample-freshness";
 
 export type DiskUsageDisplayMode = "percentage" | "space";
 
@@ -7,6 +8,7 @@ const BINARY_BASE = 1024;
 const MAXIMUM_SPACE_DISPLAY_DIGITS = 3;
 const MAXIMUM_THROUGHPUT_DISPLAY_DIGITS = 3;
 const MINIMUM_DISK_RATE_MAXIMUM_BYTES_PER_SECOND = 1024 * 1024;
+const DISK_THROUGHPUT_SAMPLE_STALE_GRACE_MILLISECONDS = 5000;
 const PERCENTAGE_SPARKLINE_SCALE = {
     mode: "fixed",
     minimumValue: 0,
@@ -79,7 +81,18 @@ export function buildDiskThroughputWidgetData(options: {
     bytesPerSecondWidgetData: WidgetData;
     maximumBytesPerSecond: number;
     label: string;
+    currentTimestampMilliseconds: number;
+    pollingFrequencySeconds: number;
 }): WidgetData {
+    if (!isPollingBackedRateSampleFresh({
+        sampleTimestampMilliseconds: options.bytesPerSecondWidgetData.sampleTimestampMilliseconds,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.pollingFrequencySeconds,
+        graceMilliseconds: DISK_THROUGHPUT_SAMPLE_STALE_GRACE_MILLISECONDS,
+    })) {
+        return buildUnavailableDiskThroughputWidgetData(options.label);
+    }
+
     const safeBytesPerSecond = Math.max(0, options.bytesPerSecondWidgetData.current);
     const formattedThroughput = formatBytesPerSecond({
         bytesPerSecond: safeBytesPerSecond,
@@ -98,6 +111,28 @@ export function buildDiskThroughputWidgetData(options: {
         displayValue: formattedThroughput.value,
         sparklineScale: { mode: "adaptive", minimumValue: 0 },
         sampleTimestampMilliseconds: options.bytesPerSecondWidgetData.sampleTimestampMilliseconds,
+    };
+}
+
+function buildUnavailableDiskThroughputWidgetData(label: string): WidgetData {
+    // Renderer-facing N/A is driven by the missing sample timestamp. The zero
+    // value only keeps the WidgetData shape safe for logs, progress, and units.
+    const formattedThroughput = formatBytesPerSecond({
+        bytesPerSecond: 0,
+        unitBase: "byte",
+        base: BINARY_BASE,
+        maximumDisplayDigits: MAXIMUM_THROUGHPUT_DISPLAY_DIGITS,
+    });
+
+    return {
+        current: 0,
+        progress: 0,
+        history: [],
+        unit: formattedThroughput.unit,
+        label,
+        displayValue: formattedThroughput.value,
+        sparklineScale: { mode: "adaptive", minimumValue: 0 },
+        sampleTimestampMilliseconds: undefined,
     };
 }
 

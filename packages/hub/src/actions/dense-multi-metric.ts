@@ -223,7 +223,8 @@ export class DenseMultiMetric extends MetricAction {
     }
 
     protected buildDenseWidgetData(event: WillAppearEvent): DenseMetricWidgetData {
-        const widget = requireResolvedDenseMultiMetricWidget(this.resolveSettings(event));
+        const settings = this.resolveSettings(event);
+        const widget = requireResolvedDenseMultiMetricWidget(settings);
 
         return buildDenseMetricWidgetData({
             widget,
@@ -231,6 +232,7 @@ export class DenseMultiMetric extends MetricAction {
             actionId: event.action.id,
             platform: this.currentPlatform(),
             currentTimestampMilliseconds: wallClockNowMilliseconds(),
+            pollingFrequencySeconds: settings.preferences.pollingFrequencySeconds,
         });
     }
 

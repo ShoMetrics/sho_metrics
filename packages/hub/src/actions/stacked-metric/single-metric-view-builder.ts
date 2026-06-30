@@ -76,6 +76,7 @@ export function buildStackedSingleMetricViewOptions(
                 target: context.target,
                 metrics: context.metrics,
                 volumeSelection: resolveStackedDiskVolumeSelection(context.target.volumeId),
+                currentTimestampMilliseconds: context.currentTimestampMilliseconds,
             });
         case "network":
             return buildNetworkViewUpdate({

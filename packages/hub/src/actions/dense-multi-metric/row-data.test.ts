@@ -30,6 +30,8 @@ import {
 import { listMetricReadPlanKeys } from "../../runtime/source-routing/metric-read-plan";
 import { buildCustomHttpRuntimeIdentity, buildDenseCustomHttpConsumerSlug } from "../../runtime/sources/custom-http/custom-http-metric-key";
 
+const TEST_POLLING_FREQUENCY_SECONDS = 1;
+
 test("dense read plan subscribes configured 2-to-6 rows", () => {
     const widget = buildDenseWidget([
         buildSlot("slot-1", buildCpuUsageTarget()),
@@ -150,6 +152,7 @@ test("dense widget data keeps no-data isolated to the affected row", () => {
         metrics,
         platform: "win32",
         currentTimestampMilliseconds: 10_000,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
     });
 
     assert.deepEqual(widgetData.rows.map(row => ({
@@ -197,6 +200,7 @@ test("dense widget data applies catalog label and raw maximum resolution", () =>
         metrics,
         platform: "win32",
         currentTimestampMilliseconds: 10_000,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
     });
 
     assert.deepEqual(widgetData.rows[0]?.widgetData, {
@@ -230,6 +234,7 @@ test("dense system row data reads the selected peripheral battery metric", () =>
         metrics,
         platform: "win32",
         currentTimestampMilliseconds: 10_000,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
     });
 
     assert.deepEqual(widgetData.rows[0]?.widgetData, {
@@ -263,6 +268,7 @@ test("dense system row data falls back to the selected battery device label", ()
         metrics,
         platform: "win32",
         currentTimestampMilliseconds: 10_000,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
     });
 
     assert.equal(widgetData.rows[0]?.widgetData.label, "MX M");
@@ -345,6 +351,7 @@ test("dense custom metric row data stays isolated when one row has no sample", (
         metrics,
         platform: "win32",
         currentTimestampMilliseconds: 10_000,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
     });
 
     assert.deepEqual(widgetData.rows.map(row => ({

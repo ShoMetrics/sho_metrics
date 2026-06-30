@@ -8,11 +8,12 @@ import {
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
     type WidgetData,
 } from "../../view-rendering/widget-data";
+import { resolvePollingBackedSampleFreshnessBudgetMilliseconds } from "../../metrics/rate-sample-freshness";
 
 // Hub-side stale-sample guard. Source-side fresh/retained metadata in
 // docs/development/runtime-sources/03-windows-helper/02-helper-source-reliability-implementation-plan.md
 // will make this a fallback check instead of the primary helper freshness signal.
-const HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS = 7000;
+const HELPER_BACKED_SAMPLE_STALE_GRACE_MILLISECONDS = 7000;
 export const HELPER_INSTALL_NOTICE_TEXT = "Install helper";
 
 interface HelperBackedWidgetDataReadOptions {
@@ -22,7 +23,21 @@ interface HelperBackedWidgetDataReadOptions {
     readonly unit: string;
     readonly maxValue?: number;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly sampleFreshnessBudgetMilliseconds: number;
     readonly transformFreshWidgetData?: (widgetData: WidgetData) => WidgetData;
+}
+
+/**
+ * Resolves how long helper-backed widgets may render the last helper sample.
+ *
+ * Helper-backed samples arrive only when the action's pull interval runs. The
+ * grace is helper-specific; the polling-window formula is shared.
+ */
+export function resolveHelperBackedSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
+    return resolvePollingBackedSampleFreshnessBudgetMilliseconds({
+        pollingFrequencySeconds,
+        graceMilliseconds: HELPER_BACKED_SAMPLE_STALE_GRACE_MILLISECONDS,
+    });
 }
 
 /**
@@ -40,7 +55,7 @@ export function readHelperBackedWidgetData(options: HelperBackedWidgetDataReadOp
     );
     const { widgetData } = readResult;
 
-    if (isFreshHelperBackedWidgetData(widgetData)) {
+    if (isFreshHelperBackedWidgetData(widgetData, options.sampleFreshnessBudgetMilliseconds)) {
         return options.transformFreshWidgetData?.(widgetData) ?? widgetData;
     }
 
@@ -113,11 +128,14 @@ export function resolveBuiltInHelperInstallNoticeText(options: {
     });
 }
 
-function isFreshHelperBackedWidgetData(widgetData: WidgetData): boolean {
+function isFreshHelperBackedWidgetData(
+    widgetData: WidgetData,
+    sampleFreshnessBudgetMilliseconds: number,
+): boolean {
     if (widgetData.sampleTimestampMilliseconds == null) {
         return false;
     }
 
     return wallClockNowMilliseconds() - widgetData.sampleTimestampMilliseconds
-        <= HELPER_BACKED_SAMPLE_FRESHNESS_MILLISECONDS;
+        <= sampleFreshnessBudgetMilliseconds;
 }

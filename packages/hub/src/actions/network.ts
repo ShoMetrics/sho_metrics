@@ -17,6 +17,7 @@ import {
     buildNetworkViewUpdate,
     resolveNetworkMaximumBytesPerSecond,
     resolveNetworkMaximumMegabitsPerSecond,
+    type NetworkPingViewDebugInfo,
     type NetworkViewDebugInfo,
     type ResolvedNetworkTrafficMetricTarget,
 } from "./network/view-builder";
@@ -200,7 +201,7 @@ function logNetworkSpeedDebug(options: {
     ].join(" "));
 }
 
-function logNetworkPingDebug(debugInfo: Extract<NetworkViewDebugInfo, { readonly kind: "ping" }>): void {
+function logNetworkPingDebug(debugInfo: NetworkPingViewDebugInfo): void {
     log.atDebug().everyMs("ping-sample", DEBUG_LOG_INTERVAL_MILLISECONDS).log(() => [
         `targetHost=${debugInfo.targetHost}`,
         `metricKey=${debugInfo.networkMetricKey}`,

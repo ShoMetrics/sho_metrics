@@ -24,6 +24,7 @@ import {
 } from "./disk/volume-selection";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
+import { wallClockNowMilliseconds } from "../shared/clock";
 
 const log = logger.for("Action:Disk");
 const DISK_USAGE_REFRESH_METRIC_KEYS = [
@@ -66,6 +67,7 @@ export class Disk extends MetricAction {
             target: diskTarget,
             metrics,
             volumeSelection,
+            currentTimestampMilliseconds: wallClockNowMilliseconds(),
         })));
     }
 

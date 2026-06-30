@@ -39,6 +39,7 @@ interface BuildDiskViewOptions {
     target: ResolvedDiskMetricTarget;
     metrics: MetricStoreReader;
     volumeSelection: DiskVolumeSelection;
+    currentTimestampMilliseconds: number;
 }
 
 type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
@@ -191,6 +192,8 @@ function buildDiskThroughputViewOptions(
                 null,
             ),
             label: throughputLabel,
+            currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+            pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
         }),
         centerIconFragment: getDiskIconFragment("unknown"),
         footerIconFragment: shouldRenderGaugeFooter
@@ -233,6 +236,8 @@ function buildDualThroughputViewOptions(
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
         label: "READ",
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
@@ -242,6 +247,8 @@ function buildDualThroughputViewOptions(
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
         label: "WRIT",
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);
     const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
@@ -304,6 +311,8 @@ function buildDiskThroughputBarViewOptions(
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
         label: "READ",
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
@@ -313,6 +322,8 @@ function buildDiskThroughputBarViewOptions(
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
         label: "WRIT",
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const readColor = resolveDiskWidgetChannelColor("read", options.settings, readWidgetData);
     const writeColor = resolveDiskWidgetChannelColor("write", options.settings, writeWidgetData);
@@ -393,6 +404,8 @@ function buildDiskThroughputSingleBarViewOptions(
             null,
         ),
         label: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const color = resolveDiskWidgetChannelColor(options.direction, options.settings, widgetData);
     const appearance = readSingleMetricAppearance(options.settings);

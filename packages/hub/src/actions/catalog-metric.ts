@@ -8,6 +8,7 @@ import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import {
     HELPER_INSTALL_NOTICE_TEXT,
     readHelperBackedWidgetData,
+    resolveHelperBackedSampleFreshnessBudgetMilliseconds,
     resolveHelperRequiredInstallNoticeText,
 } from "./shared/helper-backed-widget-data";
 import { logger } from "../logging/logger";
@@ -200,6 +201,9 @@ export function buildCatalogMetricSelectedViewOptions(options: {
         unit,
         maxValue,
         helperStatus: options.helperStatus,
+        sampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+            options.settings.preferences.pollingFrequencySeconds,
+        ),
         // Catalog-specific formatting runs only after the helper freshness
         // gate accepts the sample, so helper-error and no-data copy stays intact.
         transformFreshWidgetData: (freshWidgetData) => formatCatalogMetricFreshWidgetData({
