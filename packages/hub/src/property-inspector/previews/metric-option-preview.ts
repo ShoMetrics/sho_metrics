@@ -1,4 +1,4 @@
-import { composeMetricViewFrame, type SingleMetricRenderOptions } from "../../view-rendering/metric-view-frame";
+import { composeMetricViewFrame, type SingleMetricRenderOptions } from "../../view-rendering/frame/metric-view-frame";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../settings/default-appearance-settings";
 import { mergeResolvedAppearanceSettings, type ResolvedAppearanceSettingsOverride } from "../../settings/appearance-overrides";

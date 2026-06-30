@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/render-svg-effects";
-import { DEFAULT_RENDER_TEXT_STYLES, PIXEL_RENDER_TEXT_STYLES } from "../../view-rendering/render-text-style";
+import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/rasterize/render-svg-effects";
+import { DEFAULT_RENDER_TEXT_STYLES, PIXEL_RENDER_TEXT_STYLES } from "../../view-rendering/rasterize/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import { progressCircle, DEFAULT_PROGRESS_CIRCLE_CONFIG } from "./progress-circle";
 import { buildGaugeRangeColorPlan, resolveGaugeMarkerGap, resolveGaugeMarkerRenderProgress } from "./progress-circle-range";

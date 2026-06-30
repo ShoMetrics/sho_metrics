@@ -1,8 +1,8 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
 import { logger } from "../../logging/logger";
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
-import { rasterizeSvgToPngDataUrl } from "../../view-rendering/rasterizer";
-import type { TouchStripMetricLayout } from "../../view-rendering/metric-view-frame";
+import { rasterizeSvgToPngDataUrl } from "../../view-rendering/rasterize/rasterizer";
+import type { TouchStripMetricLayout } from "../../view-rendering/frame/metric-view-frame";
 import type { KeySize } from "../../view-rendering/widget-data";
 import {
     dispatchMetricViewImage,

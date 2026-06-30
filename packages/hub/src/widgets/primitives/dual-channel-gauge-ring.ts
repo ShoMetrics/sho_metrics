@@ -1,8 +1,8 @@
 import {
     clamp,
-} from "../../view-rendering/svg-utils";
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
-import type { ColorConfig } from "../../view-rendering/color-resolver";
+} from "../../view-rendering/rasterize/svg-utils";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
+import type { ColorConfig } from "../../view-rendering/color/color-resolver";
 import {
     buildGaugeRangeColorPlan,
     formatSvgNumber,

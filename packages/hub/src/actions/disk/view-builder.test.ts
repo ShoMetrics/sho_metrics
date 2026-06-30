@@ -10,7 +10,7 @@ import {
 import type { DiskVolumeOption } from "../../runtime/disk-volumes";
 import { LOCAL_SOURCE_SCOPE_ID } from "../../runtime/source-routing/metric-read-plan";
 import { buildMetricSnapshot, buildScalarMetricValue, MetricUnit } from "../../runtime/sources/metric-source";
-import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/metric-view-frame";
+import { buildMetricViewRenderPlan, buildRenderWidgetData } from "../../view-rendering/frame/metric-view-frame";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../../settings/storage/quick-start-widget-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";

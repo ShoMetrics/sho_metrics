@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { renderMetricFrame } from "../../view-rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../../view-rendering/single-metric-view";
+import { renderMetricFrame } from "../../view-rendering/frame/metric-frame";
+import { renderSingleMetricBodyView } from "../../view-rendering/views/single-metric-view";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import { buildDiskUsageWidgetData, buildMemoryUsageWidgetData } from "../../metrics/storage-widget-data";
 import { buildCpuUsageWidgetData } from "../cpu";

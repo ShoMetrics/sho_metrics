@@ -1,4 +1,4 @@
-import type { ColorConfig } from "../../view-rendering/color-resolver";
+import type { ColorConfig } from "../../view-rendering/color/color-resolver";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -7,8 +7,8 @@ import {
     isSvgOutlineEnabled,
     resolveSvgFilledShapeOutlinePadding,
     resolveSvgShapeOutlineExtraWidth,
-} from "../../view-rendering/svg-utils";
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
+} from "../../view-rendering/rasterize/svg-utils";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import { interpolateHexColor } from "../../shared/color-utils";
 import type { CircleVariant } from "./progress-circle";
 

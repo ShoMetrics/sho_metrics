@@ -6,8 +6,8 @@ import {
     type DurationSummary as SharedDurationSummary,
 } from "../shared/duration-accumulator";
 import { wallClockNowMilliseconds } from "../shared/clock";
-import type { MetricRenderOptions } from "../view-rendering/metric-view-frame";
-import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
+import type { MetricRenderOptions } from "../view-rendering/frame/metric-view-frame";
+import type { MetricRenderAppearance } from "../view-rendering/color/render-appearance";
 
 type MetricViewPerformanceReason = "settings-change" | "metric-tick";
 export type MetricViewPerformanceActionKind = "key" | "dial" | "unknown";

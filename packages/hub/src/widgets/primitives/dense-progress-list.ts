@@ -1,17 +1,17 @@
 import type { DenseMetricWidgetData, DenseMetricRowWidgetData } from "../../actions/dense-multi-metric/row-data";
 import { resolveReadableTextColor } from "../../shared/color-utils";
-import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
+import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     resolveRenderTextStyleFontSize,
     type RenderTextStyles,
-} from "../../view-rendering/render-text-style";
+} from "../../view-rendering/rasterize/render-text-style";
 import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     buildSvgFilterAttributes,
     type RenderThemeEffectTokens,
-} from "../../view-rendering/render-svg-effects";
+} from "../../view-rendering/rasterize/render-svg-effects";
 import type { KeySize } from "../../view-rendering/widget-data";
 import {
     clamp,
@@ -19,7 +19,7 @@ import {
     isSvgOutlineEnabled,
     renderStyledSvgText,
     resolveSvgFilledShapeOutlinePadding,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetBaseConfig } from "../widget-contract";
 
 interface DenseProgressListConfig extends WidgetBaseConfig {

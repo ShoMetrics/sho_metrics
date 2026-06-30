@@ -13,11 +13,11 @@ import type {
     ResolvedWidgetSettings,
 } from "../../settings/resolved-settings";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
-import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color/color-resolver";
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
-import { escapeSvgText } from "../../view-rendering/svg-utils";
+import { escapeSvgText } from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
     formatCompactDiskVolumeLabel,

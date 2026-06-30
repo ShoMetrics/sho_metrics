@@ -1,14 +1,14 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rendering/widget-data";
-import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
-import { buildSvgFilterAttributes } from "../../view-rendering/render-svg-effects";
-import type { RenderTextStyle } from "../../view-rendering/render-text-style";
+import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { buildSvgFilterAttributes } from "../../view-rendering/rasterize/render-svg-effects";
+import type { RenderTextStyle } from "../../view-rendering/rasterize/render-text-style";
 import { renderTitleCardDirectionIconFragment } from "../icons/title-card-icons";
 import {
     escapeSvgText,
     isSvgOutlineEnabled,
     renderConstrainedSvgText,
     resolveSvgTextFit,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import type { TextMetricConfig } from "./text-metric";
 
 export interface TitleCardSingleMetricContent {

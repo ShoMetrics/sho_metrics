@@ -1,10 +1,10 @@
-import type { ColorConfig, ColorThreshold } from "../view-rendering/color-resolver";
+import type { ColorConfig, ColorThreshold } from "../view-rendering/color/color-resolver";
 import type {
     RenderBackgroundFill,
     RenderPaintConstraint,
     RenderPaintTokens,
-} from "../view-rendering/render-appearance";
-import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
+} from "../view-rendering/color/render-appearance";
+import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/color/pixel-window-theme-tokens";
 import { parseHexColor, resolveRelativeLuminance } from "../shared/color-utils";
 import type { MetricColorChannel } from "./appearance-overrides";
 import type {

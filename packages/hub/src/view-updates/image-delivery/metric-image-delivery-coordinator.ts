@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { resolveMetricViewSampleTimestampMilliseconds, type TouchStripMetricLayout } from "../../view-rendering/metric-view-frame";
+import { resolveMetricViewSampleTimestampMilliseconds, type TouchStripMetricLayout } from "../../view-rendering/frame/metric-view-frame";
 import type { KeySize } from "../../view-rendering/widget-data";
 import type { TouchStripMetricLayoutState } from "../dispatch";
 import {

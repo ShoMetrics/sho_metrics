@@ -2,12 +2,12 @@ import type { DualChannelWidgetData, KeySize, SparklineScale } from "../../view-
 import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
-} from "../../view-rendering/render-appearance";
+} from "../../view-rendering/color/render-appearance";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../view-rendering/render-svg-effects";
+} from "../../view-rendering/rasterize/render-svg-effects";
 import {
     adjustHexColorBrightness,
     clamp,
@@ -15,11 +15,11 @@ import {
     isSvgOutlineEnabled,
     renderStyledSvgText,
     resolveSvgShapeOutlineStrokeWidth,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
-} from "../../view-rendering/render-text-style";
+} from "../../view-rendering/rasterize/render-text-style";
 import type { WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
 import {

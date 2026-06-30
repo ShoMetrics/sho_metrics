@@ -1,5 +1,5 @@
 import type { SparklineScale } from "../../view-rendering/widget-data";
-import { clamp } from "../../view-rendering/svg-utils";
+import { clamp } from "../../view-rendering/rasterize/svg-utils";
 import { buildSparklineAreaPath, buildSparklineLinePath } from "./sparkline-path";
 import { smoothSparklineValues } from "./sparkline-smoothing";
 

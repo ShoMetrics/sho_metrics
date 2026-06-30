@@ -2,17 +2,17 @@ import type { WidgetData, KeySize } from "../../view-rendering/widget-data";
 import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
-} from "../../view-rendering/render-appearance";
-import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
+} from "../../view-rendering/color/render-appearance";
+import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../view-rendering/render-svg-effects";
+} from "../../view-rendering/rasterize/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
-} from "../../view-rendering/render-text-style";
+} from "../../view-rendering/rasterize/render-text-style";
 import {
     clamp,
     formatSvgShapeOutlineStrokeAttributes,
@@ -20,7 +20,7 @@ import {
     renderStyledSvgText,
     resolveSvgShapeOutlineStrokeWidth,
     type SvgTextAnchor,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import {
     buildGaugeRangeColorPlan,
