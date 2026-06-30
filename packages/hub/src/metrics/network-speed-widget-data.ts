@@ -1,9 +1,6 @@
 import type { WidgetData } from "../view-rendering/widget-data";
 import { formatBytesPerSecond, type DataRateUnitBase } from "./byte-format";
-import {
-    isPollingBackedRateSampleFresh,
-    resolvePollingBackedSampleFreshnessBudgetMilliseconds,
-} from "./rate-sample-freshness";
+import { isNetworkSampleFresh } from "./network-sample-freshness";
 
 type NetworkSpeedUnitBase = DataRateUnitBase;
 
@@ -19,31 +16,15 @@ interface NetworkSpeedDisplayOptions {
     pollingFrequencySeconds: number;
 }
 
-const NETWORK_SAMPLE_STALE_GRACE_MILLISECONDS = 5000;
 const SI_BASE = 1000;
 const BITS_PER_BYTE = 8;
 const MINIMUM_PROGRESS_MAXIMUM_BYTES_PER_SECOND = SI_BASE;
 
-/**
- * Resolves how long network widgets may render the last-good sample.
- *
- * Traffic samples use this before the rate builder marks stale throughput as
- * unavailable; ping reuses the same network-owned freshness budget in the
- * network action view builder.
- */
-export function resolveNetworkSampleFreshnessBudgetMilliseconds(pollingFrequencySeconds: number): number {
-    return resolvePollingBackedSampleFreshnessBudgetMilliseconds({
-        pollingFrequencySeconds,
-        graceMilliseconds: NETWORK_SAMPLE_STALE_GRACE_MILLISECONDS,
-    });
-}
-
 export function buildNetworkSpeedWidgetData(options: NetworkSpeedDisplayOptions): WidgetData {
-    if (!isPollingBackedRateSampleFresh({
+    if (!isNetworkSampleFresh({
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.pollingFrequencySeconds,
-        graceMilliseconds: NETWORK_SAMPLE_STALE_GRACE_MILLISECONDS,
     })) {
         return buildUnavailableNetworkSpeedWidgetData(options);
     }

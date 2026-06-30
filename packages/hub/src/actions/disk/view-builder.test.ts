@@ -260,7 +260,60 @@ test("disk throughput bar both mode renders read and write channels", () => {
     assert.equal(widgetData.barLabel, "DISK");
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.label), ["READ", "WRIT"]);
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.color), ["#38bdf8", "#f472b6"]);
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.sampleTimestampMilliseconds), [1000, 1000]);
     assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
+});
+
+test("disk throughput bar channels keep missing-sample state for renderer repair", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+                theme: { flat: { paint: { colorMode: "solid" } } },
+            },
+            disk: {
+                kind: "throughput",
+                throughputDirection: "both",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+
+    assert.equal(target.domain, "disk");
+    if (target.domain !== "disk") {
+        assert.fail("Expected disk target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getDiskThroughputMetricKey("read")]: buildScalarMetricValue(1024, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+            [getDiskThroughputMetricKey("write")]: buildScalarMetricValue(2048, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+
+    const viewOptions = buildDiskViewOptions({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+        currentTimestampMilliseconds: 7001,
+    });
+    const widgetData = viewOptions.widgetData;
+
+    if ("positiveColor" in viewOptions || "positive" in widgetData) {
+        assert.fail("Expected disk throughput bar view.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.sampleTimestampMilliseconds), [undefined, undefined]);
 });
 
 test("disk throughput bar single direction renders direction icon value row", () => {

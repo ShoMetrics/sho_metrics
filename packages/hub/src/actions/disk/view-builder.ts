@@ -352,6 +352,7 @@ function buildDiskThroughputBarViewOptions(
                         direction: "read",
                         size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
                     }),
+                    sampleTimestampMilliseconds: readWidgetData.sampleTimestampMilliseconds,
                 },
                 {
                     label: "WRIT",
@@ -363,6 +364,7 @@ function buildDiskThroughputBarViewOptions(
                         direction: "write",
                         size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
                     }),
+                    sampleTimestampMilliseconds: writeWidgetData.sampleTimestampMilliseconds,
                 },
             ],
             sampleTimestampMilliseconds: readWidgetData.sampleTimestampMilliseconds

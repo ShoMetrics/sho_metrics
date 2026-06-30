@@ -321,17 +321,17 @@ export function buildRenderWidgetData(options: {
     shouldRenderMutedIconPlaceholder: boolean;
 }): WidgetData {
     if (options.hasData || options.shouldRenderMutedIconPlaceholder) {
-        return formatRenderWidgetDataUnit(options.widgetData);
+        return formatRenderWidgetDataUnit(buildRenderBarChannelsWidgetData(options.widgetData));
     }
 
-    return formatRenderWidgetDataUnit({
+    return formatRenderWidgetDataUnit(buildRenderBarChannelsWidgetData({
         ...options.widgetData,
         current: 0,
         progress: 0,
         history: [],
         unit: "",
         displayValue: resolveUnavailableRenderDisplayValue(options.widgetData),
-    });
+    }));
 }
 
 /** Converts dual-channel missing data into per-channel N/A placeholders. */
@@ -347,10 +347,10 @@ export function buildRenderDualChannelWidgetData(options: {
     }
 
     const positiveWidgetData = options.widgetData.positive.sampleTimestampMilliseconds == null
-        ? buildZeroChannelWidgetData(options.widgetData.positive, options.widgetData.negative.history.length)
+        ? buildPlaceholderChannelWidgetData(options.widgetData.positive, "N/A")
         : options.widgetData.positive;
     const negativeWidgetData = options.widgetData.negative.sampleTimestampMilliseconds == null
-        ? buildZeroChannelWidgetData(options.widgetData.negative, options.widgetData.positive.history.length)
+        ? buildPlaceholderChannelWidgetData(options.widgetData.negative, "N/A")
         : options.widgetData.negative;
 
     return {
@@ -896,6 +896,24 @@ function buildPlaceholderChannelWidgetData(widgetData: WidgetData, displayValue:
     };
 }
 
+function buildRenderBarChannelsWidgetData(widgetData: WidgetData): WidgetData {
+    if (widgetData.barChannels === undefined) {
+        return widgetData;
+    }
+
+    return {
+        ...widgetData,
+        barChannels: widgetData.barChannels.map(channel => channel.sampleTimestampMilliseconds == null
+            ? {
+                ...channel,
+                displayValue: "N/A",
+                unit: "",
+                progress: 0,
+            }
+            : channel),
+    };
+}
+
 function buildRenderDenseMetricWidgetData(widgetData: DenseMetricWidgetData): DenseMetricWidgetData {
     return {
         rows: widgetData.rows.map(row => ({
@@ -958,16 +976,6 @@ function formatDenseRenderWidgetDataUnit(widgetData: WidgetData): WidgetData {
     return compactUnit === formattedWidgetData.unit
         ? formattedWidgetData
         : { ...formattedWidgetData, unit: compactUnit };
-}
-
-function buildZeroChannelWidgetData(widgetData: WidgetData, referenceHistoryLength: number): WidgetData {
-    return {
-        ...widgetData,
-        current: 0,
-        progress: 0,
-        history: Array.from({ length: Math.max(2, referenceHistoryLength) }, () => 0),
-        displayValue: "0",
-    };
 }
 
 function isDualChannelWidgetData(widgetData: MetricRenderedData): widgetData is DualChannelWidgetData {

@@ -555,6 +555,8 @@ function buildNetworkRowWidgetData(
             latencyMilliseconds: sourceWidgetData.current,
             historyLatencyMilliseconds: sourceWidgetData.history,
             sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
+            currentTimestampMilliseconds,
+            pollingFrequencySeconds,
         });
     }
 

@@ -293,6 +293,46 @@ test("network bar keeps upload as the first channel", () => {
 
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.label), ["UP", "DOWN"]);
     assert.deepEqual(widgetData.barChannels?.map(channel => channel.color), ["#F97316", "#2563EB"]);
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.sampleTimestampMilliseconds), [1000, 1000]);
+});
+
+test("network bar channels keep missing-sample state for renderer repair", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: {
+                view: { selectedView: "bar" },
+                theme: { flat: { paint: { colorMode: "solid" } } },
+            },
+            network: {
+                direction: "both",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: buildNetworkMetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 7001,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected bar network view.");
+    }
+
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
+    assert.deepEqual(widgetData.barChannels?.map(channel => channel.sampleTimestampMilliseconds), [undefined, undefined]);
 });
 
 test("network bar single direction renders one direction icon value row", () => {

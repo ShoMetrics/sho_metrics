@@ -306,7 +306,7 @@ test("dual text view does not render unit text for unavailable channels", () => 
     assert.doesNotMatch(frame.svg, />M<\/text>/);
 });
 
-test("dual-channel widget fills a missing side with zero history when the other side has data", () => {
+test("dual-channel widget renders a missing side as N/A when the other side has data", () => {
     const dualWidgetData = buildDualChannelWidgetData({
         positive: buildWidgetData({
             current: 10,
@@ -325,9 +325,112 @@ test("dual-channel widget fills a missing side with zero history when the other 
     });
 
     assert.equal(renderWidgetData.positive, dualWidgetData.positive);
-    assert.deepEqual(renderWidgetData.negative.history, [0, 0, 0]);
+    assert.deepEqual(renderWidgetData.negative.history, []);
     assert.equal(renderWidgetData.negative.current, 0);
-    assert.equal(renderWidgetData.negative.displayValue, "0");
+    assert.equal(renderWidgetData.negative.displayValue, "N/A");
+    assert.equal(renderWidgetData.negative.unit, "");
+});
+
+test("single bar channels render missing channel values as N/A", () => {
+    const widgetData = buildWidgetData({
+        sampleTimestampMilliseconds: 1000,
+        barChannels: [
+            {
+                label: "UP",
+                displayValue: "42",
+                unit: "KB/s",
+                progress: 0.42,
+                color: "#ff0000",
+                iconFragment: "",
+                sampleTimestampMilliseconds: 1000,
+            },
+            {
+                label: "DOWN",
+                displayValue: "0",
+                unit: "KB/s",
+                progress: 0,
+                color: "#0000ff",
+                iconFragment: "",
+                sampleTimestampMilliseconds: undefined,
+            },
+        ],
+    });
+    const renderWidgetData = buildRenderWidgetData({
+        widgetData,
+        hasData: true,
+        shouldRenderMutedIconPlaceholder: false,
+    });
+
+    assert.equal(renderWidgetData.barChannels?.[0]?.displayValue, "42");
+    assert.equal(renderWidgetData.barChannels?.[0]?.unit, "KB/s");
+    assert.equal(renderWidgetData.barChannels?.[1]?.displayValue, "N/A");
+    assert.equal(renderWidgetData.barChannels?.[1]?.unit, "");
+});
+
+test("single bar SVG renders missing channel values as N/A", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({
+                sampleTimestampMilliseconds: 1000,
+                barChannels: [
+                    {
+                        label: "UP",
+                        displayValue: "42",
+                        unit: "KB/s",
+                        progress: 0.42,
+                        color: "#ff0000",
+                        iconFragment: "",
+                        sampleTimestampMilliseconds: 1000,
+                    },
+                    {
+                        label: "DOWN",
+                        displayValue: "0",
+                        unit: "KB/s",
+                        progress: 0,
+                        color: "#0000ff",
+                        iconFragment: "",
+                        sampleTimestampMilliseconds: undefined,
+                    },
+                ],
+            }),
+            resolvedSettings: {
+                view: { selectedView: "bar" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, />42<\/tspan>/);
+    assert.match(frame.svg, />N\/A<\/tspan>/);
+    assert.doesNotMatch(frame.svg, />0<\/text>/);
+});
+
+test("dual text SVG renders one missing channel as N/A without hiding the fresh channel", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDualMetricRenderOptions({
+            widgetData: buildDualChannelWidgetData({
+                positive: buildWidgetData({
+                    label: "UP",
+                    current: 10,
+                    displayValue: "10",
+                    sampleTimestampMilliseconds: 1000,
+                }),
+                negative: buildWidgetData({
+                    label: "DOWN",
+                    current: 99,
+                    displayValue: "99",
+                    sampleTimestampMilliseconds: undefined,
+                }),
+            }),
+            selectedView: "text",
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, />10<\/text>/);
+    assert.match(frame.svg, />N\/A<\/text>/);
+    assert.doesNotMatch(frame.svg, />99<\/text>/);
+    assert.doesNotMatch(frame.svg, />0<\/text>/);
 });
 
 test("metric data helpers treat either dual-channel timestamp as available data", () => {
@@ -888,14 +991,14 @@ test("hardware summary key frame renders a semicircle gauge and three readings",
     });
 
     assert.equal(frame.renderPlan.touchStripMetricLayout, null);
-    assert.match(frame.svg, /class="hardware-summary-view"/);
-    assert.match(frame.svg, /class="hardware-summary-gauge-track"/);
-    assert.match(frame.svg, /class="hardware-summary-gauge-fill"/);
+    assert.match(frame.svg, /class="semi-circle-gauge-panel"/);
+    assert.match(frame.svg, /class="semi-circle-gauge-panel-gauge-track"/);
+    assert.match(frame.svg, /class="semi-circle-gauge-panel-gauge-fill"/);
     assert.match(frame.svg, />GPU<\/text>/);
     assert.match(frame.svg, />TEMP<\/text>/);
     assert.match(frame.svg, />PWR<\/text>/);
     assert.match(frame.svg, />73<\/tspan>/);
-    assert.doesNotMatch(frame.svg, /hardware-summary-secondary-icon/);
+    assert.doesNotMatch(frame.svg, /semi-circle-gauge-panel-secondary-icon/);
     assert.doesNotMatch(frame.svg, />LOAD<\/text>/);
 });
 
@@ -910,9 +1013,9 @@ test("hardware summary touch strip frame uses wide summary layout", () => {
     assert.equal(frame.renderPlan.touchStripMetricLayout?.kind, "wide");
     assert.deepEqual(frame.renderPlan.renderSize, TOUCH_STRIP_LOGICAL_SIZE);
     assert.match(frame.svg, /width="200" height="100"/);
-    assert.match(frame.svg, /class="hardware-summary-view"/);
+    assert.match(frame.svg, /class="semi-circle-gauge-panel"/);
     assert.match(frame.svg, />TEMP<\/text>/);
-    assert.doesNotMatch(frame.svg, /hardware-summary-secondary-icon/);
+    assert.doesNotMatch(frame.svg, /semi-circle-gauge-panel-secondary-icon/);
 });
 
 test("hardware summary frame can render refresh and stacked overlays above the body", () => {
@@ -928,7 +1031,7 @@ test("hardware summary frame can render refresh and stacked overlays above the b
         renderTarget: "key",
     });
 
-    assert.match(frame.svg, /class="hardware-summary-view"/);
+    assert.match(frame.svg, /class="semi-circle-gauge-panel"/);
     assert.match(frame.svg, /class="metric-refresh-indicator"/);
     assert.match(frame.svg, /class="stacked-metric-indicator"/);
 });
@@ -1189,6 +1292,7 @@ function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
         history: options.history ?? [],
         unit: options.unit ?? "%",
         barUnit: options.barUnit,
+        barChannels: options.barChannels,
         label: options.label ?? "CPU",
         displayValue: options.displayValue,
         unavailableDisplayValue: options.unavailableDisplayValue,
