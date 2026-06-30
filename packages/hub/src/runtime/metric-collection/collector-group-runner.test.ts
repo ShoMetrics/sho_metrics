@@ -427,6 +427,33 @@ test("updateCollectorGroup prevents an in-flight old generation from writing", a
     );
 });
 
+test("updateCollectorGroup keeps in-flight refresh alive when refresh inputs are unchanged", async () => {
+    const metricStore = new MetricStore();
+    const deferredSnapshot = createDeferred<MetricSnapshot>();
+    const runner = new CollectorGroupRunner({
+        collectorGroup: buildCollectorGroup({
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 1000,
+        }),
+        sourceClient: new FakeSourceClient([deferredSnapshot.promise]),
+        snapshotStore: metricStore,
+        backoffPolicy: BackoffPolicy.flat(() => 0, 1000),
+    });
+
+    const refreshPromise = runner.refreshNow();
+    runner.updateCollectorGroup(buildCollectorGroup({
+        metricKeys: ["cpu.usage_percent"],
+        intervalMilliseconds: 1000,
+    }));
+    deferredSnapshot.resolve(buildSnapshot(1000, { "cpu.usage_percent": 42 }));
+
+    assert.deepEqual(await refreshPromise, { status: "refreshed" });
+    assert.equal(
+        metricStore.forScope("node-system").getWidgetData("cpu.usage_percent", "CPU", "%").current,
+        42,
+    );
+});
+
 test("updateCollectorGroup queues an immediate refresh after a pending old generation", async () => {
     const fakeTimer = new FakeTimer();
     const deferredSnapshot = createDeferred<MetricSnapshot>();

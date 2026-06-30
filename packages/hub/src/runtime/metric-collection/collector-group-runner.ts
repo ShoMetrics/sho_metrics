@@ -149,9 +149,9 @@ export class CollectorGroupRunner {
             this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
         }
         this.collectorGroup = collectorGroup;
-        this.generation += 1;
 
         if (shouldRefreshImmediately) {
+            this.generation += 1;
             this.scheduleImmediateRefresh();
         }
     }
@@ -402,6 +402,11 @@ function formatCollectorGroupId(collectorGroup: PlannedCollectorGroup): string {
         : collectorGroup.isolatedMetricKey;
 }
 
+// This comparison gates generation supersession. In-place updates arrive only
+// for the same collectorGroupKey, which already fixes sourceScopeId, sourceId,
+// groupKind, and group id. Any future PlannedCollectorGroup field that can
+// vary under that same key and affects whether an in-flight read remains valid
+// must be included here.
 function areCollectorGroupsRefreshEquivalent(
     left: PlannedCollectorGroup,
     right: PlannedCollectorGroup,
