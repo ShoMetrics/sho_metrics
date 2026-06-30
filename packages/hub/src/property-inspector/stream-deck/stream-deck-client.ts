@@ -1,4 +1,5 @@
 import { normalizePropertyInspectorHostPlatform } from "../inspector/platform";
+import type { PropertyInspectorExternalUrl } from "../external-urls";
 
 export type SettingsRecord = Record<string, unknown>;
 
@@ -19,6 +20,7 @@ export interface StreamDeckPropertyInspectorClient {
     getGlobalSettings(): Promise<GetSettingsPayload>;
     setSettings(settings: SettingsRecord): Promise<void>;
     setGlobalSettings(settings: SettingsRecord): Promise<void>;
+    openUrl(url: PropertyInspectorExternalUrl): Promise<void>;
     get<TReceived extends StreamDeckMessage>(
         sendEvent: string,
         receiveEvent: string,
@@ -280,6 +282,13 @@ export class StreamDeckClient implements StreamDeckPropertyInspectorClient {
      */
     setSettings(settings: SettingsRecord): Promise<void> {
         return this.send("setSettings", settings);
+    }
+
+    /**
+     * Opens a URL in the user's default browser.
+     */
+    openUrl(url: PropertyInspectorExternalUrl): Promise<void> {
+        return this.send("openUrl", { url });
     }
 
     /**

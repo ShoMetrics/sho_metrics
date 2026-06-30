@@ -5,7 +5,6 @@ import { optionMessages } from "../../i18n/message-groups/options";
 import { localizeOptionList } from "../../i18n/options";
 import { useI18n } from "../../i18n/react";
 import { SelectSetting } from "../controls/SelectSetting";
-import type { DisplayedMetricReadTrace } from "../../runtime/widget-runtime-cache";
 import {
     requireResolvedSingleMetricWidget,
     type ResolvedGpuMetricTarget,
@@ -21,8 +20,10 @@ import { MetricSourceSettings } from "./MetricSourceSettings";
 import { SettingsSection } from "./SettingsSection";
 import { PowerMaximumSetting, TemperatureMaximumSetting } from "./MetricMaximumSettings";
 import type { WidgetSettingsPanelProps } from "./panel-props";
+import { GpuNoValueGuidanceNote, shouldShowGpuNoValueGuidance } from "./no-value-guidance";
 import {
     buildGpuMetricKindOptionList,
+    isGpuHardwareSummarySupportedOnPlatform,
     isSummaryMetricKind,
     resolveGpuMetricKindMetricKeys,
     summaryMetricKindOption,
@@ -63,9 +64,10 @@ function GpuMetricSettings({
     onSettingsPatch,
 }: GpuWidgetSettingsProps): React.JSX.Element {
     const { t } = useI18n();
+    const metricOptions = buildGpuMetricKindOptionList(context.platform, target.reading.kind);
     const optionList = [
-        ...buildGpuMetricKindOptionList(context.platform, target.reading.kind),
-        summaryMetricKindOption,
+        ...metricOptions,
+        ...(isGpuHardwareSummarySupportedOnPlatform(context.platform) ? [summaryMetricKindOption] : []),
     ] as const satisfies readonly { readonly value: GpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isGpuReadingSupportedOnCurrentPlatform(context.platform, target);
     const shouldShowNoValueGuidance = shouldShowGpuNoValueGuidance(
@@ -111,27 +113,10 @@ function GpuMetricSettings({
                 />
             )}
             {shouldShowNoValueGuidance && (
-                <InspectorItem className="note-item note-item-caption">
-                    <p className="section-note">{t(gpuMessages.gpuNoValueGuidance)}</p>
-                </InspectorItem>
+                <GpuNoValueGuidanceNote />
             )}
         </SettingsSection>
     );
-}
-
-function shouldShowGpuNoValueGuidance(
-    isWindows: boolean,
-    trace: DisplayedMetricReadTrace | undefined,
-): boolean {
-    if (!isWindows || trace?.metricKey.startsWith("gpu.") !== true) {
-        return false;
-    }
-
-    if (trace.outcome?.kind === "value") {
-        return false;
-    }
-
-    return true;
 }
 
 function GpuTemperatureScaleSettings({

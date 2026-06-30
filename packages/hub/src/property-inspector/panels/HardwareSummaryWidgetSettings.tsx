@@ -49,6 +49,11 @@ import {
     summaryMetricKindOption,
     temperatureUnitOptionList,
 } from "./setting-options";
+import {
+    CpuSummaryHelperGuidanceNote,
+    GpuNoValueGuidanceNote,
+    shouldShowGpuNoValueGuidance,
+} from "./no-value-guidance";
 
 type CpuSummaryReadingKind = ResolvedCpuHardwareSummaryReading["kind"];
 type GpuSummaryReadingKind = ResolvedGpuHardwareSummaryReading["kind"];
@@ -111,90 +116,101 @@ function HardwareSummaryMetricSettings({
     const { t } = useI18n();
     const target = widget.target;
 
+    if (target.domain === "cpu") {
+        return (
+            <SettingsSection title={t(commonMessages.metricSection)}>
+                <SelectSetting
+                    label={t(cpuMessages.cpuMetricLabel)}
+                    value="summary"
+                    optionList={localizeOptionList(
+                        t,
+                        [
+                            summaryMetricKindOption,
+                            ...buildCpuMetricKindOptionList(context.platform),
+                        ] as const satisfies readonly SelectOption<CpuSummaryMetricChoice>[],
+                        cpuMetricKindMessageByValue,
+                    )}
+                    onValueChange={(kind) => {
+                        if (isSummaryMetricKind(kind)) {
+                            return;
+                        }
+
+                        onSettingsPatch({
+                            hardwareSummary: {
+                                switchTo: {
+                                    widgetKind: "singleMetric",
+                                    domain: "cpu",
+                                    kind,
+                                },
+                            },
+                        });
+                    }}
+                />
+                <CpuSummaryReadingSettings
+                    platform={context.platform}
+                    readings={target.orderedReadings}
+                    onReadingsChange={(orderedReadings) => onSettingsPatch({
+                        hardwareSummary: { orderedReadings },
+                    })}
+                />
+                {context.isWindows && (
+                    <CpuSummaryHelperGuidanceNote />
+                )}
+            </SettingsSection>
+        );
+    }
+
+    const shouldShowGpuRuntimeGuidance = shouldShowGpuNoValueGuidance(
+        context.isWindows,
+        context.runtimeCache.displayedMetricReadTrace,
+    );
+
     return (
         <SettingsSection title={t(commonMessages.metricSection)}>
-            {target.domain === "cpu" ? (
-                <>
-                    <SelectSetting
-                        label={t(cpuMessages.cpuMetricLabel)}
-                        value="summary"
-                        optionList={localizeOptionList(
-                            t,
-                            [
-                                summaryMetricKindOption,
-                                ...buildCpuMetricKindOptionList(context.platform),
-                            ] as const satisfies readonly SelectOption<CpuSummaryMetricChoice>[],
-                            cpuMetricKindMessageByValue,
-                        )}
-                        onValueChange={(kind) => {
-                            if (isSummaryMetricKind(kind)) {
-                                return;
-                            }
+            <SelectSetting
+                label={t(gpuMessages.gpuMetricLabel)}
+                value="summary"
+                optionList={localizeOptionList(
+                    t,
+                    [
+                        summaryMetricKindOption,
+                        ...buildGpuMetricKindOptionList(context.platform),
+                    ] as const satisfies readonly SelectOption<GpuSummaryMetricChoice>[],
+                    gpuMetricKindMessageByValue,
+                )}
+                onValueChange={(kind) => {
+                    if (isSummaryMetricKind(kind)) {
+                        return;
+                    }
 
-                            onSettingsPatch({
-                                hardwareSummary: {
-                                    switchTo: {
-                                        widgetKind: "singleMetric",
-                                        domain: "cpu",
-                                        kind,
-                                    },
-                                },
-                            });
-                        }}
-                    />
-                    <CpuSummaryReadingSettings
-                        platform={context.platform}
-                        readings={target.orderedReadings}
-                        onReadingsChange={(orderedReadings) => onSettingsPatch({
-                            hardwareSummary: { orderedReadings },
-                        })}
-                    />
-                </>
-            ) : (
-                <>
-                    <SelectSetting
-                        label={t(gpuMessages.gpuMetricLabel)}
-                        value="summary"
-                        optionList={localizeOptionList(
-                            t,
-                            [
-                                summaryMetricKindOption,
-                                ...buildGpuMetricKindOptionList(context.platform),
-                            ] as const satisfies readonly SelectOption<GpuSummaryMetricChoice>[],
-                            gpuMetricKindMessageByValue,
-                        )}
-                        onValueChange={(kind) => {
-                            if (isSummaryMetricKind(kind)) {
-                                return;
-                            }
-
-                            onSettingsPatch({
-                                hardwareSummary: {
-                                    switchTo: {
-                                        widgetKind: "singleMetric",
-                                        domain: "gpu",
-                                        kind,
-                                    },
-                                },
-                            });
-                        }}
-                    />
-                    <GpuSummaryReadingSettings
-                        platform={context.platform}
-                        readings={target.orderedReadings}
-                        onReadingsChange={(orderedReadings) => onSettingsPatch({
-                            hardwareSummary: { orderedReadings },
-                        })}
-                    />
-                    {context.isWindows && (
-                        <MetricSourceSettings
-                            sourcePolicy={widget.source}
-                            onSourcePatch={(source) => onSettingsPatch({
-                                hardwareSummary: { source },
-                            })}
-                        />
-                    )}
-                </>
+                    onSettingsPatch({
+                        hardwareSummary: {
+                            switchTo: {
+                                widgetKind: "singleMetric",
+                                domain: "gpu",
+                                kind,
+                            },
+                        },
+                    });
+                }}
+            />
+            <GpuSummaryReadingSettings
+                platform={context.platform}
+                readings={target.orderedReadings}
+                onReadingsChange={(orderedReadings) => onSettingsPatch({
+                    hardwareSummary: { orderedReadings },
+                })}
+            />
+            {context.isWindows && (
+                <MetricSourceSettings
+                    sourcePolicy={widget.source}
+                    onSourcePatch={(source) => onSettingsPatch({
+                        hardwareSummary: { source },
+                    })}
+                />
+            )}
+            {shouldShowGpuRuntimeGuidance && (
+                <GpuNoValueGuidanceNote />
             )}
         </SettingsSection>
     );

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
     customHttpPollingFrequencyOptionList,
+    isCpuHardwareSummarySupportedOnPlatform,
+    isGpuHardwareSummarySupportedOnPlatform,
     pollingFrequencyOptionList,
 } from "./setting-options";
 
@@ -15,4 +17,12 @@ test("Custom HTTP polling options extend ordinary widget polling up to 24 hours"
         customHttpPollingFrequencyOptionList.slice(-6).map(option => option.label),
         ["1h", "2h", "3h", "6h", "12h", "24h"],
     );
+});
+
+test("hardware summary options require every default reading to be supported", () => {
+    assert.equal(isCpuHardwareSummarySupportedOnPlatform("win32"), true);
+    assert.equal(isCpuHardwareSummarySupportedOnPlatform("darwin"), false);
+
+    assert.equal(isGpuHardwareSummarySupportedOnPlatform("win32"), true);
+    assert.equal(isGpuHardwareSummarySupportedOnPlatform("darwin"), false);
 });

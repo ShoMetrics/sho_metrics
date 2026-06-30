@@ -65,6 +65,11 @@ export const cpuMessages = {
         zh_CN: "当前 CPU 指标不支持此平台。请选择支持的指标继续。",
         ja: "現在の CPU メトリクスはこのプラットフォームでサポートされていません。続行するには対応メトリクスを選択してください。",
     },
+    cpuSummaryHelperGuidanceIntro: {
+        en: "CPU temperature and power require ShoMetrics Helper.",
+        zh_CN: "CPU 温度和功耗需要 ShoMetrics Helper。",
+        ja: "CPU 温度と電力には ShoMetrics Helper が必要です。",
+    },
 } as const satisfies LocalizedMessages;
 
 export const gpuMessages = {
@@ -78,10 +83,15 @@ export const gpuMessages = {
         zh_CN: "当前 GPU 指标不支持此平台。请选择支持的指标继续。",
         ja: "現在の GPU メトリクスはこのプラットフォームでサポートされていません。続行するには対応メトリクスを選択してください。",
     },
-    gpuNoValueGuidance: {
-        en: "No GPU value is available from the current source. Intel and AMD GPU metrics usually require ShoMetrics Helper. If Helper is installed, restart it or open ShoMetrics Control Panel for diagnostics.",
-        zh_CN: "当前来源没有可用的 GPU 值。Intel 和 AMD GPU 指标通常需要 ShoMetrics Helper。如果已安装 Helper，请重启它或打开 ShoMetrics Control Panel 诊断。",
-        ja: "現在のソースから GPU 値を取得できません。Intel と AMD の GPU メトリクスは通常 ShoMetrics Helper が必要です。Helper がインストール済みの場合は再起動するか、ShoMetrics Control Panel で診断してください。",
+    gpuNoValueGuidanceIntro: {
+        en: "No GPU value is available from the current source. Intel and AMD GPU metrics require ShoMetrics Helper.",
+        zh_CN: "当前来源没有可用的 GPU 值。Intel 和 AMD GPU 指标需要 ShoMetrics Helper。",
+        ja: "現在のソースから GPU 値を取得できません。Intel と AMD の GPU メトリクスには ShoMetrics Helper が必要です。",
+    },
+    gpuNoValueGuidanceTroubleshooting: {
+        en: "If Helper is already installed, restart it or open ShoMetrics Control Panel for diagnostics.",
+        zh_CN: "如果已安装 Helper，请重启它或打开 ShoMetrics Control Panel 诊断。",
+        ja: "Helper がインストール済みの場合は再起動するか、ShoMetrics Control Panel で診断してください。",
     },
 } as const satisfies LocalizedMessages;
 
@@ -334,6 +344,11 @@ export const helperMessages = {
         en: "Source: Helper only",
         zh_CN: "来源：仅 Helper",
         ja: "ソース: Helper のみ",
+    },
+    helperDownloadLink: {
+        en: "Download or update Helper.",
+        zh_CN: "下载或更新 Helper。",
+        ja: "Helper をダウンロードまたは更新してください。",
     },
 } as const satisfies LocalizedMessages;
 
