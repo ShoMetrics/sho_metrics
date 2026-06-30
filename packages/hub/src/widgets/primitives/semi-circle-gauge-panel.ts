@@ -1,15 +1,15 @@
-import type { ColorConfig } from "../../view-rendering/color-resolver";
-import { resolveColorForThresholdValue } from "../../view-rendering/color-resolver";
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
+import type { ColorConfig } from "../../view-rendering/color/color-resolver";
+import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     type RenderTextStyles,
-} from "../../view-rendering/render-text-style";
+} from "../../view-rendering/rasterize/render-text-style";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../../view-rendering/render-svg-effects";
+} from "../../view-rendering/rasterize/render-svg-effects";
 import type { KeySize } from "../../view-rendering/widget-data";
 import {
     clamp,
@@ -18,7 +18,7 @@ import {
     isSvgOutlineEnabled,
     renderStyledSvgText,
     resolveSvgShapeOutlineStrokeWidth,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
 

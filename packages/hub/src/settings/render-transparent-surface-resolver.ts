@@ -3,7 +3,7 @@ import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
     type RenderTransparentSurfaceTokens,
-} from "../view-rendering/render-appearance";
+} from "../view-rendering/color/render-appearance";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**

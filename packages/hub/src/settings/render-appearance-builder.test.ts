@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS } from "../view-rendering/render-appearance";
+import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS } from "../view-rendering/color/render-appearance";
 import {
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS,
-} from "../view-rendering/render-svg-effects";
+} from "../view-rendering/rasterize/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
     PIXEL_RENDER_TEXT_STYLES,
     TERMINAL_CLEAN_RENDER_TEXT_STYLES,
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
     TITLE_CARD_RENDER_TEXT_STYLES,
-} from "../view-rendering/render-text-style";
-import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/pixel-window-theme-tokens";
+} from "../view-rendering/rasterize/render-text-style";
+import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../view-rendering/color/pixel-window-theme-tokens";
 import { buildMetricRenderAppearance } from "./render-appearance-builder";
 import { buildColorConfigFromAppearance } from "./render-paint-resolver";
 import { buildDefaultAppearanceSettings as buildAppearanceSettings } from "./default-appearance-settings";

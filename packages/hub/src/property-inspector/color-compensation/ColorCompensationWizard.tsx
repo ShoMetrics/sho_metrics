@@ -17,7 +17,7 @@ import {
     sendColorCompensationPluginMessage,
     type ColorCompensationPluginMessage,
 } from "../../color-compensation/messages";
-import { renderColorCompensationSampleSvg } from "../../view-rendering/color-compensation-patterns";
+import { renderColorCompensationSampleSvg } from "../../view-rendering/color/color-compensation-patterns";
 import { SteppedSlider } from "../components/SteppedSlider";
 import { colorCompensationMessages } from "../../i18n/message-groups/color-compensation";
 import { commonMessages } from "../../i18n/message-groups/shell";

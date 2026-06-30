@@ -3,7 +3,7 @@ import {
     TERMINAL_CLEAN_RENDER_THEME_EFFECT_TOKENS,
     TERMINAL_VINTAGE_RENDER_THEME_EFFECT_TOKENS,
     type RenderThemeEffectTokens,
-} from "../view-rendering/render-svg-effects";
+} from "../view-rendering/rasterize/render-svg-effects";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**

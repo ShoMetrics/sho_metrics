@@ -35,7 +35,7 @@ import {
     readStackedDisplayedMetricKey,
 } from "./stacked-metric/read-plan";
 import { buildStackedSingleMetricViewOptions } from "./stacked-metric/single-metric-view-builder";
-import type { StackedMetricIndicator } from "../view-rendering/stacked-metric-indicator";
+import type { StackedMetricIndicator } from "../view-rendering/frame/stacked-metric-indicator";
 import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
 import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
 import { refreshNetworkInterfaceRuntimeCache } from "./shared/network-interface-runtime-cache";

@@ -1,6 +1,6 @@
-import { PIXEL_RENDER_FONT_FAMILY } from "../../view-rendering/render-text-style";
-import { clamp, escapeSvgText } from "../../view-rendering/svg-utils";
-import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../../view-rendering/pixel-window-theme-tokens";
+import { PIXEL_RENDER_FONT_FAMILY } from "../../view-rendering/rasterize/render-text-style";
+import { clamp, escapeSvgText } from "../../view-rendering/rasterize/svg-utils";
+import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../../view-rendering/color/pixel-window-theme-tokens";
 import type { KeySize } from "../../view-rendering/widget-data";
 import type { ThemeBodyPlacement, ThemeBodyViewport, ThemeStyle } from "./theme-style";
 

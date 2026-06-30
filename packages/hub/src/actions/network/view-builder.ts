@@ -7,7 +7,7 @@ import {
     type NetworkMetricDirection,
 } from "../../runtime/network-metric-keys";
 import type { WidgetData } from "../../view-rendering/widget-data";
-import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color-resolver";
+import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color/color-resolver";
 import type {
     ResolvedAppearanceSettings,
     ResolvedNetworkMetricTarget,

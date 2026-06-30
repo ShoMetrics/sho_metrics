@@ -1,6 +1,6 @@
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
-import { buildSvgFilterAttributes } from "../../view-rendering/render-svg-effects";
-import { escapeSvgText, isSvgOutlineEnabled } from "../../view-rendering/svg-utils";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
+import { buildSvgFilterAttributes } from "../../view-rendering/rasterize/render-svg-effects";
+import { escapeSvgText, isSvgOutlineEnabled } from "../../view-rendering/rasterize/svg-utils";
 
 export type TitleCardDirectionIconDirection = "up" | "down";
 

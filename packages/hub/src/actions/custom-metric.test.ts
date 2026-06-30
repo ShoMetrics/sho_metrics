@@ -36,7 +36,7 @@ import type {
 } from "../runtime/sources/custom-http/custom-http-transform-worker-pool";
 import type { MetricValueDisplayHint } from "../runtime/sources/source-client";
 import { CUSTOM_HTTP_SOURCE_ID } from "../runtime/sources/source-ids";
-import { composeMetricViewFrame } from "../view-rendering/metric-view-frame";
+import { composeMetricViewFrame } from "../view-rendering/frame/metric-view-frame";
 import type { WidgetData } from "../view-rendering/widget-data";
 import {
     getMetricIconFragment,

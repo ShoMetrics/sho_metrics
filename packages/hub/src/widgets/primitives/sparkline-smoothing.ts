@@ -1,4 +1,4 @@
-import { clamp } from "../../view-rendering/svg-utils";
+import { clamp } from "../../view-rendering/rasterize/svg-utils";
 
 const MAXIMUM_SMOOTHING_RADIUS = 18;
 const STRONG_SMOOTHING_THRESHOLD = 0.55;

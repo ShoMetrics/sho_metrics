@@ -1,4 +1,4 @@
-import { clamp } from "../view-rendering/svg-utils";
+import { clamp } from "../view-rendering/rasterize/svg-utils";
 import type { WidgetData } from "../view-rendering/widget-data";
 
 export interface PowerDisplayOptions {

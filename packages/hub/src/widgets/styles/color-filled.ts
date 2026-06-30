@@ -1,4 +1,4 @@
-import { adjustHexColorBrightness } from "../../view-rendering/svg-utils";
+import { adjustHexColorBrightness } from "../../view-rendering/rasterize/svg-utils";
 import type { KeySize } from "../../view-rendering/widget-data";
 import {
     renderFullBleedThemeBackground,

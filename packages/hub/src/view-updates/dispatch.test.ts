@@ -5,7 +5,7 @@ import {
     dispatchMetricViewImage,
     type TouchStripMetricLayoutState,
 } from "./dispatch";
-import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
+import type { TouchStripMetricLayout } from "../view-rendering/frame/metric-view-frame";
 
 test("dispatch sends key images through setImage", async () => {
     const action = new FakeKeyAction();

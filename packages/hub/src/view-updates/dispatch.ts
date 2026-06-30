@@ -1,6 +1,6 @@
 import { Target, type WillAppearEvent } from "@elgato/streamdeck";
 import { wallClockNowMilliseconds } from "../shared/clock";
-import type { TouchStripMetricLayout } from "../view-rendering/metric-view-frame";
+import type { TouchStripMetricLayout } from "../view-rendering/frame/metric-view-frame";
 
 export interface TouchStripMetricLayoutState {
     layoutPromise: Promise<void> | null;

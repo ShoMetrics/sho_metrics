@@ -3,8 +3,8 @@ import { shellMessages } from "../i18n/message-groups/shell";
 import { useI18n } from "../i18n/react";
 import { InspectorItem } from "./components/InspectorItem";
 import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
-import { GlobalSettingsTab } from "./panels/GlobalSettingsTab";
-import { WidgetSettingsTab } from "./panels/WidgetSettingsTab";
+import { GlobalSettingsTab } from "./panels/tabs/GlobalSettingsTab";
+import { WidgetSettingsTab } from "./panels/tabs/WidgetSettingsTab";
 import {
     usePropertyInspectorSettings,
     type SettingsNotice,

@@ -6,9 +6,9 @@ import {
     setColorCompensationPatternPreview,
 } from "../color-compensation/runtime-store";
 import { logger } from "../logging/logger";
-import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
-import { renderColorCompensationSampleSvg } from "../view-rendering/color-compensation-patterns";
-import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterizer";
+import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color/color-compensation-filter";
+import { renderColorCompensationSampleSvg } from "../view-rendering/color/color-compensation-patterns";
+import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterize/rasterizer";
 import { KEYPAD_PNG_SIZE } from "../view-rendering/widget-data";
 
 const log = logger.for("ColorCompensationPreview");

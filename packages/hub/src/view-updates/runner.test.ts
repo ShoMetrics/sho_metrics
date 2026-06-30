@@ -9,7 +9,7 @@ import { DEFAULT_COLOR_COMPENSATION_PROFILE, type ColorCompensationProfile } fro
 import { updateCommittedColorCompensationProfileFromStoredSettings } from "../color-compensation/runtime-store";
 import { writeStoredColorCompensationProfile } from "../settings/storage/color-compensation-settings";
 import { readStoredGlobalSettings } from "../settings/storage/codec";
-import * as rasterizer from "../view-rendering/rasterizer";
+import * as rasterizer from "../view-rendering/rasterize/rasterizer";
 import { CUSTOM_HTTP_METRIC_KEY_PREFIX } from "../runtime/sources/custom-http/custom-http-metric-key";
 import type { MetricViewPerformanceRenderContext } from "./performance-stats";
 import {

@@ -1,6 +1,6 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterizer";
-import type { MetricRenderAppearance } from "../view-rendering/render-appearance";
+import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterize/rasterizer";
+import type { MetricRenderAppearance } from "../view-rendering/color/render-appearance";
 import {
     composeMetricViewFrame,
     resolveMetricViewLogValue,
@@ -9,7 +9,7 @@ import {
     type HardwareSummaryRenderOptions,
     type MetricRenderOptions,
     type SingleMetricRenderOptions,
-} from "../view-rendering/metric-view-frame";
+} from "../view-rendering/frame/metric-view-frame";
 import { logger } from "../logging/logger";
 import { resolveProductionLogThrottleMilliseconds } from "../logging/log-throttle";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
@@ -28,7 +28,7 @@ import {
     resolveHardwareColorCompensationProfile,
     shouldSuppressMetricViewForColorCompensation,
 } from "../color-compensation/runtime-store";
-import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color-compensation-filter";
+import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color/color-compensation-filter";
 import { hasColorCompensationProfileEffect } from "../color-compensation/types";
 import { wallClockNowMilliseconds } from "../shared/clock";
 import {

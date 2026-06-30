@@ -8,12 +8,12 @@ import {
     sanitizeSvgId,
     type SvgTextAnchor,
     type SvgTextFitOptions,
-} from "../../view-rendering/svg-utils";
+} from "../../view-rendering/rasterize/svg-utils";
 import {
     resolveRenderTextStyleFontSize,
     type RenderTextStyle,
-} from "../../view-rendering/render-text-style";
-import type { RenderOutlineTokens } from "../../view-rendering/render-appearance";
+} from "../../view-rendering/rasterize/render-text-style";
+import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 
 interface MetricTextRowOptions {
     readonly id: string;

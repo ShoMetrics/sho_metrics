@@ -4,7 +4,7 @@ import {
     TERMINAL_METRIC_GLOW_FILTER_ID,
     TERMINAL_SUBTLE_GLOW_FILTER_ID,
     TERMINAL_VALUE_GLOW_FILTER_ID,
-} from "../../view-rendering/render-svg-effects";
+} from "../../view-rendering/rasterize/render-svg-effects";
 import { renderFullBleedThemeBackground, type ThemeStyle, type ThemeStylePaints } from "./theme-style";
 
 const TERMINAL_RADIUS = 12;

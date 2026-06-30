@@ -5,7 +5,7 @@ import {
     TERMINAL_VINTAGE_RENDER_TEXT_STYLES,
     TITLE_CARD_RENDER_TEXT_STYLES,
     type RenderTextStyles,
-} from "../view-rendering/render-text-style";
+} from "../view-rendering/rasterize/render-text-style";
 import type { ResolvedAppearanceSettings } from "./resolved-settings";
 
 /**
