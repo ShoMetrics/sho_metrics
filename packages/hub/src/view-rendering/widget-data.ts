@@ -48,6 +48,7 @@ interface BarChannelWidgetData {
     progress: number;
     color: string;
     iconFragment: string;
+    sampleTimestampMilliseconds?: number;
 }
 
 /**

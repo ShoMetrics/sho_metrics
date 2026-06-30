@@ -20,6 +20,7 @@ import {
     buildBluetoothBatteryPercentMetricKey,
 } from "../../runtime/metric-keys";
 import { resolveDiskUsageMetricKey } from "../../runtime/disk-metric-keys";
+import { getNetworkPingLatencyMetricKey } from "../../runtime/network-metric-keys";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import type { SourceMetricValueMetadata } from "../../runtime/sources/source-client";
 import type { WidgetData } from "../../view-rendering/widget-data";
@@ -278,6 +279,45 @@ test("dense system row data falls back to the selected battery device label", ()
     });
 
     assert.equal(widgetData.rows[0]?.widgetData.label, "MX M");
+});
+
+test("dense network ping row treats expired latency samples as no data", () => {
+    const metricKey = getNetworkPingLatencyMetricKey("1.1.1.1");
+    const widget = buildDenseWidget([
+        buildSlot("slot-1", buildNetworkPingTarget(), nodeSourcePolicy, { customLabel: "PING" }),
+        buildSlot("slot-2", buildGpuUsageTarget()),
+    ]);
+    const metrics = new FakeMetricStoreReader({
+        [metricKey]: buildWidgetData({
+            current: 42,
+            history: [42],
+            label: "PING",
+            unit: "ms",
+            sampleTimestampMilliseconds: 10_000,
+        }),
+    });
+
+    const widgetData = buildDenseMetricWidgetData({
+        widget,
+        metrics,
+        platform: "win32",
+        currentTimestampMilliseconds: 16_001,
+        pollingFrequencySeconds: TEST_POLLING_FREQUENCY_SECONDS,
+    });
+
+    assert.deepEqual(widgetData.rows[0]?.widgetData, {
+        current: 0,
+        progress: 0,
+        history: [],
+        label: "PING",
+        unit: "ms",
+        displayValue: "",
+        sparklineScale: {
+            mode: "adaptive",
+            minimumValue: 0,
+        },
+        sampleTimestampMilliseconds: undefined,
+    });
 });
 
 test("dense empty catalog rows are unconfigured without affecting other rows", () => {

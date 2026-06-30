@@ -3,6 +3,8 @@ import { test } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ActionKind } from "../../inspector/settings-types";
+import { StreamDeckClientProvider } from "../../stream-deck/stream-deck-client-context";
+import { TestPropertyInspectorClient } from "../../testing/test-property-inspector-client";
 import { resolveQuickStartStoredWidgetSettings } from "../../../settings/storage/quick-start-widget-settings";
 import {
     writeStoredWidgetSettingsPatch,
@@ -595,7 +597,7 @@ test("windows GPU settings panel guides no-value GPU diagnostics without changin
     });
 
     assert.match(markup, /No GPU value is available from the current source/);
-    assert.match(markup, /Intel and AMD GPU metrics usually require ShoMetrics Helper/);
+    assert.match(markup, /Intel and AMD GPU metrics require ShoMetrics Helper/);
     assert.match(markup, /open ShoMetrics Control Panel for diagnostics/);
 });
 
@@ -2019,26 +2021,34 @@ function renderWidgetSettings(options: {
     runtimeCache?: WidgetRuntimeCachePatch;
     runtimeCacheStatus?: Partial<PropertyInspectorRuntimeCacheStatus>;
 }): string {
-    return renderToStaticMarkup(createElement(WidgetSettingsTab, {
-        context: buildVisibilityContext({
-            actionKind: options.actionKind,
-            platform: options.platform,
-            isWindows: options.isWindows ?? (options.platform === undefined || options.platform === "win32"),
-            isTouchStrip: options.isTouchStrip,
-            settings: options.settings,
-            globalSettings: options.globalSettings,
-            runtimeCache: options.runtimeCache,
-            runtimeCacheStatus: options.runtimeCacheStatus,
-        }),
-        isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
-        isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
-        isGlobalTransparentSurfaceOverrideEnabled: options.isGlobalTransparentSurfaceOverrideEnabled ?? false,
-        isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
-        colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
-        onSettingsPatch: () => undefined,
-        onResetWidgetSettings: () => undefined,
-        onOpenColorCompensation: () => undefined,
-    }));
+    const client = new TestPropertyInspectorClient({ actionUuid: options.actionKind });
+
+    return renderToStaticMarkup(createElement(
+        StreamDeckClientProvider,
+        {
+            client,
+            children: createElement(WidgetSettingsTab, {
+                context: buildVisibilityContext({
+                    actionKind: options.actionKind,
+                    platform: options.platform,
+                    isWindows: options.isWindows ?? (options.platform === undefined || options.platform === "win32"),
+                    isTouchStrip: options.isTouchStrip,
+                    settings: options.settings,
+                    globalSettings: options.globalSettings,
+                    runtimeCache: options.runtimeCache,
+                    runtimeCacheStatus: options.runtimeCacheStatus,
+                }),
+                isGlobalViewOverrideEnabled: options.isGlobalViewOverrideEnabled ?? false,
+                isGlobalThemeOverrideEnabled: options.isGlobalThemeOverrideEnabled ?? false,
+                isGlobalTransparentSurfaceOverrideEnabled: options.isGlobalTransparentSurfaceOverrideEnabled ?? false,
+                isGlobalPaintOverrideEnabled: options.isGlobalPaintOverrideEnabled ?? false,
+                colorCompensationProfile: DEFAULT_COLOR_COMPENSATION_PROFILE,
+                onSettingsPatch: () => undefined,
+                onResetWidgetSettings: () => undefined,
+                onOpenColorCompensation: () => undefined,
+            }),
+        },
+    ));
 }
 
 function assertTextOrder(markup: string, earlierText: string, laterText: string): void {

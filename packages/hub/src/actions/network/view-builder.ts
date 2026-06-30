@@ -19,7 +19,6 @@ import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-da
 import {
     buildNetworkSpeedWidgetData,
     convertMegabitsPerSecondToBytesPerSecond,
-    resolveNetworkSampleFreshnessBudgetMilliseconds,
 } from "../../metrics/network-speed-widget-data";
 import { PROGRESS_CIRCLE_LABELS } from "../../widgets/primitives/progress-circle-label";
 import {
@@ -217,32 +216,18 @@ function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): Netwo
     const appearance = readSingleMetricAppearance(options.settings);
     const targetHost = options.target.reading.targetHost;
     const networkMetricKey = getNetworkPingLatencyMetricKey(targetHost);
-    const sampleFreshnessBudgetMilliseconds = resolveNetworkSampleFreshnessBudgetMilliseconds(
-        options.settings.preferences.pollingFrequencySeconds,
-    );
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
         "PING",
         "ms",
         200,
     );
-    const freshSourceWidgetData = isFreshNetworkWidgetData(
-        sourceWidgetData,
-        options.currentTimestampMilliseconds,
-        sampleFreshnessBudgetMilliseconds,
-    )
-        ? sourceWidgetData
-        : {
-            ...sourceWidgetData,
-            current: 0,
-            progress: 0,
-            history: [],
-            sampleTimestampMilliseconds: undefined,
-        };
     const viewWidgetData = buildNetworkPingWidgetData({
-        latencyMilliseconds: freshSourceWidgetData.current,
-        historyLatencyMilliseconds: freshSourceWidgetData.history,
-        sampleTimestampMilliseconds: freshSourceWidgetData.sampleTimestampMilliseconds,
+        latencyMilliseconds: sourceWidgetData.current,
+        historyLatencyMilliseconds: sourceWidgetData.history,
+        sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
+        currentTimestampMilliseconds: options.currentTimestampMilliseconds,
+        pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const renderedWidgetData = appearance.view.selectedView === "bar"
         ? { ...viewWidgetData, secondaryDisplayValue: targetHost }
@@ -508,6 +493,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
                         direction: "upload",
                         size: NETWORK_TOP_ICON_SIZE,
                     }),
+                    sampleTimestampMilliseconds: uploadWidgetData.sampleTimestampMilliseconds,
                 },
                 {
                     label: "DOWN",
@@ -519,6 +505,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
                         direction: "download",
                         size: NETWORK_TOP_ICON_SIZE,
                     }),
+                    sampleTimestampMilliseconds: downloadWidgetData.sampleTimestampMilliseconds,
                 },
             ],
             sampleTimestampMilliseconds: uploadWidgetData.sampleTimestampMilliseconds
@@ -629,18 +616,6 @@ function buildNetworkWidgetData(options: {
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.pollingFrequencySeconds,
     });
-}
-
-function isFreshNetworkWidgetData(
-    widgetData: WidgetData,
-    currentTimestampMilliseconds: number,
-    sampleFreshnessBudgetMilliseconds: number,
-): boolean {
-    if (widgetData.sampleTimestampMilliseconds == null) {
-        return false;
-    }
-
-    return currentTimestampMilliseconds - widgetData.sampleTimestampMilliseconds <= sampleFreshnessBudgetMilliseconds;
 }
 
 function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {
