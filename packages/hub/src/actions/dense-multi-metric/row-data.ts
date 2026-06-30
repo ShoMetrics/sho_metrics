@@ -61,7 +61,6 @@ import type { WidgetData } from "../../view-rendering/widget-data";
 import type { DiskThroughputMetricDirection } from "../../runtime/disk-metric-keys";
 import { resolveDiskMaximumThroughputMebibytesPerSecond } from "../disk/view-builder";
 import {
-    NETWORK_SAMPLE_STALE_MS,
     resolveNetworkMaximumBytesPerSecond as resolveSingleMetricNetworkMaximumBytesPerSecond,
     type ResolvedNetworkTrafficMetricTarget,
 } from "../network/view-builder";
@@ -143,6 +142,7 @@ export interface DenseMetricReadPlanOptions {
 export interface DenseMetricWidgetDataOptions extends DenseMetricReadPlanOptions {
     readonly metrics: MetricStoreReader;
     readonly currentTimestampMilliseconds: number;
+    readonly pollingFrequencySeconds: number;
 }
 
 /** Builds a dense widget read plan while downgrading conflicting rows before normalization. */
@@ -192,7 +192,12 @@ export function buildDenseMetricWidgetData(options: DenseMetricWidgetDataOptions
 
     return {
         rows: readPlanResolution.rows.map(row => row.rowKind === "configured"
-            ? buildConfiguredRowWidgetData(row, options.metrics, options.currentTimestampMilliseconds)
+            ? buildConfiguredRowWidgetData(
+                row,
+                options.metrics,
+                options.currentTimestampMilliseconds,
+                options.pollingFrequencySeconds,
+            )
             : buildUnconfiguredRowWidgetData(row)),
     };
 }
@@ -348,12 +353,18 @@ function buildConfiguredRowWidgetData(
     row: DenseMetricConfiguredRow,
     metrics: MetricStoreReader,
     currentTimestampMilliseconds: number,
+    pollingFrequencySeconds: number,
 ): DenseMetricConfiguredRowWidgetData {
     return {
         rowKind: "configured",
         slotId: row.slotId,
         metricKey: row.displayMetricKey,
-        widgetData: buildTargetWidgetData(row, metrics, currentTimestampMilliseconds),
+        widgetData: buildTargetWidgetData(
+            row,
+            metrics,
+            currentTimestampMilliseconds,
+            pollingFrequencySeconds,
+        ),
     };
 }
 
@@ -361,6 +372,7 @@ function buildTargetWidgetData(
     row: DenseMetricConfiguredRow,
     metrics: MetricStoreReader,
     currentTimestampMilliseconds: number,
+    pollingFrequencySeconds: number,
 ): WidgetData {
     switch (row.target.domain) {
         case "cpu":
@@ -374,9 +386,14 @@ function buildTargetWidgetData(
         case "gpu":
             return buildGpuRowWidgetData(row, metrics);
         case "disk":
-            return buildDiskRowWidgetData(row, metrics);
+            return buildDiskRowWidgetData(row, metrics, currentTimestampMilliseconds, pollingFrequencySeconds);
         case "network":
-            return buildNetworkRowWidgetData(row, metrics, currentTimestampMilliseconds);
+            return buildNetworkRowWidgetData(
+                row,
+                metrics,
+                currentTimestampMilliseconds,
+                pollingFrequencySeconds,
+            );
         case "system":
             return metrics.getWidgetData(
                 row.displayMetricKey,
@@ -483,7 +500,12 @@ function buildGpuRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricSto
     }
 }
 
-function buildDiskRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricStoreReader): WidgetData {
+function buildDiskRowWidgetData(
+    row: DenseMetricConfiguredRow,
+    metrics: MetricStoreReader,
+    currentTimestampMilliseconds: number,
+    pollingFrequencySeconds: number,
+): WidgetData {
     if (row.target.domain !== "disk") {
         throw new Error("Expected disk dense row.");
     }
@@ -504,6 +526,8 @@ function buildDiskRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricSt
         bytesPerSecondWidgetData: metrics.getWidgetData(getDiskThroughputMetricKey(direction), label, "B/s"),
         maximumBytesPerSecond: resolveDiskMaximumBytesPerSecond(row, direction),
         label,
+        currentTimestampMilliseconds,
+        pollingFrequencySeconds,
     });
 }
 
@@ -511,6 +535,7 @@ function buildNetworkRowWidgetData(
     row: DenseMetricConfiguredRow,
     metrics: MetricStoreReader,
     currentTimestampMilliseconds: number,
+    pollingFrequencySeconds: number,
 ): WidgetData {
     if (row.target.domain !== "network") {
         throw new Error("Expected network dense row.");
@@ -538,12 +563,6 @@ function buildNetworkRowWidgetData(
     };
     const direction = requireSupportedNetworkTrafficDirection(trafficTarget.reading.direction);
     const sourceWidgetData = metrics.getWidgetData(row.displayMetricKey, label, "B/s");
-    if (
-        sourceWidgetData.sampleTimestampMilliseconds === undefined
-        || currentTimestampMilliseconds - sourceWidgetData.sampleTimestampMilliseconds > NETWORK_SAMPLE_STALE_MS
-    ) {
-        return buildEmptyRowWidgetData(label);
-    }
 
     return buildNetworkSpeedWidgetData({
         bytesPerSecond: sourceWidgetData.current,
@@ -554,6 +573,8 @@ function buildNetworkRowWidgetData(
         unitBase: trafficTarget.reading.display.unitBase,
         maximumDisplayDigits: 3,
         sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
+        currentTimestampMilliseconds,
+        pollingFrequencySeconds,
     });
 }
 

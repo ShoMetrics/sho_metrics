@@ -11,10 +11,13 @@ import {
 } from "../../view-rendering/widget-data";
 import {
     HELPER_INSTALL_NOTICE_TEXT,
-    readHelperBackedWidgetData,
+    readHelperBackedWidgetData as readProductionHelperBackedWidgetData,
     resolveBuiltInHelperInstallNoticeText,
+    resolveHelperBackedSampleFreshnessBudgetMilliseconds,
     resolveHelperRequiredInstallNoticeText,
 } from "./helper-backed-widget-data";
+
+const TEST_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS = resolveHelperBackedSampleFreshnessBudgetMilliseconds(1);
 
 test("helper-backed widget data keeps fresh samples", () => {
     const widgetData = readHelperBackedWidgetData({
@@ -72,6 +75,25 @@ test("helper-backed widget data transforms only fresh samples", () => {
     assert.equal(freshWidgetData.displayValue, "fresh");
     assert.equal(staleWidgetData.displayValue, undefined);
     assert.equal(staleWidgetData.unavailableDisplayValue, undefined);
+});
+
+test("helper-backed widget data keeps samples fresh through the polling interval plus helper grace", () => {
+    const widgetData = readHelperBackedWidgetData({
+        metrics: buildMetricReader({
+            current: 42,
+            progress: 0.42,
+            history: [40, 42],
+            sampleTimestampMilliseconds: Date.now() - 60_500,
+        }),
+        metricKey: "cpu.temp",
+        label: "CPU",
+        unit: "C",
+        helperStatus: { state: "available" },
+        sampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(60),
+    });
+
+    assert.equal(widgetData.current, 42);
+    assert.deepEqual(widgetData.history, [40, 42]);
 });
 
 test("helper-backed widget data keeps default N/A copy when helper was never reached", () => {
@@ -284,6 +306,21 @@ function buildMetricReader(
         }),
         getTextValue: () => undefined,
     };
+}
+
+function readHelperBackedWidgetData(
+    options: Omit<
+        Parameters<typeof readProductionHelperBackedWidgetData>[0],
+        "sampleFreshnessBudgetMilliseconds"
+    > & {
+        readonly sampleFreshnessBudgetMilliseconds?: number;
+    },
+): WidgetData {
+    return readProductionHelperBackedWidgetData({
+        ...options,
+        sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds
+            ?? TEST_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS,
+    });
 }
 
 function buildWidgetData(options: Partial<WidgetData>): WidgetData {

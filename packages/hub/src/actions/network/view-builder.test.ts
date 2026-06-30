@@ -161,6 +161,56 @@ test("network view treats expired throughput samples as no data", () => {
     assert.deepEqual(widgetData.history, []);
 });
 
+test("network view keeps throughput samples fresh through the configured polling interval", () => {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            preferences: {
+                pollingFrequencySeconds: 60,
+            },
+            appearance: {
+                view: { selectedView: "line" },
+            },
+            network: {
+                direction: "download",
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+
+    assert.equal(target.domain, "network");
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getNetworkAggregateMetricKey("download")]: buildScalarMetricValue(1234, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 61_000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network view.");
+    }
+    assert.equal(widgetData.sampleTimestampMilliseconds, 1000);
+    assert.equal(widgetData.current, 1234);
+});
+
 test("network overlay line keeps upload as the first channel", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
@@ -445,5 +495,3 @@ function buildNetworkMetricStore(): MetricStore {
     }));
     return metricStore;
 }
-
-

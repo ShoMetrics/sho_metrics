@@ -58,9 +58,12 @@ test("disk throughput widget data clamps the live sample without rewriting histo
             current: -1,
             history: [-1, 2048],
             unit: "B/s",
+            sampleTimestampMilliseconds: 1000,
         }),
         maximumBytesPerSecond: 0,
         label: "DISK",
+        currentTimestampMilliseconds: 1000,
+        pollingFrequencySeconds: 1,
     });
 
     assert.equal(widgetData.current, 0);
@@ -69,4 +72,23 @@ test("disk throughput widget data clamps the live sample without rewriting histo
     assert.equal(widgetData.unit, "KB/s");
     assert.deepEqual(widgetData.history, [-1, 2048]);
     assert.deepEqual(widgetData.sparklineScale, { mode: "adaptive", minimumValue: 0 });
+});
+
+test("disk throughput widget data treats stale rate samples as no data", () => {
+    const widgetData = buildDiskThroughputWidgetData({
+        bytesPerSecondWidgetData: buildWidgetDataFixture({
+            current: 2048,
+            history: [1024, 2048],
+            unit: "B/s",
+            sampleTimestampMilliseconds: 1000,
+        }),
+        maximumBytesPerSecond: 4096,
+        label: "DISK",
+        currentTimestampMilliseconds: 7001,
+        pollingFrequencySeconds: 1,
+    });
+
+    assert.equal(widgetData.current, 0);
+    assert.deepEqual(widgetData.history, []);
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
 });

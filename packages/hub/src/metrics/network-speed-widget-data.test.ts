@@ -14,6 +14,8 @@ test("network speed widget data clamps the live sample without rewriting history
         unitBase: "byte",
         maximumDisplayDigits: 3,
         sampleTimestampMilliseconds: 1000,
+        currentTimestampMilliseconds: 1000,
+        pollingFrequencySeconds: 1,
     });
 
     assert.equal(widgetData.current, 0);
@@ -32,6 +34,9 @@ test("network speed widget data uses decimal bit units for traffic displays", ()
         label: "DOWN",
         unitBase: "bit",
         maximumDisplayDigits: 3,
+        sampleTimestampMilliseconds: 1000,
+        currentTimestampMilliseconds: 1000,
+        pollingFrequencySeconds: 1,
     });
 
     assert.equal(widgetData.current, 12_500);
@@ -39,6 +44,24 @@ test("network speed widget data uses decimal bit units for traffic displays", ()
     assert.equal(widgetData.displayValue, "100");
     assert.equal(widgetData.unit, "Kb/s");
     assert.deepEqual(widgetData.sparklineScale, { mode: "adaptive", minimumValue: 0 });
+});
+
+test("network speed widget data treats stale rate samples as no data", () => {
+    const widgetData = buildNetworkSpeedWidgetData({
+        bytesPerSecond: 12_500,
+        historyBytesPerSecond: [0, 12_500],
+        maximumBytesPerSecond: 25_000,
+        label: "DOWN",
+        unitBase: "bit",
+        maximumDisplayDigits: 3,
+        sampleTimestampMilliseconds: 1000,
+        currentTimestampMilliseconds: 7001,
+        pollingFrequencySeconds: 1,
+    });
+
+    assert.equal(widgetData.current, 0);
+    assert.deepEqual(widgetData.history, []);
+    assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
 });
 
 test("network speed maximum converts megabits to bytes and rejects negative input", () => {

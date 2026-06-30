@@ -14,6 +14,7 @@ export function buildHardwareSummaryViewOptions(options: {
     readonly widget: ResolvedHardwareSummaryWidget;
     readonly metrics: MetricStoreReader;
     readonly helperStatus: SourceClientStatus | undefined;
+    readonly helperSampleFreshnessBudgetMilliseconds: number;
 }): HardwareSummaryViewOptions {
     return {
         event: options.event,
@@ -24,6 +25,7 @@ export function buildHardwareSummaryViewOptions(options: {
             widget: options.widget,
             metrics: options.metrics,
             helperStatus: options.helperStatus,
+            helperSampleFreshnessBudgetMilliseconds: options.helperSampleFreshnessBudgetMilliseconds,
         }),
         ...buildMetricViewIcons({
             hardware: options.widget.target.domain,

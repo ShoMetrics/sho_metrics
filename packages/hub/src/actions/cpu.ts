@@ -28,6 +28,7 @@ import {
 import {
     readHelperBackedWidgetData,
     resolveBuiltInHelperInstallNoticeText,
+    resolveHelperBackedSampleFreshnessBudgetMilliseconds,
 } from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
@@ -89,6 +90,9 @@ export class Cpu extends MetricAction {
                 widget: readHardwareSummaryWidget(settings, "cpu"),
                 metrics,
                 helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+                helperSampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+                    settings.preferences.pollingFrequencySeconds,
+                ),
             })));
             return;
         }
@@ -136,6 +140,9 @@ export function buildCpuViewOptions(options: {
         metricRenderKind: "singleMetric" as const,
         resolvedSettings: widget.slot.appearance,
     };
+    const helperSampleFreshnessBudgetMilliseconds = resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+        options.settings.preferences.pollingFrequencySeconds,
+    );
 
     switch (options.target.reading.kind) {
         case "temperature": {
@@ -146,6 +153,7 @@ export function buildCpuViewOptions(options: {
                 unit: "C",
                 maxValue: options.target.reading.maximumCelsius,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const widgetData = buildTemperatureWidgetData({
                 celsiusWidgetData,
@@ -174,6 +182,7 @@ export function buildCpuViewOptions(options: {
                 unit: "W",
                 maxValue: options.target.reading.maximumWatts,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const widgetData = buildPowerWidgetData({
                 powerWidgetData,

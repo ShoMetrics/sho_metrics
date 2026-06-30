@@ -20,7 +20,9 @@ import {
 } from "../../settings/resolved-settings";
 import { writeStoredWidgetSettingsPatch } from "../../settings/storage/patch/widget-settings-patch";
 import type { WidgetData } from "../../view-rendering/widget-data";
-import { buildHardwareSummaryWidgetData } from "./widget-data";
+import { buildHardwareSummaryWidgetData as buildProductionHardwareSummaryWidgetData } from "./widget-data";
+
+const TEST_HELPER_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS = 8000;
 
 test("primary VRAM progress uses used over total memory", () => {
     const widget = buildHardwareSummaryWidget("gpu", [
@@ -182,4 +184,16 @@ function buildMetricValue(options: {
         label: "TEST",
         sampleTimestampMilliseconds,
     };
+}
+
+function buildHardwareSummaryWidgetData(
+    options: Omit<
+        Parameters<typeof buildProductionHardwareSummaryWidgetData>[0],
+        "helperSampleFreshnessBudgetMilliseconds"
+    >,
+): ReturnType<typeof buildProductionHardwareSummaryWidgetData> {
+    return buildProductionHardwareSummaryWidgetData({
+        ...options,
+        helperSampleFreshnessBudgetMilliseconds: TEST_HELPER_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS,
+    });
 }

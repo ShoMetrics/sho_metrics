@@ -34,6 +34,7 @@ import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import {
     readHelperBackedWidgetData,
     resolveBuiltInHelperInstallNoticeText,
+    resolveHelperBackedSampleFreshnessBudgetMilliseconds,
 } from "./shared/helper-backed-widget-data";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
@@ -100,6 +101,9 @@ export class Gpu extends MetricAction {
                 widget,
                 metrics,
                 helperStatus: this.readCachedSourceStatus(WINDOWS_HELPER_SOURCE_ID),
+                helperSampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+                    settings.preferences.pollingFrequencySeconds,
+                ),
             })));
             return;
         }
@@ -191,6 +195,9 @@ export function buildGpuViewOptions(options: {
         metricRenderKind: "singleMetric" as const,
         resolvedSettings: widget.slot.appearance,
     };
+    const helperSampleFreshnessBudgetMilliseconds = resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+        options.settings.preferences.pollingFrequencySeconds,
+    );
 
     switch (options.target.reading.kind) {
         case "temperature": {
@@ -201,6 +208,7 @@ export function buildGpuViewOptions(options: {
                 unit: "C",
                 maxValue: options.target.reading.maximumCelsius,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const widgetData = buildTemperatureWidgetData({
                 celsiusWidgetData,
@@ -228,6 +236,7 @@ export function buildGpuViewOptions(options: {
                 label: PROGRESS_CIRCLE_LABELS.vram,
                 unit: "MB",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const totalWidgetData = readHelperBackedWidgetData({
                 metrics: options.metrics,
@@ -235,6 +244,7 @@ export function buildGpuViewOptions(options: {
                 label: PROGRESS_CIRCLE_LABELS.vram,
                 unit: "MB",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const widgetData = buildGpuVramWidgetData(
                 usedWidgetData,
@@ -262,6 +272,7 @@ export function buildGpuViewOptions(options: {
                 unit: "W",
                 maxValue: options.target.reading.maximumWatts,
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
             const widgetData = buildGpuPowerWidgetData({
                 powerWidgetData,
@@ -288,6 +299,7 @@ export function buildGpuViewOptions(options: {
                 label: PROGRESS_CIRCLE_LABELS.gpu,
                 unit: "%",
                 helperStatus: options.helperStatus,
+                sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
 
             const widgetData = {
