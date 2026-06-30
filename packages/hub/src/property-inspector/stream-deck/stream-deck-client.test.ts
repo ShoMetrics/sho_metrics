@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "vitest";
+import { propertyInspectorExternalUrls } from "../external-urls";
 import {
     StreamDeckClient,
     type ActionInfo,
@@ -224,6 +225,23 @@ test("setSettings and setGlobalSettings send Stream Deck command payloads", asyn
         context: "pi-uuid",
         action: "com.example.action",
         payload: buildGlobalSettings(true),
+    });
+});
+
+test("openUrl sends a default-browser request", async () => {
+    const client = new StreamDeckClient();
+    await connectClient(client);
+    const socket = readSingleSocket();
+
+    await client.openUrl(propertyInspectorExternalUrls.helperDownload);
+
+    assert.deepEqual(readSentMessage(socket, 1), {
+        event: "openUrl",
+        context: "pi-uuid",
+        action: "com.example.action",
+        payload: {
+            url: "https://shometrics.github.io/download/",
+        },
     });
 });
 

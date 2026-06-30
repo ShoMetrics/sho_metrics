@@ -156,7 +156,7 @@ export function hasExplicitLocalAutoMetricSourcePreference(metricKey: string): b
         || isDiskUsageMetricKey(metricKey);
 }
 
-/** Reports whether a stable built-in metric has any local source on a platform. */
+/** Reports whether local:auto can route a stable built-in metric on a platform. */
 export function isBuiltInMetricSupportedOnPlatform(
     metricKey: string,
     platform: MetricSupportPlatform,

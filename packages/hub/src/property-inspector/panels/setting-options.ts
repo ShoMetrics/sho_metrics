@@ -157,6 +157,19 @@ export const gpuMetricKindOptionList = [
     { value: "power", label: "Power" },
 ] as const satisfies readonly SelectOption<ResolvedGpuReading["kind"]>[];
 
+const DEFAULT_CPU_HARDWARE_SUMMARY_METRIC_KEYS = [
+    CPU_USAGE_METRIC_KEY,
+    CPU_TEMP_METRIC_KEY,
+    CPU_POWER_METRIC_KEY,
+] as const;
+
+const DEFAULT_GPU_HARDWARE_SUMMARY_METRIC_KEYS = [
+    GPU_USAGE_METRIC_KEY,
+    GPU_TEMP_METRIC_KEY,
+    GPU_VRAM_USED_METRIC_KEY,
+    GPU_VRAM_TOTAL_METRIC_KEY,
+] as const;
+
 /** Stable PI sentinel for switching a CPU/GPU metric selector into hardware summary mode. */
 export const summaryMetricKindOption = {
     value: "summary",
@@ -169,6 +182,20 @@ export type SummaryMetricKind = typeof summaryMetricKindOption.value;
 /** Checks whether a metric selector value is the hardware summary sentinel. */
 export function isSummaryMetricKind(value: string): value is SummaryMetricKind {
     return value === summaryMetricKindOption.value;
+}
+
+/** Reports whether the default CPU hardware summary can collect all three readings locally. */
+export function isCpuHardwareSummarySupportedOnPlatform(platform: MetricSupportPlatform): boolean {
+    return DEFAULT_CPU_HARDWARE_SUMMARY_METRIC_KEYS.every(metricKey =>
+        isBuiltInMetricSupportedOnPlatform(metricKey, platform),
+    );
+}
+
+/** Reports whether the default GPU hardware summary can collect all three readings locally. */
+export function isGpuHardwareSummarySupportedOnPlatform(platform: MetricSupportPlatform): boolean {
+    return DEFAULT_GPU_HARDWARE_SUMMARY_METRIC_KEYS.every(metricKey =>
+        isBuiltInMetricSupportedOnPlatform(metricKey, platform),
+    );
 }
 
 export const temperatureUnitOptionList = [

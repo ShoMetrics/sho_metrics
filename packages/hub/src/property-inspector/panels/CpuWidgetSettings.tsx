@@ -16,6 +16,7 @@ import { resolveHelperStatusGuidanceText } from "./helper-status-guidance";
 import type { WidgetSettingsPanelProps } from "./panel-props";
 import {
     buildCpuMetricKindOptionList,
+    isCpuHardwareSummarySupportedOnPlatform,
     isSummaryMetricKind,
     resolveCpuMetricKindMetricKey,
     summaryMetricKindOption,
@@ -60,9 +61,10 @@ function CpuMetricSettings({
     const i18n = useI18n();
     const { t } = i18n;
     const reading = target.reading;
+    const metricOptions = buildCpuMetricKindOptionList(context.platform, reading.kind);
     const optionList = [
-        ...buildCpuMetricKindOptionList(context.platform, reading.kind),
-        summaryMetricKindOption,
+        ...metricOptions,
+        ...(isCpuHardwareSummarySupportedOnPlatform(context.platform) ? [summaryMetricKindOption] : []),
     ] as const satisfies readonly { readonly value: CpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isBuiltInMetricSupportedOnPlatform(
         resolveCpuMetricKindMetricKey(reading.kind),

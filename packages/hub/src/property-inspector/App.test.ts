@@ -45,6 +45,7 @@ const fakePropertyInspectorClient: StreamDeckPropertyInspectorClient = {
     },
     setSettings: async (): Promise<void> => undefined,
     setGlobalSettings: async (): Promise<void> => undefined,
+    openUrl: async (): Promise<void> => undefined,
     get: async <TReceived extends StreamDeckMessage>(): Promise<TReceived> => {
         throw new Error("Server-rendered App test must not send Stream Deck requests.");
     },

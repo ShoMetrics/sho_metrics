@@ -10,6 +10,7 @@ import type {
     StreamDeckMessage,
     StreamDeckPropertyInspectorClient,
 } from "../stream-deck/stream-deck-client";
+import type { PropertyInspectorExternalUrl } from "../external-urls";
 
 interface TestPropertyInspectorClientOptions {
     readonly actionUuid: string;
@@ -101,6 +102,10 @@ export class TestPropertyInspectorClient implements StreamDeckPropertyInspectorC
     async setGlobalSettings(settings: SettingsRecord): Promise<void> {
         this.globalSettings = settings;
         this.setGlobalSettingsCalls.push(settings);
+    }
+
+    async openUrl(url: PropertyInspectorExternalUrl): Promise<void> {
+        await this.send("openUrl", { url });
     }
 
     async get<TReceived extends StreamDeckMessage>(): Promise<TReceived> {
