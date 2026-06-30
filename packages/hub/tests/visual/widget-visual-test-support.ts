@@ -1,17 +1,17 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
-import { renderDualMetricBodyView } from "../../src/view-rendering/dual-metric-view";
-import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
+import { renderDualMetricBodyView } from "../../src/view-rendering/views/dual-metric-view";
+import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
 import {
     composeMetricViewFrame,
     type MetricRenderTarget,
-} from "../../src/view-rendering/metric-view-frame";
-import { resolveResvgFontOptions } from "../../src/view-rendering/resvg-font-options";
-import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
-import type { TextMetricVariant } from "../../src/view-rendering/render-appearance";
-import type { ColorConfig } from "../../src/view-rendering/color-resolver";
-import { resolveColorForThresholdValue } from "../../src/view-rendering/color-resolver";
+} from "../../src/view-rendering/frame/metric-view-frame";
+import { resolveResvgFontOptions } from "../../src/view-rendering/rasterize/resvg-font-options";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
+import type { TextMetricVariant } from "../../src/view-rendering/color/render-appearance";
+import type { ColorConfig } from "../../src/view-rendering/color/color-resolver";
+import { resolveColorForThresholdValue } from "../../src/view-rendering/color/color-resolver";
 import type {
     DualChannelWidgetData,
     KeySize,
@@ -24,7 +24,7 @@ import { buildMetricRenderAppearance } from "../../src/settings/render-appearanc
 import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-resolver";
 import type { DenseMetricWidgetData } from "../../src/actions/dense-multi-metric/row-data";
 import type { HardwareSummaryWidgetData } from "../../src/actions/hardware-summary/widget-data";
-import type { StackedMetricIndicator } from "../../src/view-rendering/stacked-metric-indicator";
+import type { StackedMetricIndicator } from "../../src/view-rendering/frame/stacked-metric-indicator";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
     getNetworkDirectionStatusIcon,

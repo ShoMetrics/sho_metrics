@@ -21,6 +21,7 @@ import {
     resolveMetricCustomLabelKeyShape,
 } from "../../settings/metric-custom-label-policy";
 import type { SingleMetricViewOptions } from "../../view-updates/runner";
+import { buildPercentageWidgetData } from "../../metrics/percentage-widget-data";
 import { TITLE_CARD_BATTERY_CAPTION_TEXT } from "../../view-rendering/text-content/title-card-text-content";
 import { getMetricIconFragment } from "../../widgets/icons/metric-icons";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
@@ -66,12 +67,12 @@ export function buildSystemViewOptions(options: {
         resolvedSettings: widget.slot.appearance,
         metricKey,
         widgetData: {
-            ...options.metrics.getWidgetData(
+            ...buildPercentageWidgetData(options.metrics.getWidgetData(
                 metricKey,
                 selectedView === "bar" ? SYSTEM_BATTERY_TITLE_LABEL : batteryLabel,
                 "%",
                 100,
-            ),
+            )),
             ...(selectedView === "bar" ? {
                 barLabel: SYSTEM_BATTERY_TITLE_LABEL,
                 secondaryDisplayValue: secondaryBatteryLabel,

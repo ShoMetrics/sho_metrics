@@ -4,6 +4,8 @@ export interface WidgetData {
     history: readonly number[];    // Last N samples, oldest first.
     unit: string;                  // Examples: "%", "deg C", "MB/s".
     label: string;                 // Examples: "CPU Usage", "GPU Temp".
+    // TODO: Move display precision to one owner or make displayValue required
+    // for rendered metric data. Primitive fallbacks currently guess precision.
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
     unavailableDisplayValue?: string; // Optional short key copy for render-owned no-data states.
     secondaryDisplayValue?: string;

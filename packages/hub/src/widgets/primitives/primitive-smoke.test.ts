@@ -258,9 +258,9 @@ test("gauge circle variant puts the label and direction icon at the bottom", () 
 });
 
 test("gauge circle variant keeps value and unit in fixed regions", () => {
-    const singleDigitFragment = renderGaugeValueSample("3", "KB/s");
-    const doubleDigitFragment = renderGaugeValueSample("70", "KB/s");
-    const tripleDigitFragment = renderGaugeValueSample("552", "KB/s");
+    const singleDigitFragment = renderGaugeValueSample("3", "°C");
+    const doubleDigitFragment = renderGaugeValueSample("70", "°C");
+    const tripleDigitFragment = renderGaugeValueSample("552", "°C");
     const shortUnitSingleDigitFragment = renderGaugeValueSample("3", "%");
     const shortUnitDoubleDigitFragment = renderGaugeValueSample("38", "%");
     const shortUnitTripleDigitFragment = renderGaugeValueSample("301", "W");
@@ -268,29 +268,29 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
 
     assert.match(singleDigitFragment, /id="progress-circle-value"/);
     assert.match(singleDigitFragment, /id="progress-circle-unit"/);
-    assert.match(singleDigitFragment, /x="74"/);
-    assert.match(singleDigitFragment, /x="85"/);
-    assert.match(singleDigitFragment, /font-size="43"/);
+    assert.match(singleDigitFragment, /x="92"/);
+    assert.match(singleDigitFragment, /x="97"/);
+    assert.match(singleDigitFragment, /font-size="48"/);
     assert.match(singleDigitFragment, /font-size="13"/);
-    assert.match(doubleDigitFragment, /x="74"/);
-    assert.match(doubleDigitFragment, /x="85"/);
-    assert.match(doubleDigitFragment, /font-size="37"/);
+    assert.match(doubleDigitFragment, /x="92"/);
+    assert.match(doubleDigitFragment, /x="97"/);
+    assert.match(doubleDigitFragment, /font-size="48"/);
     assert.match(doubleDigitFragment, /font-size="13"/);
-    assert.match(tripleDigitFragment, /x="74"/);
-    assert.match(tripleDigitFragment, /x="85"/);
-    assert.match(tripleDigitFragment, /font-size="25"/);
+    assert.match(tripleDigitFragment, /x="92"/);
+    assert.match(tripleDigitFragment, /x="97"/);
+    assert.match(tripleDigitFragment, /font-size="31"/);
     assert.match(tripleDigitFragment, /font-size="13"/);
-    assert.match(shortUnitSingleDigitFragment, /x="72"/);
+    assert.match(shortUnitSingleDigitFragment, /x="92"/);
     assert.match(shortUnitSingleDigitFragment, /x="97"/);
     assert.match(shortUnitSingleDigitFragment, /font-size="48"/);
-    assert.match(shortUnitDoubleDigitFragment, /x="66"/);
+    assert.match(shortUnitDoubleDigitFragment, /x="92"/);
     assert.match(shortUnitDoubleDigitFragment, /x="97"/);
     assert.match(shortUnitDoubleDigitFragment, /font-size="48"/);
     assert.match(shortUnitTripleDigitFragment, /x="92"/);
     assert.match(shortUnitTripleDigitFragment, /x="97"/);
     assert.match(shortUnitTripleDigitFragment, /font-size="31"/);
-    assert.match(longUnitManyDigitFragment, /x="74"/);
-    assert.match(longUnitManyDigitFragment, /x="85"/);
+    assert.match(longUnitManyDigitFragment, /x="92"/);
+    assert.match(longUnitManyDigitFragment, /x="97"/);
     assert.match(longUnitManyDigitFragment, /font-size="21"/);
     assert.doesNotMatch(singleDigitFragment, /progress-circle-value-unit/);
     assert.doesNotMatch(singleDigitFragment, /textLength=/);

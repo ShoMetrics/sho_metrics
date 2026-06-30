@@ -104,6 +104,23 @@ test("single title-card text uses the solid metric paint for static text", () =>
     assert.match(svg, /fill="#metric-token"[\s\S]*CPU/);
 });
 
+test("single gauge view compacts data-rate units before rendering", () => {
+    const svg = renderSingleMetricBodyView({
+        data: {
+            ...buildWidgetData(),
+            label: "NET",
+            unit: "MB/s",
+        },
+        visual: buildMetricRenderAppearance(),
+        renderSize: { width: 144, height: 144 },
+        centerIcon: "",
+        circleVariant: "gauge",
+    });
+
+    assert.match(svg, /id="progress-circle-unit"[\s\S]*>M<\/text>/);
+    assert.doesNotMatch(svg, /MB\/s/);
+});
+
 function buildMetricRenderAppearance(): MetricRenderAppearance {
     return {
         renderPrimitive: "circle",

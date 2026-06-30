@@ -1,6 +1,6 @@
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
-import type { TextMetricVariant } from "../../src/view-rendering/render-appearance";
-import type { MetricRenderTarget } from "../../src/view-rendering/metric-view-frame";
+import type { TextMetricVariant } from "../../src/view-rendering/color/render-appearance";
+import type { MetricRenderTarget } from "../../src/view-rendering/frame/metric-view-frame";
 import type { DualChannelWidgetData, WidgetData } from "../../src/view-rendering/widget-data";
 import type { CircleVariant } from "../../src/widgets/primitives/progress-circle";
 import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/primitives/dual-channel-progress-circle";
