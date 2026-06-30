@@ -243,6 +243,12 @@ test("dense system row data reads the selected peripheral battery metric", () =>
         history: [],
         label: "MSE",
         unit: "%",
+        displayValue: "85",
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 100,
+        },
         sampleTimestampMilliseconds: 10_000,
     });
 });

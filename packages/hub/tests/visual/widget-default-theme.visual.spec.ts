@@ -1,8 +1,8 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
-import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
-import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
 import {
     TOUCH_STRIP_LOGICAL_SIZE,
     WIDGET_LOGICAL_SIZE,
@@ -34,6 +34,16 @@ const CPU_USAGE_WIDGET_DATA: WidgetData = {
     sampleTimestampMilliseconds: 1,
 };
 
+const GPU_TEMPERATURE_WIDGET_DATA: WidgetData = {
+    current: 38,
+    progress: 0.38,
+    history: [30, 32, 35, 38],
+    unit: "°C",
+    label: "GPU",
+    displayValue: "38",
+    sampleTimestampMilliseconds: 1,
+};
+
 interface DefaultThemeVisualWidgetTestCase {
     readonly snapshotName: string;
     readonly appearance: ResolvedAppearanceSettingsOverride;
@@ -61,6 +71,14 @@ const DEFAULT_THEME_VISUAL_TEST_CASES: readonly DefaultThemeVisualWidgetTestCase
             circleVariant: "gauge",
         }),
         data: CPU_USAGE_WIDGET_DATA,
+    },
+    {
+        snapshotName: "default-theme-single-circle-gauge-gpu-temperature-multi-color",
+        appearance: buildDefaultThemeAppearanceOverride({
+            selectedView: "circle",
+            circleVariant: "gauge",
+        }),
+        data: GPU_TEMPERATURE_WIDGET_DATA,
     },
     {
         snapshotName: "default-theme-single-progress-bar-cpu-usage-multi-color",

@@ -107,26 +107,17 @@ const ARC_LAYOUT = {
     gaugeMarkerGapScale: 1.5,
     gaugeValueYOffset: 2,
     gaugeValueRow: {
-        shortUnitValueEndXOffset: 20,
-        shortUnitStartXOffset: 25,
-        shortUnitTwoDigitOpticalXOffset: -6,
-        shortUnitValueMaxWidth: 74,
-        shortUnitMaxWidth: 28,
-        shortUnitDigitFontSizes: {
+        valueEndXOffset: 20,
+        unitStartXOffset: 25,
+        valueMaxWidth: 74,
+        // Gauge reserves about two characters for the unit. Longer rate units
+        // must be compacted before reaching this primitive.
+        unitMaxWidth: 28,
+        unitFontSize: 13,
+        digitFontSizes: {
             one: 48,
             two: 48,
             three: 31,
-            many: 21,
-        },
-        longUnitValueEndXOffset: 2,
-        longUnitStartXOffset: 13,
-        longUnitFontSize: 13,
-        longUnitValueMaxWidth: 52,
-        longUnitMaxWidth: 46,
-        longUnitDigitFontSizes: {
-            one: 43,
-            two: 37,
-            three: 25,
             many: 21,
         },
     },
@@ -597,19 +588,13 @@ function renderGaugeValueRow(options: {
         });
     }
 
-    const unitLength = Array.from(options.unitText.trim()).length;
-    const isShortUnit = unitLength === 1;
     const layout = ARC_LAYOUT.gaugeValueRow;
     const valuePlacement = resolveGaugeValuePlacement({
         centerXCoordinate: options.centerXCoordinate,
-        isShortUnit,
         valueText: options.valueText,
         fallbackFontSize: options.valueFontSize,
     });
-    const unitXCoordinate = options.centerXCoordinate + (
-        isShortUnit ? layout.shortUnitStartXOffset : layout.longUnitStartXOffset
-    );
-    const unitFontSize = isShortUnit ? options.unitFontSize : layout.longUnitFontSize;
+    const unitXCoordinate = options.centerXCoordinate + layout.unitStartXOffset;
 
     return `
         ${renderStyledSvgText({
@@ -633,8 +618,8 @@ function renderGaugeValueRow(options: {
             text: options.unitText,
             xCoordinate: unitXCoordinate,
             yCoordinate,
-            maxWidth: isShortUnit ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
-            baseFontSize: unitFontSize,
+            maxWidth: layout.unitMaxWidth,
+            baseFontSize: layout.unitFontSize,
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "start",
@@ -646,7 +631,6 @@ function renderGaugeValueRow(options: {
 
 function resolveGaugeValuePlacement(options: {
     centerXCoordinate: number;
-    isShortUnit: boolean;
     valueText: string;
     fallbackFontSize: number;
 }): {
@@ -658,36 +642,13 @@ function resolveGaugeValuePlacement(options: {
     const layout = ARC_LAYOUT.gaugeValueRow;
     const digitCount = countDigits(options.valueText);
 
-    if (options.isShortUnit && digitCount <= 2) {
-        const opticalXOffset = digitCount === 2
-            ? layout.shortUnitTwoDigitOpticalXOffset
-            : 0;
-
-        return {
-            xCoordinate: options.centerXCoordinate + opticalXOffset,
-            maxWidth: layout.shortUnitValueMaxWidth,
-            fontSize: resolveGaugeValueFontSize({
-                digitCount,
-                fallbackFontSize: options.fallbackFontSize,
-                digitFontSizes: layout.shortUnitDigitFontSizes,
-            }),
-            textAnchor: "middle",
-        };
-    }
-
-    const xOffset = options.isShortUnit
-        ? layout.shortUnitValueEndXOffset
-        : layout.longUnitValueEndXOffset;
-
     return {
-        xCoordinate: options.centerXCoordinate + xOffset,
-        maxWidth: options.isShortUnit ? layout.shortUnitValueMaxWidth : layout.longUnitValueMaxWidth,
+        xCoordinate: options.centerXCoordinate + layout.valueEndXOffset,
+        maxWidth: layout.valueMaxWidth,
         fontSize: resolveGaugeValueFontSize({
             digitCount,
             fallbackFontSize: options.fallbackFontSize,
-            digitFontSizes: options.isShortUnit
-                ? layout.shortUnitDigitFontSizes
-                : layout.longUnitDigitFontSizes,
+            digitFontSizes: layout.digitFontSizes,
         }),
         textAnchor: "end",
     };

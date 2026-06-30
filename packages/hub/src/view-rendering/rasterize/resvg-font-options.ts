@@ -28,6 +28,9 @@ export interface ResvgFontResolverEnvironment {
 const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
     platform: process.platform,
     fileExists: existsSync,
+    // TODO: resvg-js 2.6.2 does not apply font-weight to InterVariable's
+    // weight axis. If visible weight matters, replace this with registered
+    // static Inter faces such as Regular and Bold.
     bundledInterFontFile: resolveBundledFontFile("inter", "InterVariable.ttf"),
     bundledShareTechMonoFontFile: resolveBundledFontFile("share-tech-mono", "ShareTechMono-Regular.ttf"),
     bundledDotGothic16FontFile: resolveBundledFontFile("dotgothic16", "DotGothic16-Regular.ttf"),

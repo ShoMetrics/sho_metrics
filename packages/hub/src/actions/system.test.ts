@@ -166,6 +166,27 @@ test("System battery circle view passes the stored custom label to the renderer"
     assert.equal(viewOptions.widgetData.titleCardCaptionText, "電池量");
 });
 
+test("System battery view exposes integer percentage display values", () => {
+    const read = buildMetricReader({
+        current: 39,
+        progress: 0.39,
+        sampleTimestampMilliseconds: 10_000,
+    });
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined),
+        metrics: read.metrics,
+    });
+
+    assert.equal(viewOptions.widgetData.displayValue, "39");
+    assert.deepEqual(viewOptions.widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 100,
+    });
+});
+
 test("System battery circle view preserves eight-character custom labels", () => {
     const read = buildMetricReader();
     buildSystemViewOptions({
@@ -438,7 +459,7 @@ function buildPeripheralIdentity(): ResolvedSystemPeripheralIdentity {
     };
 }
 
-function buildMetricReader(): {
+function buildMetricReader(widgetDataOptions: Partial<WidgetData> = {}): {
     readonly calls: Array<{
         readonly metricKey: string;
         readonly label: string;
@@ -453,7 +474,7 @@ function buildMetricReader(): {
         readonly unit: string;
         readonly maxValue: number | undefined;
     }> = [];
-    const widgetData = buildWidgetData();
+    const widgetData = buildWidgetData(widgetDataOptions);
 
     return {
         calls,
@@ -475,13 +496,13 @@ function buildWillAppearEvent(): WillAppearEvent {
     return { action: { id: "system-test-action", isDial: () => false } } as unknown as WillAppearEvent;
 }
 
-function buildWidgetData(): WidgetData {
+function buildWidgetData(options: Partial<WidgetData> = {}): WidgetData {
     return {
-        current: 0,
-        progress: 0,
-        history: [],
-        unit: "%",
-        label: "BATT",
-        sampleTimestampMilliseconds: undefined,
+        current: options.current ?? 0,
+        progress: options.progress ?? 0,
+        history: options.history ?? [],
+        unit: options.unit ?? "%",
+        label: options.label ?? "BATT",
+        sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
 }

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
-import { renderMetricFrame } from "../../src/view-rendering/metric-frame";
-import { resolveResvgFontOptions } from "../../src/view-rendering/resvg-font-options";
-import { renderSingleMetricBodyView } from "../../src/view-rendering/single-metric-view";
+import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
+import { resolveResvgFontOptions } from "../../src/view-rendering/rasterize/resvg-font-options";
+import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
 import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";

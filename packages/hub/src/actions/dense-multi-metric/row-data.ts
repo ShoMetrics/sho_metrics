@@ -54,6 +54,7 @@ import {
 } from "../../metrics/storage-widget-data";
 import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-data";
 import { buildNetworkSpeedWidgetData } from "../../metrics/network-speed-widget-data";
+import { buildPercentageWidgetData } from "../../metrics/percentage-widget-data";
 import { resolveCatalogMetricDefaultMaximumValue } from "../../metrics/catalog-metric-scale";
 import { formatCatalogMetricFreshWidgetData } from "../../metrics/catalog-metric-widget-data";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
@@ -395,12 +396,12 @@ function buildTargetWidgetData(
                 pollingFrequencySeconds,
             );
         case "system":
-            return metrics.getWidgetData(
+            return buildPercentageWidgetData(metrics.getWidgetData(
                 row.displayMetricKey,
                 resolveDenseRowLabel(row),
                 "%",
                 100,
-            );
+            ));
         case "catalog":
             return buildCatalogRowWidgetData(row, metrics);
         case "customMetric":
