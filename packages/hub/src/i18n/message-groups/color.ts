@@ -127,9 +127,9 @@ export const colorMessages = {
         ja: "透明背景",
     },
     transparencyNote: {
-        en: "Affects theme background and chrome only. Metrics stay opaque.",
-        zh_CN: "仅影响主题背景和边框。指标保持不透明。",
-        ja: "テーマ背景と装飾のみに影響します。メトリクスは不透明のままです。",
+        en: "Affects theme background and chrome only. Metrics stay opaque. Useful if you set a custom image background.",
+        zh_CN: "仅影响主题背景和边框。指标保持不透明。适合搭配自定义图片背景使用。",
+        ja: "テーマ背景と装飾のみに影響します。メトリクスは不透明のままです。カスタム画像背景を使う場合に便利です。",
     },
     backgroundOpacityLabel: {
         en: "Background Opacity",
