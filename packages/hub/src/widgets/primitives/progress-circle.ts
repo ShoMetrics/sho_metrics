@@ -107,17 +107,26 @@ const ARC_LAYOUT = {
     gaugeMarkerGapScale: 1.5,
     gaugeValueYOffset: 2,
     gaugeValueRow: {
-        valueEndXOffset: 20,
-        unitStartXOffset: 25,
-        valueMaxWidth: 74,
-        // Gauge reserves about two characters for the unit. Longer rate units
-        // must be compacted before reaching this primitive.
-        unitMaxWidth: 28,
-        unitFontSize: 13,
-        digitFontSizes: {
+        shortUnitValueEndXOffset: 20,
+        shortUnitStartXOffset: 25,
+        shortUnitTwoDigitOpticalXOffset: -6,
+        shortUnitValueMaxWidth: 74,
+        shortUnitMaxWidth: 28,
+        shortUnitDigitFontSizes: {
             one: 48,
             two: 48,
             three: 31,
+            many: 21,
+        },
+        longUnitValueEndXOffset: 2,
+        longUnitStartXOffset: 13,
+        longUnitFontSize: 13,
+        longUnitValueMaxWidth: 52,
+        longUnitMaxWidth: 46,
+        longUnitDigitFontSizes: {
+            one: 43,
+            two: 37,
+            three: 25,
             many: 21,
         },
     },
@@ -588,13 +597,19 @@ function renderGaugeValueRow(options: {
         });
     }
 
+    const unitLayoutCharacterCount = countGaugeUnitLayoutCharacters(options.unitText);
     const layout = ARC_LAYOUT.gaugeValueRow;
+    const usesShortUnitLayout = unitLayoutCharacterCount === 1;
     const valuePlacement = resolveGaugeValuePlacement({
         centerXCoordinate: options.centerXCoordinate,
+        usesShortUnitLayout,
         valueText: options.valueText,
         fallbackFontSize: options.valueFontSize,
     });
-    const unitXCoordinate = options.centerXCoordinate + layout.unitStartXOffset;
+    const unitXCoordinate = options.centerXCoordinate + (
+        usesShortUnitLayout ? layout.shortUnitStartXOffset : layout.longUnitStartXOffset
+    );
+    const unitFontSize = usesShortUnitLayout ? options.unitFontSize : layout.longUnitFontSize;
 
     return `
         ${renderStyledSvgText({
@@ -618,8 +633,8 @@ function renderGaugeValueRow(options: {
             text: options.unitText,
             xCoordinate: unitXCoordinate,
             yCoordinate,
-            maxWidth: layout.unitMaxWidth,
-            baseFontSize: layout.unitFontSize,
+            maxWidth: usesShortUnitLayout ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
+            baseFontSize: unitFontSize,
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
             textAnchor: "start",
@@ -631,6 +646,7 @@ function renderGaugeValueRow(options: {
 
 function resolveGaugeValuePlacement(options: {
     centerXCoordinate: number;
+    usesShortUnitLayout: boolean;
     valueText: string;
     fallbackFontSize: number;
 }): {
@@ -640,15 +656,38 @@ function resolveGaugeValuePlacement(options: {
     textAnchor: SvgTextAnchor;
 } {
     const layout = ARC_LAYOUT.gaugeValueRow;
-    const digitCount = countDigits(options.valueText);
+    const valueDigitCount = countGaugeValueDigits(options.valueText);
+
+    if (options.usesShortUnitLayout && valueDigitCount > 0 && valueDigitCount <= 2) {
+        const opticalXOffset = valueDigitCount === 2
+            ? layout.shortUnitTwoDigitOpticalXOffset
+            : 0;
+
+        return {
+            xCoordinate: options.centerXCoordinate + opticalXOffset,
+            maxWidth: layout.shortUnitValueMaxWidth,
+            fontSize: resolveGaugeValueFontSize({
+                digitCount: valueDigitCount,
+                fallbackFontSize: options.fallbackFontSize,
+                digitFontSizes: layout.shortUnitDigitFontSizes,
+            }),
+            textAnchor: "middle",
+        };
+    }
+
+    const valueXOffset = options.usesShortUnitLayout
+        ? layout.shortUnitValueEndXOffset
+        : layout.longUnitValueEndXOffset;
 
     return {
-        xCoordinate: options.centerXCoordinate + layout.valueEndXOffset,
-        maxWidth: layout.valueMaxWidth,
+        xCoordinate: options.centerXCoordinate + valueXOffset,
+        maxWidth: options.usesShortUnitLayout ? layout.shortUnitValueMaxWidth : layout.longUnitValueMaxWidth,
         fontSize: resolveGaugeValueFontSize({
-            digitCount,
+            digitCount: valueDigitCount,
             fallbackFontSize: options.fallbackFontSize,
-            digitFontSizes: layout.digitFontSizes,
+            digitFontSizes: options.usesShortUnitLayout
+                ? layout.shortUnitDigitFontSizes
+                : layout.longUnitDigitFontSizes,
         }),
         textAnchor: "end",
     };
@@ -683,8 +722,18 @@ function resolveGaugeValueFontSize(options: {
     return options.digitFontSizes.many;
 }
 
-function countDigits(value: string): number {
+function countGaugeValueDigits(value: string): number {
     return Array.from(value).filter(character => /\d/u.test(character)).length;
+}
+
+function countGaugeUnitLayoutCharacters(unit: string): number {
+    const trimmedUnit = unit.trim();
+
+    if (/^°[CF]$/u.test(trimmedUnit)) {
+        return 1;
+    }
+
+    return Array.from(trimmedUnit).length;
 }
 
 function renderGaugeBottomLabel(options: {

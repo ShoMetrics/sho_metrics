@@ -75,7 +75,13 @@ test("dual metric view dispatches text variants to centered and title-card rende
 
 test("dual title-card text uses the solid metric paint for static text", () => {
     const svg = renderDualMetricBodyView({
-        data: buildDualChannelData(),
+        data: {
+            ...buildDualChannelData(),
+            negative: {
+                ...buildDualChannelData().negative,
+                unit: "KB/s",
+            },
+        },
         visual: {
             ...buildMetricRenderAppearance(),
             textVariant: "title-card",
@@ -116,6 +122,32 @@ test("dual text metric compacts data-rate units in the view layer", () => {
     assert.match(svg, />K<\/text>/);
     assert.doesNotMatch(svg, />MB\/s<\/text>/);
     assert.doesNotMatch(svg, />KB\/s<\/text>/);
+});
+
+test("direct dual circle metric preserves raw data-rate units", () => {
+    const data = buildDualChannelData();
+    const svg = renderDualMetricBodyView({
+        data: {
+            ...data,
+            negative: {
+                ...data.negative,
+                unit: "KB/s",
+            },
+        },
+        visual: buildMetricRenderAppearance(),
+        renderPrimitive: "circle",
+        renderSize: { width: 200, height: 100 },
+        titleText: "NET",
+        chartMode: "overlay",
+        centerContent: "icon-value-unit",
+        circleVariant: "gauge",
+        topIcon: "",
+        positive: { labelText: "UP", unitText: "MB/s", color: "#3b82f6" },
+        negative: { labelText: "DN", unitText: "KB/s", color: "#ef4444" },
+    });
+
+    assert.match(svg, />MB\/s<\/text>/);
+    assert.match(svg, />KB\/s<\/text>/);
 });
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {
