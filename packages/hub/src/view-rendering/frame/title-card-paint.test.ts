@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { RenderPaintTokens } from "../color/render-appearance";
-import { resolveDualTitleCardStaticTextColor, resolveTitleCardStaticTextColor } from "./title-card-paint";
+import { resolveTitleCardStaticTextColor } from "./title-card-paint";
 
 test("title-card static text uses the solid metric paint", () => {
     const staticTextColor = resolveTitleCardStaticTextColor({
@@ -29,21 +29,6 @@ test("title-card static text keeps neutral paint for threshold metrics", () => {
                 { min: 0, max: 50, color: "#25e84a" },
                 { min: 50, max: 100, color: "#ffb000" },
             ],
-            isGradientEnabled: false,
-        },
-    });
-
-    assert.equal(staticTextColor, "#metric-value-text-token");
-});
-
-test("dual title-card static text keeps neutral paint", () => {
-    const staticTextColor = resolveDualTitleCardStaticTextColor({
-        ...buildRenderPaintTokens(),
-        metricValueText: "#metric-value-text-token",
-        primaryMetric: {
-            mode: "solid",
-            solidColor: "#25e84a",
-            thresholds: [],
             isGradientEnabled: false,
         },
     });

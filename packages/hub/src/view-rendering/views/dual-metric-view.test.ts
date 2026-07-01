@@ -73,7 +73,38 @@ test("dual metric view dispatches text variants to centered and title-card rende
     assert.doesNotMatch(titleCardSvg, /text-metric-positive-value/);
 });
 
-test("dual title-card text keeps static text neutral", () => {
+test("dual title-card text uses solid paint for static text", () => {
+    const svg = renderDualMetricBodyView({
+        data: buildDualChannelData(),
+        visual: {
+            ...buildMetricRenderAppearance(),
+            textVariant: "title-card",
+            paints: {
+                ...buildMetricRenderAppearance().paints,
+                primaryMetric: {
+                    mode: "solid",
+                    solidColor: "#25e84a",
+                    thresholds: [],
+                    isGradientEnabled: false,
+                },
+            },
+        },
+        renderPrimitive: "text",
+        renderSize: { width: 120, height: 120 },
+        titleText: "NET",
+        chartMode: "overlay",
+        centerContent: "value",
+        circleVariant: "full-ring",
+        topIcon: "",
+        positive: { labelText: "UP", unitText: "M", color: "#3b82f6" },
+        negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
+    });
+
+    assert.match(svg, /id="title-card-dual-code"[\s\S]*fill="#25e84a"/);
+    assert.match(svg, /id="title-card-dual-caption-0"[\s\S]*fill="#25e84a"/);
+});
+
+test("dual title-card text keeps static text neutral for threshold paint", () => {
     const svg = renderDualMetricBodyView({
         data: {
             ...buildDualChannelData(),
@@ -85,6 +116,18 @@ test("dual title-card text keeps static text neutral", () => {
         visual: {
             ...buildMetricRenderAppearance(),
             textVariant: "title-card",
+            paints: {
+                ...buildMetricRenderAppearance().paints,
+                primaryMetric: {
+                    mode: "threshold",
+                    solidColor: "#3b82f6",
+                    thresholds: [
+                        { min: 0, max: 50, color: "#3b82f6" },
+                        { min: 50, max: 100, color: "#ef4444" },
+                    ],
+                    isGradientEnabled: false,
+                },
+            },
         },
         renderPrimitive: "text",
         renderSize: { width: 120, height: 120 },
