@@ -33,9 +33,7 @@ internal sealed class LibreHardwareSnapshotReader
         DateTimeOffset capturedAt = _timeProvider.GetUtcNow();
         Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
-        List<RankedMetricReading> cpuTemperatureCandidates = [];
-        List<RankedMetricReading> cpuPowerCandidates = [];
-        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId = new(StringComparer.Ordinal);
+        Dictionary<string, List<RankedMetricReading>> rankedCandidatesByMetricId = new(StringComparer.Ordinal);
         List<string> cpuPollingGroupIds = [];
         List<string> gpuPollingGroupIds = [];
         List<HardwareRefreshDiagnostic> hardwareUpdates = [];
@@ -50,9 +48,7 @@ internal sealed class LibreHardwareSnapshotReader
                 hardware,
                 readingsByMetricId,
                 unavailableReportsByMetricId,
-                cpuTemperatureCandidates,
-                cpuPowerCandidates,
-                gpuFallbackCandidatesByMetricId,
+                rankedCandidatesByMetricId,
                 cpuPollingGroupIds,
                 gpuPollingGroupIds,
                 capturedAt,
@@ -70,14 +66,14 @@ internal sealed class LibreHardwareSnapshotReader
         {
             AddRankedStableAliasReading(
                 LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-                cpuTemperatureCandidates,
+                GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.CpuTemperatureMetricId),
                 cpuPollingGroupIds[0],
                 retentionRead,
                 readingsByMetricId,
                 unavailableReportsByMetricId);
             AddRankedStableAliasReading(
                 LibreHardwareMetricCatalog.CpuPowerMetricId,
-                cpuPowerCandidates,
+                GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.CpuPowerMetricId),
                 cpuPollingGroupIds[0],
                 retentionRead,
                 readingsByMetricId,
@@ -87,21 +83,21 @@ internal sealed class LibreHardwareSnapshotReader
         {
             AddRankedFallbackStableAliasReading(
                 LibreHardwareMetricCatalog.GpuUsageMetricId,
-                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
+                GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
                 gpuPollingGroupIds[0],
                 retentionRead,
                 readingsByMetricId,
                 unavailableReportsByMetricId);
             AddRankedFallbackStableAliasReading(
                 LibreHardwareMetricCatalog.GpuVramUsedMetricId,
-                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
+                GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
                 gpuPollingGroupIds[0],
                 retentionRead,
                 readingsByMetricId,
                 unavailableReportsByMetricId);
             AddRankedFallbackStableAliasReading(
                 LibreHardwareMetricCatalog.GpuVramTotalMetricId,
-                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
+                GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
                 gpuPollingGroupIds[0],
                 retentionRead,
                 readingsByMetricId,
@@ -127,9 +123,7 @@ internal sealed class LibreHardwareSnapshotReader
         IHardware hardware,
         Dictionary<string, MetricReading> readingsByMetricId,
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
-        List<RankedMetricReading> cpuTemperatureCandidates,
-        List<RankedMetricReading> cpuPowerCandidates,
-        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId,
+        Dictionary<string, List<RankedMetricReading>> rankedCandidatesByMetricId,
         List<string> cpuPollingGroupIds,
         List<string> gpuPollingGroupIds,
         DateTimeOffset capturedAt,
@@ -205,9 +199,7 @@ internal sealed class LibreHardwareSnapshotReader
                     sensor,
                     readingsByMetricId,
                     unavailableReportsByMetricId,
-                    cpuTemperatureCandidates,
-                    cpuPowerCandidates,
-                    gpuFallbackCandidatesByMetricId,
+                    rankedCandidatesByMetricId,
                     pollingGroupId,
                     retentionRead);
             }
@@ -231,9 +223,7 @@ internal sealed class LibreHardwareSnapshotReader
                 childHardware,
                 readingsByMetricId,
                 unavailableReportsByMetricId,
-                cpuTemperatureCandidates,
-                cpuPowerCandidates,
-                gpuFallbackCandidatesByMetricId,
+                rankedCandidatesByMetricId,
                 cpuPollingGroupIds,
                 gpuPollingGroupIds,
                 capturedAt,
@@ -250,9 +240,7 @@ internal sealed class LibreHardwareSnapshotReader
         ISensor sensor,
         Dictionary<string, MetricReading> readingsByMetricId,
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
-        List<RankedMetricReading> cpuTemperatureCandidates,
-        List<RankedMetricReading> cpuPowerCandidates,
-        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId,
+        Dictionary<string, List<RankedMetricReading>> rankedCandidatesByMetricId,
         string hardwarePollingGroupId,
         HardwareMetricRetentionCache.ReadScope retentionRead)
     {
@@ -272,16 +260,7 @@ internal sealed class LibreHardwareSnapshotReader
             out RankedMetricReading? cpuStableAliasCandidate))
         {
             hadFreshReading = true;
-            if (cpuStableAliasCandidate.Reading.MetricId.Equals(
-                LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-                StringComparison.Ordinal))
-            {
-                cpuTemperatureCandidates.Add(cpuStableAliasCandidate);
-            }
-            else
-            {
-                cpuPowerCandidates.Add(cpuStableAliasCandidate);
-            }
+            AddCandidate(rankedCandidatesByMetricId, cpuStableAliasCandidate);
         }
 
         if (LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
@@ -289,7 +268,7 @@ internal sealed class LibreHardwareSnapshotReader
             sensor,
             out RankedMetricReading? gpuFallbackStableAliasCandidate))
         {
-            AddCandidate(gpuFallbackCandidatesByMetricId, gpuFallbackStableAliasCandidate);
+            AddCandidate(rankedCandidatesByMetricId, gpuFallbackStableAliasCandidate);
         }
 
         if (hadFreshReading)
