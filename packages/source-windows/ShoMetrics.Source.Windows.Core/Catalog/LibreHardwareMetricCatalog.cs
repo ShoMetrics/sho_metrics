@@ -10,6 +10,9 @@ internal static class LibreHardwareMetricCatalog
     internal const string RamTotalMetricId = "ram.total";
     internal const string CpuTemperatureMetricId = "cpu.temp";
     internal const string CpuPowerMetricId = "cpu.power";
+    internal const string GpuUsageMetricId = "gpu.usage_percent";
+    internal const string GpuVramUsedMetricId = "gpu.vram_used";
+    internal const string GpuVramTotalMetricId = "gpu.vram_total";
 
     private const string DynamicMetricIdPrefix = "lhm.sensor:";
     internal const string NetworkAggregatePollingGroupId = "lhm:aggregate:network";
@@ -129,6 +132,52 @@ internal static class LibreHardwareMetricCatalog
         candidate = null;
 
         if (!TryClassifyCpuStableAliasSensor(hardware, sensor, out string? metricId, out int rank)
+            || !TryGetCanonicalMetricUnit(sensor.SensorType, out MetricUnit unit))
+        {
+            return false;
+        }
+
+        candidate = new RankedHardwareMetricDescriptor
+        {
+            Rank = rank,
+            Descriptor = CreateDescriptor(hardware, sensor, metricId, unit, MetricIdKind.StableAlias),
+        };
+        return true;
+    }
+
+    internal static bool TryCreateGpuFallbackStableAliasReadingCandidate(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out RankedMetricReading? candidate)
+    {
+        candidate = null;
+
+        if (!TryClassifyGpuFallbackStableAliasSensor(hardware, sensor, out string? metricId, out int rank)
+            || sensor.Value is not { } value
+            || !float.IsFinite(value)
+            || !TryConvertValue(sensor.SensorType, value, out double convertedValue, out MetricUnit unit)
+            || !IsValidStableMetricValue(metricId, convertedValue))
+        {
+            return false;
+        }
+
+        candidate = new RankedMetricReading
+        {
+            Rank = rank,
+            Reading = CreateReading(hardware, sensor, metricId, convertedValue, unit),
+            PollingGroupId = BuildHardwarePollingGroupId(hardware),
+        };
+        return true;
+    }
+
+    internal static bool TryCreateGpuFallbackStableAliasDescriptorCandidate(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out RankedHardwareMetricDescriptor? candidate)
+    {
+        candidate = null;
+
+        if (!TryClassifyGpuFallbackStableAliasSensor(hardware, sensor, out string? metricId, out int rank)
             || !TryGetCanonicalMetricUnit(sensor.SensorType, out MetricUnit unit))
         {
             return false;
@@ -334,7 +383,7 @@ internal static class LibreHardwareMetricCatalog
     {
         return sensor.SensorType switch
         {
-            SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.usage_percent",
+            SensorType.Load when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => GpuUsageMetricId,
             SensorType.Temperature when sensor.Name.Equals("GPU Core", StringComparison.Ordinal) => "gpu.temp",
             // LHM sources:
             // - LibreHardwareMonitorLib/Hardware/Gpu/AmdGpu.cs constructor
@@ -353,8 +402,8 @@ internal static class LibreHardwareMetricCatalog
             // - LibreHardwareMonitorLib/Hardware/Gpu/IntelDiscreteGpu.cs constructor
             // These expose GPU Memory Used/Total as SensorType.SmallData (MiB),
             // not SensorType.Data (GiB).
-            SensorType.SmallData when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => "gpu.vram_used",
-            SensorType.SmallData when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => "gpu.vram_total",
+            SensorType.SmallData when sensor.Name.Equals("GPU Memory Used", StringComparison.Ordinal) => GpuVramUsedMetricId,
+            SensorType.SmallData when sensor.Name.Equals("GPU Memory Total", StringComparison.Ordinal) => GpuVramTotalMetricId,
             _ => null,
         };
     }
@@ -491,6 +540,77 @@ internal static class LibreHardwareMetricCatalog
         };
 
         return rank >= 0;
+    }
+
+    private static bool TryClassifyGpuFallbackStableAliasSensor(
+        IHardware hardware,
+        ISensor sensor,
+        [NotNullWhen(true)] out string? metricId,
+        out int rank)
+    {
+        metricId = null;
+        rank = 0;
+
+        if (hardware.HardwareType is not (HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia))
+        {
+            return false;
+        }
+
+        if (sensor.SensorType is SensorType.Load
+            && sensor.Name.Equals("D3D 3D", StringComparison.Ordinal))
+        {
+            metricId = GpuUsageMetricId;
+            rank = 10;
+            return true;
+        }
+
+        if (sensor.SensorType is not SensorType.SmallData)
+        {
+            return false;
+        }
+
+        if (sensor.Name.Equals("D3D Dedicated Memory Used", StringComparison.Ordinal))
+        {
+            metricId = GpuVramUsedMetricId;
+            rank = 10;
+            return true;
+        }
+
+        if (sensor.Name.Equals("D3D Dedicated Memory Total", StringComparison.Ordinal))
+        {
+            metricId = GpuVramTotalMetricId;
+            rank = 10;
+            return true;
+        }
+
+        if (!ShouldUseGpuSharedMemory(hardware))
+        {
+            return false;
+        }
+
+        if (sensor.Name.Equals("D3D Shared Memory Used", StringComparison.Ordinal))
+        {
+            metricId = GpuVramUsedMetricId;
+            rank = 20;
+            return true;
+        }
+
+        if (sensor.Name.Equals("D3D Shared Memory Total", StringComparison.Ordinal))
+        {
+            metricId = GpuVramTotalMetricId;
+            rank = 20;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldUseGpuSharedMemory(IHardware hardware)
+    {
+        // LHM uses Intel's integrated-adapter flag before constructing the GPU
+        // hardware. The resulting identifier is a stronger signal than the
+        // adapter marketing name.
+        return hardware.Identifier.ToString().StartsWith("/gpu-intel-integrated", StringComparison.Ordinal);
     }
 
     private static bool IsIndividualCoreTemperatureName(string normalizedName)

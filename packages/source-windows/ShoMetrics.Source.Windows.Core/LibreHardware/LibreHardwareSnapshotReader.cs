@@ -35,7 +35,9 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
         List<RankedMetricReading> cpuTemperatureCandidates = [];
         List<RankedMetricReading> cpuPowerCandidates = [];
+        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId = new(StringComparer.Ordinal);
         List<string> cpuPollingGroupIds = [];
+        List<string> gpuPollingGroupIds = [];
         List<HardwareRefreshDiagnostic> hardwareUpdates = [];
         List<TouchedPollingGroup> touchedPollingGroups = [];
         List<string> warnings = [];
@@ -50,7 +52,9 @@ internal sealed class LibreHardwareSnapshotReader
                 unavailableReportsByMetricId,
                 cpuTemperatureCandidates,
                 cpuPowerCandidates,
+                gpuFallbackCandidatesByMetricId,
                 cpuPollingGroupIds,
+                gpuPollingGroupIds,
                 capturedAt,
                 retentionRead,
                 hardwareUpdates,
@@ -79,6 +83,30 @@ internal sealed class LibreHardwareSnapshotReader
                 readingsByMetricId,
                 unavailableReportsByMetricId);
         }
+        if (gpuPollingGroupIds.Count > 0)
+        {
+            AddRankedFallbackStableAliasReading(
+                LibreHardwareMetricCatalog.GpuUsageMetricId,
+                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
+                gpuPollingGroupIds[0],
+                retentionRead,
+                readingsByMetricId,
+                unavailableReportsByMetricId);
+            AddRankedFallbackStableAliasReading(
+                LibreHardwareMetricCatalog.GpuVramUsedMetricId,
+                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
+                gpuPollingGroupIds[0],
+                retentionRead,
+                readingsByMetricId,
+                unavailableReportsByMetricId);
+            AddRankedFallbackStableAliasReading(
+                LibreHardwareMetricCatalog.GpuVramTotalMetricId,
+                GetCandidates(gpuFallbackCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
+                gpuPollingGroupIds[0],
+                retentionRead,
+                readingsByMetricId,
+                unavailableReportsByMetricId);
+        }
         AddMemoryDerivedReadings(readingsByMetricId);
 
         return new LibreHardwareSnapshotReadResult
@@ -101,7 +129,9 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
         List<RankedMetricReading> cpuTemperatureCandidates,
         List<RankedMetricReading> cpuPowerCandidates,
+        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId,
         List<string> cpuPollingGroupIds,
+        List<string> gpuPollingGroupIds,
         DateTimeOffset capturedAt,
         HardwareMetricRetentionCache.ReadScope retentionRead,
         List<HardwareRefreshDiagnostic> hardwareUpdates,
@@ -118,6 +148,11 @@ internal sealed class LibreHardwareSnapshotReader
             && !cpuPollingGroupIds.Contains(pollingGroupId, StringComparer.Ordinal))
         {
             cpuPollingGroupIds.Add(pollingGroupId);
+        }
+        if (hardware.HardwareType is HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia
+            && !gpuPollingGroupIds.Contains(pollingGroupId, StringComparer.Ordinal))
+        {
+            gpuPollingGroupIds.Add(pollingGroupId);
         }
 
         string? updateError = null;
@@ -172,6 +207,7 @@ internal sealed class LibreHardwareSnapshotReader
                     unavailableReportsByMetricId,
                     cpuTemperatureCandidates,
                     cpuPowerCandidates,
+                    gpuFallbackCandidatesByMetricId,
                     pollingGroupId,
                     retentionRead);
             }
@@ -197,7 +233,9 @@ internal sealed class LibreHardwareSnapshotReader
                 unavailableReportsByMetricId,
                 cpuTemperatureCandidates,
                 cpuPowerCandidates,
+                gpuFallbackCandidatesByMetricId,
                 cpuPollingGroupIds,
+                gpuPollingGroupIds,
                 capturedAt,
                 retentionRead,
                 hardwareUpdates,
@@ -214,6 +252,7 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
         List<RankedMetricReading> cpuTemperatureCandidates,
         List<RankedMetricReading> cpuPowerCandidates,
+        Dictionary<string, List<RankedMetricReading>> gpuFallbackCandidatesByMetricId,
         string hardwarePollingGroupId,
         HardwareMetricRetentionCache.ReadScope retentionRead)
     {
@@ -243,6 +282,14 @@ internal sealed class LibreHardwareSnapshotReader
             {
                 cpuPowerCandidates.Add(cpuStableAliasCandidate);
             }
+        }
+
+        if (LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            hardware,
+            sensor,
+            out RankedMetricReading? gpuFallbackStableAliasCandidate))
+        {
+            AddCandidate(gpuFallbackCandidatesByMetricId, gpuFallbackStableAliasCandidate);
         }
 
         if (hadFreshReading)
@@ -345,6 +392,50 @@ internal sealed class LibreHardwareSnapshotReader
             metricId,
             isExpired ? MetricUnavailableReason.Expired : MetricUnavailableReason.NoSensor,
             isExpired ? BuildRawSensorIdentity(retainedReading) : null);
+    }
+
+    private void AddRankedFallbackStableAliasReading(
+        string metricId,
+        List<RankedMetricReading> candidates,
+        string fallbackPollingGroupId,
+        HardwareMetricRetentionCache.ReadScope retentionRead,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId)
+    {
+        if (readingsByMetricId.ContainsKey(metricId) || unavailableReportsByMetricId.ContainsKey(metricId))
+        {
+            return;
+        }
+
+        AddRankedStableAliasReading(
+            metricId,
+            candidates,
+            fallbackPollingGroupId,
+            retentionRead,
+            readingsByMetricId,
+            unavailableReportsByMetricId);
+    }
+
+    private static List<RankedMetricReading> GetCandidates(
+        Dictionary<string, List<RankedMetricReading>> candidatesByMetricId,
+        string metricId)
+    {
+        return candidatesByMetricId.TryGetValue(metricId, out List<RankedMetricReading>? candidates)
+            ? candidates
+            : [];
+    }
+
+    private static void AddCandidate(
+        Dictionary<string, List<RankedMetricReading>> candidatesByMetricId,
+        RankedMetricReading candidate)
+    {
+        if (!candidatesByMetricId.TryGetValue(candidate.Reading.MetricId, out List<RankedMetricReading>? candidates))
+        {
+            candidates = [];
+            candidatesByMetricId.Add(candidate.Reading.MetricId, candidates);
+        }
+
+        candidates.Add(candidate);
     }
 
     private static void AddReading(Dictionary<string, MetricReading> readingsByMetricId, MetricReading reading)

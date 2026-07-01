@@ -26,6 +26,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
         List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates = [];
         List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates = [];
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> gpuFallbackDescriptorCandidatesByMetricId = new(StringComparer.Ordinal);
         List<string> warnings = [];
 
         foreach (IHardware hardware in rootHardware)
@@ -35,6 +36,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
                 descriptorsByMetricId,
                 cpuTemperatureDescriptorCandidates,
                 cpuPowerDescriptorCandidates,
+                gpuFallbackDescriptorCandidatesByMetricId,
                 warnings,
                 cancellationToken);
         }
@@ -46,6 +48,18 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         AddRankedStableAliasDescriptor(
             LibreHardwareMetricCatalog.CpuPowerMetricId,
             cpuPowerDescriptorCandidates,
+            descriptorsByMetricId);
+        AddRankedFallbackStableAliasDescriptor(
+            LibreHardwareMetricCatalog.GpuUsageMetricId,
+            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
+            descriptorsByMetricId);
+        AddRankedFallbackStableAliasDescriptor(
+            LibreHardwareMetricCatalog.GpuVramUsedMetricId,
+            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
+            descriptorsByMetricId);
+        AddRankedFallbackStableAliasDescriptor(
+            LibreHardwareMetricCatalog.GpuVramTotalMetricId,
+            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
             descriptorsByMetricId);
         AddDerivedDescriptors(descriptorsByMetricId);
         AddNativeDiskThroughputDescriptors(descriptorsByMetricId, diskThroughputProvider);
@@ -127,6 +141,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
         List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates,
         List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates,
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> gpuFallbackDescriptorCandidatesByMetricId,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -174,6 +189,14 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
                         cpuPowerDescriptorCandidates.Add(cpuStableAliasDescriptorCandidate);
                     }
                 }
+
+                if (LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasDescriptorCandidate(
+                    hardware,
+                    sensor,
+                    out RankedHardwareMetricDescriptor? gpuFallbackStableAliasDescriptorCandidate))
+                {
+                    AddCandidate(gpuFallbackDescriptorCandidatesByMetricId, gpuFallbackStableAliasDescriptorCandidate);
+                }
             }
         }
 
@@ -184,6 +207,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
                 descriptorsByMetricId,
                 cpuTemperatureDescriptorCandidates,
                 cpuPowerDescriptorCandidates,
+                gpuFallbackDescriptorCandidatesByMetricId,
                 warnings,
                 cancellationToken);
         }
@@ -232,6 +256,41 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         {
             descriptorsByMetricId[metricId] = selectedCandidate.Descriptor;
         }
+    }
+
+    private static void AddRankedFallbackStableAliasDescriptor(
+        string metricId,
+        List<RankedHardwareMetricDescriptor> candidates,
+        Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId)
+    {
+        if (descriptorsByMetricId.ContainsKey(metricId))
+        {
+            return;
+        }
+
+        AddRankedStableAliasDescriptor(metricId, candidates, descriptorsByMetricId);
+    }
+
+    private static List<RankedHardwareMetricDescriptor> GetCandidates(
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> candidatesByMetricId,
+        string metricId)
+    {
+        return candidatesByMetricId.TryGetValue(metricId, out List<RankedHardwareMetricDescriptor>? candidates)
+            ? candidates
+            : [];
+    }
+
+    private static void AddCandidate(
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> candidatesByMetricId,
+        RankedHardwareMetricDescriptor candidate)
+    {
+        if (!candidatesByMetricId.TryGetValue(candidate.Descriptor.MetricId, out List<RankedHardwareMetricDescriptor>? candidates))
+        {
+            candidates = [];
+            candidatesByMetricId.Add(candidate.Descriptor.MetricId, candidates);
+        }
+
+        candidates.Add(candidate);
     }
 
     private static List<HardwareMetricDescriptor> FilterDescriptors(
