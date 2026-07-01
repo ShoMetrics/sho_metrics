@@ -265,22 +265,14 @@ a {
 }
 
 .deck-stage {
-  width: min(880px, calc(100% - 2rem));
+  width: min(595px, calc(100% - 2rem));
   margin: 3.5rem auto 4rem;
-  perspective: 1400px;
 }
 
-.stream-deck {
-  margin-bottom: 0;
-  padding: 1.375rem;
-  border-radius: 1.75rem;
-  background: linear-gradient(180deg, var(--deck-color), var(--deck-dark-color));
-  box-shadow:
-    0 1.875rem 3.75rem var(--deck-shadow-color),
-    0 0.5rem 1.125rem var(--deck-shadow-soft-color),
-    inset 0 1px 0 var(--key-highlight-color);
-  transform: rotateX(8deg);
-  transform-origin: center bottom;
+.showcase-image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .deck-grid {
@@ -521,26 +513,11 @@ details[open] summary::after {
 }
 
 .variant-preview {
-  display: grid;
-  grid-template-columns: repeat(4, 5.25rem);
-  justify-content: center;
-  gap: 1.3rem clamp(2rem, 7vw, 5.5rem);
+  width: min(595px, 100%);
   margin: 2.75rem auto 0;
   padding: 2.25rem 0 2.5rem;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
-  background:
-    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--accent-color) 9%, transparent), transparent 34rem),
-    linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-color) 34%, transparent), transparent);
-}
-
-.variant-preview .mini-key {
-  justify-self: center;
-  width: 5.25rem;
-  margin: 0;
-  box-shadow:
-    0 0.9rem 1.8rem var(--shadow-color),
-    inset 0 1px 0 var(--key-highlight-color);
 }
 
 .mini-key {
@@ -715,13 +692,7 @@ details[open] summary::after {
   }
 
   .variant-preview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
     padding: 1.5rem 0;
-  }
-
-  .variant-preview .mini-key {
-    width: 4.75rem;
   }
 }
 
@@ -820,27 +791,7 @@ details[open] summary::after {
     width: 100%;
   }
 
-  .stream-deck {
-    margin-bottom: 0;
-    transform: none;
-    border-radius: 0.85rem;
-  }
-
-  .deck-grid {
-    gap: 0.45rem;
-  }
-
   .metric-key {
     border-radius: 0.55rem;
-  }
-}
-
-@media (max-width: 520px) {
-  .deck-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .variant-preview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
