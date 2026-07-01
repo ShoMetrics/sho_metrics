@@ -671,7 +671,9 @@ function composeDualMetricBody(
     });
 
     if (renderPlan.bodyViewports.length === 2) {
-        return composeDualTouchStripCircleBodies({
+        // The touch-strip two-square-bodies layout renders two single-metric
+        // circle bodies; it does not use the direct dual-channel circle primitive.
+        return composeSplitDualTouchStripCircleBodies({
             viewOptions: options,
             renderedMetricData,
             renderPlan,
@@ -761,7 +763,7 @@ function composeHardwareSummaryBody(
     };
 }
 
-function composeDualTouchStripCircleBodies(options: {
+function composeSplitDualTouchStripCircleBodies(options: {
     viewOptions: DualMetricRenderOptions;
     renderedMetricData: DualChannelWidgetData;
     renderPlan: MetricViewRenderPlan;
@@ -772,7 +774,7 @@ function composeDualTouchStripCircleBodies(options: {
     return {
         bodies: [
             {
-                svg: renderDualTouchStripCircleBody({
+                svg: renderSplitDualTouchStripCircleBody({
                     widgetData: options.renderedMetricData.positive,
                     labelText: options.viewOptions.positiveLabelText,
                     color: options.viewOptions.positiveColor,
@@ -787,7 +789,7 @@ function composeDualTouchStripCircleBodies(options: {
                 muted: false,
             },
             {
-                svg: renderDualTouchStripCircleBody({
+                svg: renderSplitDualTouchStripCircleBody({
                     widgetData: options.renderedMetricData.negative,
                     labelText: options.viewOptions.negativeLabelText,
                     color: options.viewOptions.negativeColor,
@@ -806,7 +808,7 @@ function composeDualTouchStripCircleBodies(options: {
     };
 }
 
-function renderDualTouchStripCircleBody(options: {
+function renderSplitDualTouchStripCircleBody(options: {
     widgetData: WidgetData;
     labelText: string | undefined;
     color: string;
