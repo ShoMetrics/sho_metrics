@@ -60,78 +60,78 @@ The plugin bundles these fonts under `assets/fonts` for SVG rasterization.
 
 The plugin package uses these non-development npm packages from the locked dependency graph.
 
-| Package | Version | License |
-| --- | --- | --- |
-| @bufbuild/cel | 0.4.0 | Apache-2.0 |
-| @bufbuild/cel-spec | 0.4.0 | Apache-2.0 |
-| @bufbuild/protobuf | 2.12.0 | (Apache-2.0 AND BSD-3-Clause) |
-| @bufbuild/protovalidate | 1.2.0 | Apache-2.0 |
-| @elgato/schemas | 0.4.15 | MIT |
-| @elgato/streamdeck | 2.1.0 | MIT |
-| @elgato/utils | 0.4.5 | MIT |
-| @grpc/grpc-js | 1.14.0 | Apache-2.0 |
-| @grpc/proto-loader | 0.8.0 | Apache-2.0 |
-| @js-sdsl/ordered-map | 4.4.2 | MIT |
-| @protobufjs/aspromise | 1.1.2 | BSD-3-Clause |
-| @protobufjs/base64 | 1.1.2 | BSD-3-Clause |
-| @protobufjs/codegen | 2.0.5 | BSD-3-Clause |
-| @protobufjs/eventemitter | 1.1.0 | BSD-3-Clause |
-| @protobufjs/fetch | 1.1.1 | BSD-3-Clause |
-| @protobufjs/float | 1.0.2 | BSD-3-Clause |
-| @protobufjs/inquire | 1.1.2 | BSD-3-Clause |
-| @protobufjs/path | 1.1.2 | BSD-3-Clause |
-| @protobufjs/pool | 1.1.0 | BSD-3-Clause |
-| @protobufjs/utf8 | 1.1.1 | BSD-3-Clause |
-| @resvg/resvg-js | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-android-arm-eabi | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-android-arm64 | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-darwin-arm64 | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-darwin-x64 | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-linux-arm-gnueabihf | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-linux-arm64-gnu | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-linux-arm64-musl | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-linux-x64-gnu | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-linux-x64-musl | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-win32-arm64-msvc | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-win32-ia32-msvc | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-win32-x64-msvc | 2.6.2 | MPL-2.0 |
-| @types/d3-path | 3.1.1 | MIT |
-| @types/d3-shape | 3.1.8 | MIT |
-| @types/node | 24.1.0 | MIT |
-| ansi-regex | 5.0.1 | MIT |
-| ansi-styles | 4.3.0 | MIT |
-| cliui | 8.0.1 | ISC |
-| cliui/node_modules/wrap-ansi | 7.0.0 | MIT |
-| color-convert | 2.0.1 | MIT |
-| color-name | 1.1.4 | MIT |
-| d3-path | 3.1.0 | ISC |
-| d3-shape | 3.2.0 | ISC |
-| emoji-regex | 8.0.0 | MIT |
-| escalade | 3.2.0 | MIT |
-| fast-equals | 6.0.0 | MIT |
-| get-caller-file | 2.0.5 | ISC |
-| is-fullwidth-code-point | 3.0.0 | MIT |
-| jq-wasm | 1.1.0-jq-1.8.1 | MIT |
-| lodash.camelcase | 4.3.0 | MIT |
-| long | 5.3.2 | Apache-2.0 |
-| lru-cache | 11.3.6 | BlueOak-1.0.0 |
-| lucide | 1.11.0 | ISC |
-| node-addon-api | 3.2.1 | MIT |
-| node-hid | 3.3.0 | (MIT OR X11) |
-| pkg-prebuilds | 1.0.0 | MIT |
-| protobufjs | 7.6.0 | BSD-3-Clause |
-| react | 19.2.5 | MIT |
-| react-dom | 19.2.5 | MIT |
-| require-directory | 2.1.1 | MIT |
-| scheduler | 0.27.0 | MIT |
-| string-width | 4.2.3 | MIT |
-| strip-ansi | 6.0.1 | MIT |
-| systeminformation | 5.31.5 | MIT |
-| undici-types | 7.8.0 | MIT |
-| validator | 13.15.35 | MIT |
-| workerpool | 10.0.2 | Apache-2.0 |
-| ws | 8.20.0 | MIT |
-| y18n | 5.0.8 | ISC |
-| yargs | 17.7.2 | MIT |
-| yargs-parser | 21.1.1 | ISC |
-| zod | 3.25.76 | MIT |
+| Package | License |
+| --- | --- |
+| @bufbuild/cel | Apache-2.0 |
+| @bufbuild/cel-spec | Apache-2.0 |
+| @bufbuild/protobuf | (Apache-2.0 AND BSD-3-Clause) |
+| @bufbuild/protovalidate | Apache-2.0 |
+| @elgato/schemas | MIT |
+| @elgato/streamdeck | MIT |
+| @elgato/utils | MIT |
+| @grpc/grpc-js | Apache-2.0 |
+| @grpc/proto-loader | Apache-2.0 |
+| @js-sdsl/ordered-map | MIT |
+| @protobufjs/aspromise | BSD-3-Clause |
+| @protobufjs/base64 | BSD-3-Clause |
+| @protobufjs/codegen | BSD-3-Clause |
+| @protobufjs/eventemitter | BSD-3-Clause |
+| @protobufjs/fetch | BSD-3-Clause |
+| @protobufjs/float | BSD-3-Clause |
+| @protobufjs/inquire | BSD-3-Clause |
+| @protobufjs/path | BSD-3-Clause |
+| @protobufjs/pool | BSD-3-Clause |
+| @protobufjs/utf8 | BSD-3-Clause |
+| @resvg/resvg-js | MPL-2.0 |
+| @resvg/resvg-js-android-arm-eabi | MPL-2.0 |
+| @resvg/resvg-js-android-arm64 | MPL-2.0 |
+| @resvg/resvg-js-darwin-arm64 | MPL-2.0 |
+| @resvg/resvg-js-darwin-x64 | MPL-2.0 |
+| @resvg/resvg-js-linux-arm-gnueabihf | MPL-2.0 |
+| @resvg/resvg-js-linux-arm64-gnu | MPL-2.0 |
+| @resvg/resvg-js-linux-arm64-musl | MPL-2.0 |
+| @resvg/resvg-js-linux-x64-gnu | MPL-2.0 |
+| @resvg/resvg-js-linux-x64-musl | MPL-2.0 |
+| @resvg/resvg-js-win32-arm64-msvc | MPL-2.0 |
+| @resvg/resvg-js-win32-ia32-msvc | MPL-2.0 |
+| @resvg/resvg-js-win32-x64-msvc | MPL-2.0 |
+| @types/d3-path | MIT |
+| @types/d3-shape | MIT |
+| @types/node | MIT |
+| ansi-regex | MIT |
+| ansi-styles | MIT |
+| cliui | ISC |
+| cliui/node_modules/wrap-ansi | MIT |
+| color-convert | MIT |
+| color-name | MIT |
+| d3-path | ISC |
+| d3-shape | ISC |
+| emoji-regex | MIT |
+| escalade | MIT |
+| fast-equals | MIT |
+| get-caller-file | ISC |
+| is-fullwidth-code-point | MIT |
+| jq-wasm | MIT |
+| lodash.camelcase | MIT |
+| long | Apache-2.0 |
+| lru-cache | BlueOak-1.0.0 |
+| lucide | ISC |
+| node-addon-api | MIT |
+| node-hid | (MIT OR X11) |
+| pkg-prebuilds | MIT |
+| protobufjs | BSD-3-Clause |
+| react | MIT |
+| react-dom | MIT |
+| require-directory | MIT |
+| scheduler | MIT |
+| string-width | MIT |
+| strip-ansi | MIT |
+| systeminformation | MIT |
+| undici-types | MIT |
+| validator | MIT |
+| workerpool | Apache-2.0 |
+| ws | MIT |
+| y18n | ISC |
+| yargs | MIT |
+| yargs-parser | ISC |
+| zod | MIT |

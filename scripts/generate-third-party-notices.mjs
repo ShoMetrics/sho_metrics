@@ -337,11 +337,10 @@ function normalizeLicense(licenseValue) {
 
 function formatNpmPackageTable(packageEntries) {
     return [
-        "| Package | Version | License |",
-        "| --- | --- | --- |",
+        "| Package | License |",
+        "| --- | --- |",
         ...packageEntries.map(packageEntry => [
             escapeMarkdownTableCell(packageEntry.name),
-            escapeMarkdownTableCell(packageEntry.version),
             escapeMarkdownTableCell(packageEntry.license),
         ].join(" | ")).map(row => `| ${row} |`),
     ].join("\n");
@@ -349,11 +348,10 @@ function formatNpmPackageTable(packageEntries) {
 
 function formatPackageTable(packageEntries) {
     return [
-        "| Package | Version | License | Source |",
-        "| --- | --- | --- | --- |",
+        "| Package | License | Source |",
+        "| --- | --- | --- |",
         ...packageEntries.map(packageEntry => [
             escapeMarkdownTableCell(packageEntry.name),
-            escapeMarkdownTableCell(packageEntry.version),
             escapeMarkdownTableCell(packageEntry.license),
             formatSourceCell(packageEntry.source),
         ].join(" | ")).map(row => `| ${row} |`),
