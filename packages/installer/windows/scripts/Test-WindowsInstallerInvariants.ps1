@@ -36,7 +36,12 @@ $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
 $serviceProgramText = Get-Content -Encoding UTF8 -LiteralPath $serviceProgramPath -Raw
 $serviceStartCommandText = Get-Content -Encoding UTF8 -LiteralPath $serviceStartCommandPath -Raw
-$controlPanelMainWindowText = (Get-Content -Encoding UTF8 -LiteralPath $controlPanelMainWindowXamlPath -Raw) + "`n" + (Get-Content -Encoding UTF8 -LiteralPath $controlPanelMainWindowCodePath -Raw)
+$controlPanelMainWindowCodeText = (Get-ChildItem -LiteralPath (Split-Path -Parent $controlPanelMainWindowCodePath) -Filter "MainWindow*.cs" -File |
+    Sort-Object Name |
+    ForEach-Object {
+        Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw
+    }) -join "`n"
+$controlPanelMainWindowText = (Get-Content -Encoding UTF8 -LiteralPath $controlPanelMainWindowXamlPath -Raw) + "`n" + $controlPanelMainWindowCodeText
 $ciWorkflowText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot ".github\workflows\source-windows-ci.yml") -Raw
 $setupAppIdGuid = [regex]::Match($mainScriptText, '(?m)^AppId=\{\{(?<guid>[0-9A-Fa-f-]+)\}\r?$').Groups["guid"].Value
 $uninstallRegistryGuid = [regex]::Match($scriptText, "ShoMetricsUninstallRegistryKey\s*=\s*'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\{(?<guid>[0-9A-Fa-f-]+)\}_is1'").Groups["guid"].Value
