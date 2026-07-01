@@ -22,6 +22,8 @@ import { SteppedSlider } from "../components/SteppedSlider";
 import { colorCompensationMessages } from "../../i18n/message-groups/color-compensation";
 import { commonMessages } from "../../i18n/message-groups/shell";
 import { useI18n } from "../../i18n/react";
+import { propertyInspectorExternalUrls } from "../external-urls";
+import { PropertyInspectorExternalLink } from "../panels/external-link";
 import type { StreamDeckPropertyInspectorClient } from "../stream-deck/stream-deck-client";
 import {
     COLOR_COMPENSATION_GUIDED_ADJUSTMENT_IDS,
@@ -321,6 +323,11 @@ function IntroPage({
             </p>
             <p>
                 {t(colorCompensationMessages.colorCompensationIntro2)}
+            </p>
+            <p>
+                <PropertyInspectorExternalLink url={propertyInspectorExternalUrls.colorCompensationFaq}>
+                    {t(colorCompensationMessages.colorCompensationFaqLink)}
+                </PropertyInspectorExternalLink>
             </p>
             <ul className="color-compensation-bullet-list">
                 <li>{t(colorCompensationMessages.colorCompensationBulletBrightness)}</li>

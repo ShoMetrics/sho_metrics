@@ -49,65 +49,64 @@ export function App({ client }: AppProps): React.JSX.Element {
         isGlobalSettingsReady && resolvedGlobalSettings.transparentSurfaceOverride !== undefined;
     const isGlobalPaintOverrideEnabled =
         isGlobalSettingsReady && resolvedGlobalSettings.paintOverride !== undefined;
-    if (isColorCompensationWizardOpen) {
-        return (
-            <ColorCompensationWizard
-                client={client}
-                initialProfile={colorCompensation.profile}
-                onProfileSave={colorCompensation.saveProfile}
-                onProfileReset={colorCompensation.resetProfile}
-                onClose={() => setIsColorCompensationWizardOpen(false)}
-            />
-        );
-    }
 
     return (
         <StreamDeckClientProvider client={client}>
-            <div>
-                <div className="settings-tab-list" role="tablist" aria-label={t(shellMessages.settingsTabListLabel)}>
-                    {settingsTabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            className="settings-tab"
-                            type="button"
-                            role="tab"
-                            aria-selected={activeTab === tab.id}
-                            data-selected={activeTab === tab.id ? "true" : "false"}
-                            onClick={() => setActiveTab(tab.id)}
-                        >
-                            {t(tab.label)}
-                        </button>
-                    ))}
-                </div>
-
-                <SettingsNoticeSlot
-                    notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
+            {isColorCompensationWizardOpen ? (
+                <ColorCompensationWizard
+                    client={client}
+                    initialProfile={colorCompensation.profile}
+                    onProfileSave={colorCompensation.saveProfile}
+                    onProfileReset={colorCompensation.resetProfile}
+                    onClose={() => setIsColorCompensationWizardOpen(false)}
                 />
+            ) : (
+                <div>
+                    <div className="settings-tab-list" role="tablist" aria-label={t(shellMessages.settingsTabListLabel)}>
+                        {settingsTabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                className="settings-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected={activeTab === tab.id}
+                                data-selected={activeTab === tab.id ? "true" : "false"}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                {t(tab.label)}
+                            </button>
+                        ))}
+                    </div>
 
-                {activeTab === "widget" ? (
-                    <WidgetSettingsTab
-                        context={visibilityContext}
-                        isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
-                        isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
-                        isGlobalTransparentSurfaceOverrideEnabled={isGlobalTransparentSurfaceOverrideEnabled}
-                        isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
-                        colorCompensationProfile={colorCompensation.profile}
-                        onSettingsPatch={updateWidgetSettings}
-                        onGlobalSettingsPatch={updateGlobalSettings}
-                        onCustomHttpCredentialUpsert={upsertCustomHttpCredential}
-                        onCustomHttpCredentialDelete={deleteCustomHttpCredential}
-                        onResetWidgetSettings={resetWidgetSettings}
-                        onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
+                    <SettingsNoticeSlot
+                        notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
                     />
-                ) : (
-                    <GlobalSettingsTab
-                        resolvedSettings={resolvedGlobalSettings}
-                        colorCompensationProfile={colorCompensation.profile}
-                        onSettingsPatch={updateGlobalSettings}
-                        onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
-                    />
-                )}
-            </div>
+
+                    {activeTab === "widget" ? (
+                        <WidgetSettingsTab
+                            context={visibilityContext}
+                            isGlobalViewOverrideEnabled={isGlobalViewOverrideEnabled}
+                            isGlobalThemeOverrideEnabled={isGlobalThemeOverrideEnabled}
+                            isGlobalTransparentSurfaceOverrideEnabled={isGlobalTransparentSurfaceOverrideEnabled}
+                            isGlobalPaintOverrideEnabled={isGlobalPaintOverrideEnabled}
+                            colorCompensationProfile={colorCompensation.profile}
+                            onSettingsPatch={updateWidgetSettings}
+                            onGlobalSettingsPatch={updateGlobalSettings}
+                            onCustomHttpCredentialUpsert={upsertCustomHttpCredential}
+                            onCustomHttpCredentialDelete={deleteCustomHttpCredential}
+                            onResetWidgetSettings={resetWidgetSettings}
+                            onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
+                        />
+                    ) : (
+                        <GlobalSettingsTab
+                            resolvedSettings={resolvedGlobalSettings}
+                            colorCompensationProfile={colorCompensation.profile}
+                            onSettingsPatch={updateGlobalSettings}
+                            onOpenColorCompensation={() => setIsColorCompensationWizardOpen(true)}
+                        />
+                    )}
+                </div>
+            )}
         </StreamDeckClientProvider>
     );
 }

@@ -36,6 +36,8 @@ import { InspectorItem } from "../../../components/InspectorItem";
 import { SelectSetting } from "../../../controls/SelectSetting";
 import { TextAreaSetting } from "../../../controls/TextAreaSetting";
 import { TextSetting } from "../../../controls/TextSetting";
+import { propertyInspectorExternalUrls } from "../../../external-urls";
+import { PropertyInspectorExternalLink } from "../../external-link";
 import { SettingsSection } from "../../controls/SettingsSection";
 import {
     customHttpRetryCountOptionList,
@@ -163,6 +165,11 @@ export function CustomMetricSourceEditor({
                 </InspectorItem>
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">{t(customMetricMessages.editSourceNote)}</p>
+                    <p className="section-note">
+                        <PropertyInspectorExternalLink url={propertyInspectorExternalUrls.customHttpMetricFaq}>
+                            {t(customMetricMessages.customHttpMetricFaqLink)}
+                        </PropertyInspectorExternalLink>
+                    </p>
                 </InspectorItem>
                 <TextSetting
                     label={t(customMetricMessages.urlLabel)}
