@@ -30,6 +30,7 @@ import {
     resolveBatteryDeviceCachePatchForPropertyInspector,
 } from "../runtime/sources/battery/battery-device-cache-patch";
 import type { WidgetRuntimeCachePatch } from "../runtime/widget-runtime-cache";
+import { getHardwareIconFragment } from "../widgets/icons/hardware-icons";
 
 test("System action subscribes to the selected battery metric", () => {
     assert.deepEqual(
@@ -185,6 +186,49 @@ test("System battery view exposes integer percentage display values", () => {
         minimumValue: 0,
         maximumValue: 100,
     });
+});
+
+test("System battery view selects the default icon from the battery percentage", () => {
+    const cases = [
+        { current: 0, expectedIcon: "battery-empty" },
+        { current: 39, expectedIcon: "battery-medium" },
+        { current: 100, expectedIcon: "battery-full" },
+    ] as const;
+
+    for (const testCase of cases) {
+        const read = buildMetricReader({
+            current: testCase.current,
+            progress: testCase.current / 100,
+            sampleTimestampMilliseconds: 10_000,
+        });
+
+        const viewOptions = buildSystemViewOptions({
+            event: buildWillAppearEvent(),
+            settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+            target: buildSystemTarget(undefined),
+            metrics: read.metrics,
+        });
+
+        assert.equal(viewOptions.centerIconFragment, getHardwareIconFragment(testCase.expectedIcon));
+    }
+});
+
+test("System battery view uses the generic battery icon when no battery sample exists", () => {
+    const read = buildMetricReader({
+        current: 0,
+        progress: 0,
+        sampleTimestampMilliseconds: undefined,
+    });
+
+    const viewOptions = buildSystemViewOptions({
+        event: buildWillAppearEvent(),
+        settings: resolveInitialActionSettings(undefined, "system").resolvedSettings,
+        target: buildSystemTarget(undefined),
+        metrics: read.metrics,
+    });
+
+    assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, undefined);
+    assert.equal(viewOptions.centerIconFragment, getHardwareIconFragment("battery"));
 });
 
 test("System battery circle view preserves eight-character custom labels", () => {

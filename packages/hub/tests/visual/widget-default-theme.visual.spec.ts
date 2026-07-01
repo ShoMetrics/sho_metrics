@@ -17,7 +17,7 @@ import { renderNetworkDirectionIconFragment } from "../../src/widgets/icons/cata
 
 const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const CPU_ICON_FRAGMENT = getHardwareIconFragment("cpu");
-const BATTERY_ICON_FRAGMENT = getHardwareIconFragment("battery");
+const BATTERY_ICON_FRAGMENT = getHardwareIconFragment("battery-medium");
 const NETWORK_UPLOAD_ICON_FRAGMENT = renderNetworkDirectionIconFragment({
     direction: "upload",
     color: "#F97316",
