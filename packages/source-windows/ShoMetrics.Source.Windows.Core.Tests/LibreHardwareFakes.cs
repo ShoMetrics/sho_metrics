@@ -20,6 +20,30 @@ internal sealed class FakeHardware : IHardware
         return new FakeHardware(HardwareType.GpuNvidia, "gpu/0");
     }
 
+    public static FakeHardware GpuNvidia()
+    {
+        return new FakeHardware(HardwareType.GpuNvidia, "gpu-nvidia/0")
+        {
+            Name = "NVIDIA GeForce RTX 4090",
+        };
+    }
+
+    public static FakeHardware GpuIntelIntegrated()
+    {
+        return new FakeHardware(HardwareType.GpuIntel, "gpu-intel-integrated/0")
+        {
+            Name = "Intel(R) Arc(TM) 130V GPU (8GB)",
+        };
+    }
+
+    public static FakeHardware GpuIntelDiscrete()
+    {
+        return new FakeHardware(HardwareType.GpuIntel, "gpu-intel/0")
+        {
+            Name = "Intel(R) Arc(TM) A770 Graphics",
+        };
+    }
+
     public static FakeHardware Memory()
     {
         return new FakeHardware(HardwareType.Memory, "ram");

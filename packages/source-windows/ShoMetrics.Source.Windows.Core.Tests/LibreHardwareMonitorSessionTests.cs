@@ -248,6 +248,122 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task RefreshPollingGroupForIntelIntegratedGpuPublishesD3dFallbackAliases()
+    {
+        FakeHardware gpuHardware = FakeHardware.GpuIntelIntegrated();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.Load("D3D 3D", value: 42),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: 512),
+            FakeSensor.SmallData("D3D Shared Memory Total", value: 8192),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([gpuHardware], provider);
+
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(gpuHardware),
+            CancellationToken.None);
+
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is { MetricId: LibreHardwareMetricCatalog.GpuUsageMetricId, Value: 42 });
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is { MetricId: LibreHardwareMetricCatalog.GpuVramUsedMetricId, Value: 512d * 1024d * 1024d });
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is { MetricId: LibreHardwareMetricCatalog.GpuVramTotalMetricId, Value: 8192d * 1024d * 1024d });
+    }
+
+    [Fact]
+    public async Task ListMetricDescriptorsForIntelIntegratedGpuPublishesD3dFallbackAliases()
+    {
+        FakeHardware gpuHardware = FakeHardware.GpuIntelIntegrated();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.Load("D3D 3D", value: null),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: null),
+            FakeSensor.SmallData("D3D Shared Memory Total", value: null),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([gpuHardware], provider);
+
+        HardwareMetricDescriptorSnapshot snapshot = await session.ListMetricDescriptorsAsync([], CancellationToken.None);
+
+        Assert.Contains(snapshot.Descriptors, descriptor =>
+            descriptor.MetricId == LibreHardwareMetricCatalog.GpuUsageMetricId);
+        Assert.Contains(snapshot.Descriptors, descriptor =>
+            descriptor.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId);
+        Assert.Contains(snapshot.Descriptors, descriptor =>
+            descriptor.MetricId == LibreHardwareMetricCatalog.GpuVramTotalMetricId);
+    }
+
+    [Fact]
+    public async Task RefreshPollingGroupForNvidiaGpuDoesNotUseSharedMemoryFallback()
+    {
+        FakeHardware gpuHardware = FakeHardware.GpuNvidia();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.SmallData("GPU Memory Used", value: null),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: 512),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([gpuHardware], provider);
+
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(gpuHardware),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(result.Snapshot.Readings, reading =>
+            reading.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId);
+        Assert.Contains(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId
+                && report.Reason == MetricUnavailableReason.InvalidValue);
+    }
+
+    [Fact]
+    public async Task RefreshPollingGroupDoesNotUseD3dFallbackWhenVendorGpuAliasIsInvalid()
+    {
+        FakeHardware gpuHardware = FakeHardware.GpuNvidia();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.SmallData("GPU Memory Used", value: null),
+            FakeSensor.SmallData("D3D Dedicated Memory Used", value: 512),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([gpuHardware], provider);
+
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(gpuHardware),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(result.Snapshot.Readings, reading =>
+            reading.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId);
+        Assert.Contains(result.Snapshot.UnavailableMetrics, report =>
+            report.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId
+                && report.Reason == MetricUnavailableReason.InvalidValue);
+    }
+
+    [Fact]
+    public async Task ListMetricDescriptorsForNvidiaGpuDoesNotUseSharedMemoryFallback()
+    {
+        FakeHardware gpuHardware = FakeHardware.GpuNvidia();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.SmallData("D3D Shared Memory Used", value: null),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([gpuHardware], provider);
+
+        HardwareMetricDescriptorSnapshot snapshot = await session.ListMetricDescriptorsAsync([], CancellationToken.None);
+
+        Assert.DoesNotContain(snapshot.Descriptors, descriptor =>
+            descriptor.MetricId == LibreHardwareMetricCatalog.GpuVramUsedMetricId);
+    }
+
+    [Fact]
     public async Task RefreshPollingGroupForNonCpuHardwareDoesNotReplaceCpuSnapshot()
     {
         var timeProvider = new ManualTimeProvider();

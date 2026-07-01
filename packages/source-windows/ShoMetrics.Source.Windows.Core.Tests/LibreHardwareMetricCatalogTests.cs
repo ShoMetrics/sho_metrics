@@ -259,6 +259,72 @@ public sealed class LibreHardwareMetricCatalogTests
     }
 
     [Fact]
+    public void GpuFallbackStableAliasAcceptsIntelIntegratedD3dUsage()
+    {
+        bool classified = LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            FakeHardware.GpuIntelIntegrated(),
+            FakeSensor.Load("D3D 3D", value: 42),
+            out RankedMetricReading? candidate);
+
+        Assert.True(classified);
+        Assert.NotNull(candidate);
+        Assert.Equal(LibreHardwareMetricCatalog.GpuUsageMetricId, candidate.Reading.MetricId);
+        Assert.Equal(42, candidate.Reading.Value);
+    }
+
+    [Fact]
+    public void GpuFallbackStableAliasAcceptsIntelIntegratedSharedMemory()
+    {
+        bool classified = LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            FakeHardware.GpuIntelIntegrated(),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: 512),
+            out RankedMetricReading? candidate);
+
+        Assert.True(classified);
+        Assert.NotNull(candidate);
+        Assert.Equal(LibreHardwareMetricCatalog.GpuVramUsedMetricId, candidate.Reading.MetricId);
+        Assert.Equal(512d * 1024d * 1024d, candidate.Reading.Value);
+    }
+
+    [Fact]
+    public void GpuFallbackStableAliasRejectsSharedMemoryOnNvidiaGpu()
+    {
+        bool classified = LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            FakeHardware.GpuNvidia(),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: 512),
+            out RankedMetricReading? candidate);
+
+        Assert.False(classified);
+        Assert.Null(candidate);
+    }
+
+    [Fact]
+    public void GpuFallbackStableAliasRejectsSharedMemoryOnDiscreteIntelArc()
+    {
+        bool classified = LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            FakeHardware.GpuIntelDiscrete(),
+            FakeSensor.SmallData("D3D Shared Memory Used", value: 512),
+            out RankedMetricReading? candidate);
+
+        Assert.False(classified);
+        Assert.Null(candidate);
+    }
+
+    [Fact]
+    public void GpuFallbackStableAliasAcceptsDedicatedMemoryOnDiscreteGpu()
+    {
+        bool classified = LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasReadingCandidate(
+            FakeHardware.GpuNvidia(),
+            FakeSensor.SmallData("D3D Dedicated Memory Total", value: 8192),
+            out RankedMetricReading? candidate);
+
+        Assert.True(classified);
+        Assert.NotNull(candidate);
+        Assert.Equal(LibreHardwareMetricCatalog.GpuVramTotalMetricId, candidate.Reading.MetricId);
+        Assert.Equal(8192d * 1024d * 1024d, candidate.Reading.Value);
+    }
+
+    [Fact]
     public void StorageThroughputDoesNotCreateFirstClassDiskAliases()
     {
         IReadOnlyList<MetricReading> readings = LibreHardwareMetricCatalog.CreateReadings(
