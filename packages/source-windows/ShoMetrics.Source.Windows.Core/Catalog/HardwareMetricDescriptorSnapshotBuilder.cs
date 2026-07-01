@@ -24,9 +24,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         CancellationToken cancellationToken)
     {
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
-        List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates = [];
-        List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates = [];
-        Dictionary<string, List<RankedHardwareMetricDescriptor>> gpuFallbackDescriptorCandidatesByMetricId = new(StringComparer.Ordinal);
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> rankedCandidatesByMetricId = new(StringComparer.Ordinal);
         List<string> warnings = [];
 
         foreach (IHardware hardware in rootHardware)
@@ -34,32 +32,30 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
             ReadHardwareDescriptors(
                 hardware,
                 descriptorsByMetricId,
-                cpuTemperatureDescriptorCandidates,
-                cpuPowerDescriptorCandidates,
-                gpuFallbackDescriptorCandidatesByMetricId,
+                rankedCandidatesByMetricId,
                 warnings,
                 cancellationToken);
         }
 
         AddRankedStableAliasDescriptor(
             LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-            cpuTemperatureDescriptorCandidates,
+            GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.CpuTemperatureMetricId),
             descriptorsByMetricId);
         AddRankedStableAliasDescriptor(
             LibreHardwareMetricCatalog.CpuPowerMetricId,
-            cpuPowerDescriptorCandidates,
+            GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.CpuPowerMetricId),
             descriptorsByMetricId);
         AddRankedFallbackStableAliasDescriptor(
             LibreHardwareMetricCatalog.GpuUsageMetricId,
-            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
+            GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuUsageMetricId),
             descriptorsByMetricId);
         AddRankedFallbackStableAliasDescriptor(
             LibreHardwareMetricCatalog.GpuVramUsedMetricId,
-            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
+            GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramUsedMetricId),
             descriptorsByMetricId);
         AddRankedFallbackStableAliasDescriptor(
             LibreHardwareMetricCatalog.GpuVramTotalMetricId,
-            GetCandidates(gpuFallbackDescriptorCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
+            GetCandidates(rankedCandidatesByMetricId, LibreHardwareMetricCatalog.GpuVramTotalMetricId),
             descriptorsByMetricId);
         AddDerivedDescriptors(descriptorsByMetricId);
         AddNativeDiskThroughputDescriptors(descriptorsByMetricId, diskThroughputProvider);
@@ -139,9 +135,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
     private static void ReadHardwareDescriptors(
         IHardware hardware,
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
-        List<RankedHardwareMetricDescriptor> cpuTemperatureDescriptorCandidates,
-        List<RankedHardwareMetricDescriptor> cpuPowerDescriptorCandidates,
-        Dictionary<string, List<RankedHardwareMetricDescriptor>> gpuFallbackDescriptorCandidatesByMetricId,
+        Dictionary<string, List<RankedHardwareMetricDescriptor>> rankedCandidatesByMetricId,
         List<string> warnings,
         CancellationToken cancellationToken)
     {
@@ -178,16 +172,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
                     sensor,
                     out RankedHardwareMetricDescriptor? cpuStableAliasDescriptorCandidate))
                 {
-                    if (cpuStableAliasDescriptorCandidate.Descriptor.MetricId.Equals(
-                        LibreHardwareMetricCatalog.CpuTemperatureMetricId,
-                        StringComparison.Ordinal))
-                    {
-                        cpuTemperatureDescriptorCandidates.Add(cpuStableAliasDescriptorCandidate);
-                    }
-                    else
-                    {
-                        cpuPowerDescriptorCandidates.Add(cpuStableAliasDescriptorCandidate);
-                    }
+                    AddCandidate(rankedCandidatesByMetricId, cpuStableAliasDescriptorCandidate);
                 }
 
                 if (LibreHardwareMetricCatalog.TryCreateGpuFallbackStableAliasDescriptorCandidate(
@@ -195,7 +180,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
                     sensor,
                     out RankedHardwareMetricDescriptor? gpuFallbackStableAliasDescriptorCandidate))
                 {
-                    AddCandidate(gpuFallbackDescriptorCandidatesByMetricId, gpuFallbackStableAliasDescriptorCandidate);
+                    AddCandidate(rankedCandidatesByMetricId, gpuFallbackStableAliasDescriptorCandidate);
                 }
             }
         }
@@ -205,9 +190,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
             ReadHardwareDescriptors(
                 childHardware,
                 descriptorsByMetricId,
-                cpuTemperatureDescriptorCandidates,
-                cpuPowerDescriptorCandidates,
-                gpuFallbackDescriptorCandidatesByMetricId,
+                rankedCandidatesByMetricId,
                 warnings,
                 cancellationToken);
         }
