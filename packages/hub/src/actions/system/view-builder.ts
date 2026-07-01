@@ -25,6 +25,7 @@ import { buildPercentageWidgetData } from "../../metrics/percentage-widget-data"
 import { TITLE_CARD_BATTERY_CAPTION_TEXT } from "../../view-rendering/text-content/title-card-text-content";
 import { getMetricIconFragment } from "../../widgets/icons/metric-icons";
 import { buildMetricViewIcons } from "../../widgets/icons/metric-view-icons";
+import type { HardwareIconKind } from "../../widgets/icons/hardware-icons";
 
 const MISSING_BLUETOOTH_PRIMARY_IDENTIFIER_DESCRIPTOR_ID = "missing-primary-identifier";
 
@@ -59,7 +60,16 @@ export function buildSystemViewOptions(options: {
         selectedPeripheralDisplayName: options.target.reading.detectedPeripheralDisplayName,
         maximumCharacters: displayMaximumLabelCharacters,
     });
-    const defaultIcons = buildMetricViewIcons({ hardware: "battery", status: "percentage" });
+    const widgetData = buildPercentageWidgetData(options.metrics.getWidgetData(
+        metricKey,
+        selectedView === "bar" ? SYSTEM_BATTERY_TITLE_LABEL : batteryLabel,
+        "%",
+        100,
+    ));
+    const defaultIcons = buildMetricViewIcons({
+        hardware: resolveBatteryHardwareIconKind(widgetData),
+        status: "percentage",
+    });
 
     return {
         event: options.event,
@@ -67,12 +77,7 @@ export function buildSystemViewOptions(options: {
         resolvedSettings: widget.slot.appearance,
         metricKey,
         widgetData: {
-            ...buildPercentageWidgetData(options.metrics.getWidgetData(
-                metricKey,
-                selectedView === "bar" ? SYSTEM_BATTERY_TITLE_LABEL : batteryLabel,
-                "%",
-                100,
-            )),
+            ...widgetData,
             ...(selectedView === "bar" ? {
                 barLabel: SYSTEM_BATTERY_TITLE_LABEL,
                 secondaryDisplayValue: secondaryBatteryLabel,
@@ -83,6 +88,26 @@ export function buildSystemViewOptions(options: {
         centerIconFragment: getMetricIconFragment(options.target.reading.customIconId)
             ?? defaultIcons.centerIconFragment,
     };
+}
+
+function resolveBatteryHardwareIconKind(widgetData: {
+    readonly current: number;
+    readonly sampleTimestampMilliseconds?: number;
+}): HardwareIconKind {
+    if (widgetData.sampleTimestampMilliseconds === undefined) {
+        return "battery";
+    }
+
+    const batteryPercent = widgetData.current;
+    if (batteryPercent >= 100) {
+        return "battery-full";
+    }
+
+    if (batteryPercent > 0) {
+        return "battery-medium";
+    }
+
+    return "battery-empty";
 }
 
 export function resolveSystemMetricKeys(target: ResolvedSystemMetricTarget): readonly string[] {
