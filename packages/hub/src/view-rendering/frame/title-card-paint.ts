@@ -12,3 +12,8 @@ export function resolveTitleCardStaticTextColor(paints: RenderPaintTokens): stri
         ? paints.primaryMetric.solidColor
         : paints.metricValueText;
 }
+
+/** Resolves static code and caption paint for dual-channel title-card metrics. */
+export function resolveDualTitleCardStaticTextColor(paints: RenderPaintTokens): string {
+    return paints.metricValueText;
+}

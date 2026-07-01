@@ -73,7 +73,7 @@ test("dual metric view dispatches text variants to centered and title-card rende
     assert.doesNotMatch(titleCardSvg, /text-metric-positive-value/);
 });
 
-test("dual title-card text uses the solid metric paint for static text", () => {
+test("dual title-card text keeps static text neutral", () => {
     const svg = renderDualMetricBodyView({
         data: {
             ...buildDualChannelData(),
@@ -97,7 +97,11 @@ test("dual title-card text uses the solid metric paint for static text", () => {
         negative: { labelText: "DN", unitText: "M", color: "#ef4444" },
     });
 
-    assert.match(svg, /fill="#3b82f6"[\s\S]*N/);
+    assert.match(svg, /id="title-card-dual-code"[\s\S]*fill="#metric-value-text-token"/);
+    assert.match(svg, /id="title-card-dual-caption-0"[\s\S]*fill="#metric-value-text-token"/);
+    assert.doesNotMatch(svg, /fill="#3b82f6">NET/);
+    assert.match(svg, /id="title-card-positive-value"[\s\S]*fill="#3b82f6"[\s\S]*>12<\/text>/);
+    assert.match(svg, /id="title-card-negative-value"[\s\S]*fill="#ef4444"[\s\S]*>4<\/text>/);
 });
 
 test("dual text metric compacts data-rate units in the view layer", () => {
