@@ -264,33 +264,37 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
     const shortUnitSingleDigitFragment = renderGaugeValueSample("3", "%");
     const shortUnitDoubleDigitFragment = renderGaugeValueSample("38", "%");
     const shortUnitTripleDigitFragment = renderGaugeValueSample("301", "W");
+    const decimalValueShortUnitFragment = renderGaugeValueSample("87.4", "M");
     const longUnitManyDigitFragment = renderGaugeValueSample("1234", "ms");
 
     assert.match(singleDigitFragment, /id="progress-circle-value"/);
     assert.match(singleDigitFragment, /id="progress-circle-unit"/);
-    assert.match(singleDigitFragment, /x="92"/);
+    assert.match(singleDigitFragment, /x="72"/);
     assert.match(singleDigitFragment, /x="97"/);
     assert.match(singleDigitFragment, /font-size="48"/);
-    assert.match(singleDigitFragment, /font-size="13"/);
-    assert.match(doubleDigitFragment, /x="92"/);
+    assert.match(singleDigitFragment, /font-size="19"/);
+    assert.match(doubleDigitFragment, /x="66"/);
     assert.match(doubleDigitFragment, /x="97"/);
     assert.match(doubleDigitFragment, /font-size="48"/);
-    assert.match(doubleDigitFragment, /font-size="13"/);
+    assert.match(doubleDigitFragment, /font-size="19"/);
     assert.match(tripleDigitFragment, /x="92"/);
     assert.match(tripleDigitFragment, /x="97"/);
     assert.match(tripleDigitFragment, /font-size="31"/);
-    assert.match(tripleDigitFragment, /font-size="13"/);
-    assert.match(shortUnitSingleDigitFragment, /x="92"/);
+    assert.match(tripleDigitFragment, /font-size="19"/);
+    assert.match(shortUnitSingleDigitFragment, /x="72"/);
     assert.match(shortUnitSingleDigitFragment, /x="97"/);
     assert.match(shortUnitSingleDigitFragment, /font-size="48"/);
-    assert.match(shortUnitDoubleDigitFragment, /x="92"/);
+    assert.match(shortUnitDoubleDigitFragment, /x="66"/);
     assert.match(shortUnitDoubleDigitFragment, /x="97"/);
     assert.match(shortUnitDoubleDigitFragment, /font-size="48"/);
     assert.match(shortUnitTripleDigitFragment, /x="92"/);
     assert.match(shortUnitTripleDigitFragment, /x="97"/);
     assert.match(shortUnitTripleDigitFragment, /font-size="31"/);
-    assert.match(longUnitManyDigitFragment, /x="92"/);
-    assert.match(longUnitManyDigitFragment, /x="97"/);
+    assert.match(decimalValueShortUnitFragment, /x="92"/);
+    assert.match(decimalValueShortUnitFragment, /x="97"/);
+    assert.match(decimalValueShortUnitFragment, /font-size="31"/);
+    assert.match(longUnitManyDigitFragment, /x="74"/);
+    assert.match(longUnitManyDigitFragment, /x="85"/);
     assert.match(longUnitManyDigitFragment, /font-size="21"/);
     assert.doesNotMatch(singleDigitFragment, /progress-circle-value-unit/);
     assert.doesNotMatch(singleDigitFragment, /textLength=/);
@@ -299,6 +303,7 @@ test("gauge circle variant keeps value and unit in fixed regions", () => {
     assert.doesNotMatch(shortUnitSingleDigitFragment, /textLength=/);
     assert.doesNotMatch(shortUnitDoubleDigitFragment, /textLength=/);
     assert.doesNotMatch(shortUnitTripleDigitFragment, /textLength=/);
+    assert.doesNotMatch(decimalValueShortUnitFragment, /textLength=/);
 });
 
 test("gauge circle variant uses semantic range bands for range colors", () => {
@@ -746,6 +751,40 @@ test("dual-channel gauge variant keeps long row values out of icon space", () =>
     assert.match(svgFragment, /font-size="13\.50"[^>]*>328<\/text>/);
     assert.match(svgFragment, /id="dual-progress-circle-negative-row-unit"/);
     assert.match(svgFragment, /download-icon/);
+});
+
+test("dual-channel gauge variant ignores decimal points when choosing row font size", () => {
+    const svgFragment = renderDualChannelProgressCircle({
+        positive: {
+            ...buildWidgetData(),
+            current: 16.2,
+            progress: 0.34,
+            displayValue: "16.2",
+            unit: "M",
+        },
+        negative: {
+            ...buildWidgetData(),
+            current: 87.4,
+            progress: 0.8,
+            displayValue: "87.4",
+            unit: "M",
+        },
+    }, {
+        ...DEFAULT_DUAL_CHANNEL_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+        titleText: "NETWORK",
+        positiveIconFragment: "<path id=\"upload-icon\" />",
+        negativeIconFragment: "<path id=\"download-icon\" />",
+    }, keySize);
+
+    assert.match(svgFragment, /id="dual-progress-circle-positive-row-value"[\s\S]*font-size="13\.50"[^>]*>16\.2<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-positive-row-value"[\s\S]*x="82\.71"[^>]*>16\.2<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-positive-row-unit"[\s\S]*font-size="12"[^>]*>M<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-positive-row-unit"[\s\S]*x="88\.06"[^>]*>M<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-value"[\s\S]*font-size="13\.50"[^>]*>87\.4<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-value"[\s\S]*x="82\.71"[^>]*>87\.4<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-unit"[\s\S]*font-size="12"[^>]*>M<\/text>/);
+    assert.match(svgFragment, /id="dual-progress-circle-negative-row-unit"[\s\S]*x="88\.06"[^>]*>M<\/text>/);
 });
 
 test("dual-channel gauge variant uses a safe single-row placeholder for unavailable values", () => {
@@ -1260,6 +1299,7 @@ function buildProgressBarChannel(label: string, displayValue: string): NonNullab
         progress: 0.5,
         color: "#123456",
         iconFragment: "<path d=\"M0 0\" />",
+        sampleTimestampMilliseconds: 1000,
     };
 }
 

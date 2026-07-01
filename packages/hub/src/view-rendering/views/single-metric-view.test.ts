@@ -104,7 +104,7 @@ test("single title-card text uses the solid metric paint for static text", () =>
     assert.match(svg, /fill="#metric-token"[\s\S]*CPU/);
 });
 
-test("single gauge view compacts data-rate units before rendering", () => {
+test("single gauge view preserves raw data-rate units", () => {
     const svg = renderSingleMetricBodyView({
         data: {
             ...buildWidgetData(),
@@ -117,8 +117,7 @@ test("single gauge view compacts data-rate units before rendering", () => {
         circleVariant: "gauge",
     });
 
-    assert.match(svg, /id="progress-circle-unit"[\s\S]*>M<\/text>/);
-    assert.doesNotMatch(svg, /MB\/s/);
+    assert.match(svg, /id="progress-circle-unit"[\s\S]*>MB\/s<\/text>/);
 });
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {

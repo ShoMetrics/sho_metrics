@@ -18,7 +18,6 @@ import {
 } from "../../widgets/primitives/text-metric";
 import { renderTitleCardTextMetric } from "../../widgets/primitives/title-card-text-metric";
 import { buildTitleCardSingleMetricContent } from "../text-content/title-card-text-content";
-import { formatCompactDataRateUnitText } from "../text-content/render-unit-text";
 import { resolveTitleCardStaticTextColor } from "../frame/title-card-paint";
 import {
     DEFAULT_PROGRESS_BAR_CONFIG,
@@ -73,14 +72,7 @@ export function renderSingleMetricBodyView(options: SingleMetricBodyViewProps): 
 }
 
 function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string {
-    const circleWidgetData = options.circleVariant === "gauge"
-        ? {
-            ...options.data,
-            unit: formatCompactDataRateUnitText(options.data.unit),
-        }
-        : options.data;
-
-    return progressCircle.render(circleWidgetData, {
+    return progressCircle.render(options.data, {
         ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         colorConfig: options.visual.paints.primaryMetric,
         trackColor: options.visual.paints.track,
