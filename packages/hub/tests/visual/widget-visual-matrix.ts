@@ -219,6 +219,7 @@ const MULTI_CHANNEL_PROGRESS_BAR_DATA: WidgetData = {
             progress: 0.72,
             color: VISUAL_TEST_COLORS.networkDownload,
             iconFragment: NETWORK_DOWNLOAD_ICON_FRAGMENT,
+            sampleTimestampMilliseconds: 1,
         },
         {
             label: "WR",
@@ -227,6 +228,7 @@ const MULTI_CHANNEL_PROGRESS_BAR_DATA: WidgetData = {
             progress: 0.48,
             color: VISUAL_TEST_COLORS.networkUpload,
             iconFragment: NETWORK_UPLOAD_ICON_FRAGMENT,
+            sampleTimestampMilliseconds: 1,
         },
     ],
 };
@@ -242,6 +244,7 @@ const MULTI_CHANNEL_PROGRESS_BAR_NO_DATA: WidgetData = {
             progress: 0,
             color: VISUAL_TEST_COLORS.networkDownload,
             iconFragment: NETWORK_DOWNLOAD_ICON_FRAGMENT,
+            sampleTimestampMilliseconds: undefined,
         },
         {
             label: "WR",
@@ -250,6 +253,7 @@ const MULTI_CHANNEL_PROGRESS_BAR_NO_DATA: WidgetData = {
             progress: 0,
             color: VISUAL_TEST_COLORS.networkUpload,
             iconFragment: NETWORK_UPLOAD_ICON_FRAGMENT,
+            sampleTimestampMilliseconds: undefined,
         },
     ],
 };
@@ -459,7 +463,8 @@ const SURFACE_CASE_DEFINITIONS: readonly SurfaceCaseDefinition[] = [
         supportsViewCase: viewCaseDefinition =>
             viewCaseDefinition.selectedView === "circle"
             && viewCaseDefinition.metricKind === "dual",
-        unsupportedReason: "Only dual circle views use the production touch-strip-wide-two-square-bodies layout.",
+        unsupportedReason:
+            "Only dual circle views use the production touch-strip-wide-two-square-bodies split single-body layout.",
     },
 ];
 
