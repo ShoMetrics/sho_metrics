@@ -26,33 +26,33 @@ Selected CommunityToolkit Windows SettingsControls source files are vendored und
 
 The Windows Helper service and Control Panel publish outputs include the following runtime NuGet packages from published dependency manifests.
 
-| Package | Version | License | Source |
-| --- | --- | --- | --- |
-| BlackSharp.Core | 1.0.7 | MPL-2.0 | <https://github.com/Blacktempel/BlackSharp> |
-| DiskInfoToolkit | 1.1.2 | MPL-2.0 | <https://github.com/Blacktempel/DiskInfoToolkit> |
-| Google.Protobuf | 3.34.1 | BSD-3-Clause | <https://github.com/protocolbuffers/protobuf> |
-| Grpc.AspNetCore.Server | 2.71.0 | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
-| Grpc.Core.Api | 2.71.0 | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
-| Grpc.Net.Client | 2.71.0 | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
-| Grpc.Net.Common | 2.71.0 | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
-| HidSharp | 2.6.4 | https://aka.ms/deprecateLicenseUrl | <https://software.seekye.com/hidsharp> |
-| LibreHardwareMonitorLib | 0.9.6 | MPL-2.0 | <https://github.com/LibreHardwareMonitor/LibreHardwareMonitor> |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
-| Microsoft.Extensions.Hosting.WindowsServices | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
-| Microsoft.Web.WebView2 | 1.0.3719.77 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/webview> |
-| Microsoft.WindowsAppSDK.Foundation | 2.0.21 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
-| Microsoft.WindowsAppSDK.InteractiveExperiences | 2.0.13 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
-| Microsoft.WindowsAppSDK.WinUI | 2.1.0 | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
-| Mono.Posix.NETStandard | 1.0.0 | https://go.microsoft.com/fwlink/?linkid=869050 | <https://go.microsoft.com/fwlink/?linkid=869051> |
-| RAMSPDToolkit-NDD | 1.4.2 | MPL-2.0 | <https://github.com/Blacktempel/RAMSPDToolkit> |
-| Serilog | 4.3.0 | Apache-2.0 | <https://github.com/serilog/serilog> |
-| Serilog.Extensions.Hosting | 10.0.0 | Apache-2.0 | <https://github.com/serilog/serilog-extensions-hosting> |
-| Serilog.Extensions.Logging | 10.0.0 | Apache-2.0 | <https://github.com/serilog/serilog-extensions-logging> |
-| Serilog.Sinks.Console | 6.1.1 | Apache-2.0 | <https://github.com/serilog/serilog-sinks-console> |
-| Serilog.Sinks.EventLog | 4.0.0 | Apache-2.0 | <https://github.com/serilog/serilog-sinks-async> |
-| Serilog.Sinks.File | 7.0.0 | Apache-2.0 | <https://github.com/serilog/serilog-sinks-file> |
-| System.CodeDom | 10.0.2 | MIT | <https://github.com/dotnet/dotnet> |
-| System.IO.Ports | 10.0.3 | MIT | <https://github.com/dotnet/dotnet> |
-| System.Management | 10.0.2 | MIT | <https://github.com/dotnet/dotnet> |
-| System.ServiceProcess.ServiceController | 10.0.8 | MIT | <https://github.com/dotnet/dotnet> |
+| Package | License | Source |
+| --- | --- | --- |
+| BlackSharp.Core | MPL-2.0 | <https://github.com/Blacktempel/BlackSharp> |
+| DiskInfoToolkit | MPL-2.0 | <https://github.com/Blacktempel/DiskInfoToolkit> |
+| Google.Protobuf | BSD-3-Clause | <https://github.com/protocolbuffers/protobuf> |
+| Grpc.AspNetCore.Server | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
+| Grpc.Core.Api | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
+| Grpc.Net.Client | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
+| Grpc.Net.Common | Apache-2.0 | <https://github.com/grpc/grpc-dotnet> |
+| HidSharp | https://aka.ms/deprecateLicenseUrl | <https://software.seekye.com/hidsharp> |
+| LibreHardwareMonitorLib | MPL-2.0 | <https://github.com/LibreHardwareMonitor/LibreHardwareMonitor> |
+| Microsoft.Extensions.DependencyInjection.Abstractions | MIT | <https://github.com/dotnet/dotnet> |
+| Microsoft.Extensions.Hosting.WindowsServices | MIT | <https://github.com/dotnet/dotnet> |
+| Microsoft.Extensions.Logging.Abstractions | MIT | <https://github.com/dotnet/dotnet> |
+| Microsoft.Web.WebView2 | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/webview> |
+| Microsoft.WindowsAppSDK.Foundation | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
+| Microsoft.WindowsAppSDK.InteractiveExperiences | https://aka.ms/deprecateLicenseUrl | <https://aka.ms/windowsappsdk> |
+| Microsoft.WindowsAppSDK.WinUI | https://aka.ms/deprecateLicenseUrl | <https://github.com/microsoft/windowsappsdk> |
+| Mono.Posix.NETStandard | https://go.microsoft.com/fwlink/?linkid=869050 | <https://go.microsoft.com/fwlink/?linkid=869051> |
+| RAMSPDToolkit-NDD | MPL-2.0 | <https://github.com/Blacktempel/RAMSPDToolkit> |
+| Serilog | Apache-2.0 | <https://github.com/serilog/serilog> |
+| Serilog.Extensions.Hosting | Apache-2.0 | <https://github.com/serilog/serilog-extensions-hosting> |
+| Serilog.Extensions.Logging | Apache-2.0 | <https://github.com/serilog/serilog-extensions-logging> |
+| Serilog.Sinks.Console | Apache-2.0 | <https://github.com/serilog/serilog-sinks-console> |
+| Serilog.Sinks.EventLog | Apache-2.0 | <https://github.com/serilog/serilog-sinks-async> |
+| Serilog.Sinks.File | Apache-2.0 | <https://github.com/serilog/serilog-sinks-file> |
+| System.CodeDom | MIT | <https://github.com/dotnet/dotnet> |
+| System.IO.Ports | MIT | <https://github.com/dotnet/dotnet> |
+| System.Management | MIT | <https://github.com/dotnet/dotnet> |
+| System.ServiceProcess.ServiceController | MIT | <https://github.com/dotnet/dotnet> |
