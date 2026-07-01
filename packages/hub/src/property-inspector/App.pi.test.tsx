@@ -153,6 +153,26 @@ test("app color compensation wizard saves the profile through global settings", 
     });
 });
 
+test("app color compensation FAQ link opens in the default browser", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.cpu,
+        settings: buildQuickStartSettingsRecord("cpu"),
+    });
+
+    renderApp(client);
+
+    await user.click(await screen.findByRole("button", { name: "Color Compensation" }));
+    await user.click(screen.getByRole("link", { name: "Learn more about color compensation." }));
+
+    assert.deepEqual(client.sentMessages.at(-1), {
+        event: "openUrl",
+        payload: {
+            url: "https://shometrics.github.io/faq/color-compensation/",
+        },
+    });
+});
+
 test("app color compensation wizard resets a saved profile through global settings", async () => {
     const user = userEvent.setup();
     const savedProfile: ColorCompensationProfile = {

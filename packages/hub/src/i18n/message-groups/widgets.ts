@@ -519,6 +519,11 @@ export const customMetricMessages = {
         zh_CN: "编辑会自动保存。返回后可编辑组件外观和轮询。",
         ja: "編集は自動保存されます。戻るとウィジェットの外観とポーリングを編集できます。",
     },
+    customHttpMetricFaqLink: {
+        en: "Learn more about custom HTTP metrics.",
+        zh_CN: "了解自定义 HTTP 指标。",
+        ja: "カスタム HTTP メトリクスについて詳しく見る。",
+    },
     urlLabel: {
         en: "HTTP URL",
         zh_CN: "HTTP URL",

@@ -148,6 +148,13 @@ for (const contractCase of customHttpSourceEditorContractCases) {
             assert.equal(readPropertyInspectorScrollTopForTest(), 0);
         });
         assert.equal(screen.queryByRole("button", { name: "Reset Widget Settings" }), null);
+        await user.click(screen.getByRole("link", { name: "Learn more about custom HTTP metrics." }));
+        assert.deepEqual(client.sentMessages.at(-1), {
+            event: "openUrl",
+            payload: {
+                url: "https://shometrics.github.io/faq/custom-http-metric/",
+            },
+        });
         assert.match(
             screen.getByText(/Worst-case request time is about/).textContent ?? "",
             /1s polling frequency/,

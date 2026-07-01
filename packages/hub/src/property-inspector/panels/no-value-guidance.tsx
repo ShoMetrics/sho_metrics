@@ -2,7 +2,7 @@ import type { DisplayedMetricReadTrace } from "../../runtime/widget-runtime-cach
 import { cpuMessages, gpuMessages, helperMessages } from "../../i18n/message-groups/widgets";
 import { useI18n } from "../../i18n/react";
 import { InspectorItem } from "../components/InspectorItem";
-import { HelperDownloadLink } from "./helper-download-link";
+import { HelperDownloadLink } from "./external-link";
 
 /** Reports whether Windows GPU settings should explain a missing runtime value. */
 export function shouldShowGpuNoValueGuidance(

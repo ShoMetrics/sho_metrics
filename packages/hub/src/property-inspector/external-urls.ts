@@ -1,5 +1,7 @@
 /** Lists external URLs the Property Inspector is allowed to open in the default browser. */
 export const propertyInspectorExternalUrls = {
+    colorCompensationFaq: "https://shometrics.github.io/faq/color-compensation/",
+    customHttpMetricFaq: "https://shometrics.github.io/faq/custom-http-metric/",
     helperDownload: "https://shometrics.github.io/download/",
 } as const;
 

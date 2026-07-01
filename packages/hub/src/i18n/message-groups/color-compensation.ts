@@ -66,6 +66,11 @@ export const colorCompensationMessages = {
         zh_CN: "每一步都会在两个屏幕上显示相同样本。显示器上的样本保持不变；移动滑块时 Stream Deck 样本会更新。请调整到两者尽可能接近。",
         ja: "各ステップでは両方の画面に同じサンプルを表示します。モニター上のサンプルは変わらず、スライダーを動かすと Stream Deck のサンプルが更新されます。できるだけ近く見えるように調整してください。",
     },
+    colorCompensationFaqLink: {
+        en: "Learn more about color compensation.",
+        zh_CN: "了解颜色补偿。",
+        ja: "色補正について詳しく見る。",
+    },
     colorCompensationBulletBrightness: {
         en: "Set Stream Deck global brightness to a comfortable level before starting",
         zh_CN: "开始前，将 Stream Deck 全局亮度调到舒适水平",
