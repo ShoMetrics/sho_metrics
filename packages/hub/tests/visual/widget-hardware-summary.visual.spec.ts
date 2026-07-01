@@ -69,12 +69,52 @@ const GPU_SUMMARY_NO_DATA: HardwareSummaryWidgetData = {
     ],
 };
 
+const CPU_SUMMARY_LOW_LOAD_TERMINAL_DATA: HardwareSummaryWidgetData = {
+    domain: "cpu",
+    primary: {
+        kind: "usage",
+        label: "LOAD",
+        diagnosticValue: 17,
+        displayValue: "17",
+        unit: "%",
+        progress: 0.17,
+        sampleTimestampMilliseconds: 1,
+    },
+    secondary: [
+        {
+            kind: "temperature",
+            label: "TEMP",
+            diagnosticValue: 53,
+            displayValue: "53",
+            unit: "°C",
+            sampleTimestampMilliseconds: 1,
+        },
+        {
+            kind: "power",
+            label: "PWR",
+            diagnosticValue: 52,
+            displayValue: "52",
+            unit: "W",
+            sampleTimestampMilliseconds: 1,
+        },
+    ],
+};
+
 const PIXEL_WINDOW_SUMMARY_APPEARANCE: ResolvedAppearanceSettingsOverride = {
     view: {
         selectedView: "circle",
     },
     theme: {
         selectedTheme: "pixel-window",
+    },
+};
+
+const TERMINAL_SUMMARY_APPEARANCE: ResolvedAppearanceSettingsOverride = {
+    view: {
+        selectedView: "circle",
+    },
+    theme: {
+        selectedTheme: "terminal",
     },
 };
 
@@ -109,6 +149,11 @@ const HARDWARE_SUMMARY_VISUAL_TEST_CASES: readonly HardwareSummaryVisualTestCase
         snapshotName: "hardware-summary-square-gpu-pixel-window",
         appearance: PIXEL_WINDOW_SUMMARY_APPEARANCE,
         data: GPU_SUMMARY_DATA,
+    },
+    {
+        snapshotName: "hardware-summary-square-cpu-terminal-low-load",
+        appearance: TERMINAL_SUMMARY_APPEARANCE,
+        data: CPU_SUMMARY_LOW_LOAD_TERMINAL_DATA,
     },
 ];
 

@@ -540,7 +540,7 @@ function renderSemiCircleGauge(options: {
             ${renderArcOutline("semi-circle-gauge-panel-gauge-fill-outline", progressPath, options.layout, options.config)}
             <path class="semi-circle-gauge-panel-gauge-fill" d="${progressPath}" fill="none"
                 stroke="${escapeSvgText(options.color)}" stroke-width="${options.layout.strokeWidth}"
-                stroke-linecap="round" ${buildSvgFilterAttributes(options.config.themeEffects.metricFilter).join(" ")} />
+                stroke-linecap="round" />
         ` : ""}
     `;
 }
