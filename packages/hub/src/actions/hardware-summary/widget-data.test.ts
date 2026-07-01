@@ -25,6 +25,7 @@ import { buildHardwareSummaryWidgetData as buildProductionHardwareSummaryWidgetD
 const TEST_HELPER_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS = 8000;
 
 test("primary VRAM progress uses used over total memory", () => {
+    const bytesPerGibibyte = 1024 ** 3;
     const widget = buildHardwareSummaryWidget("gpu", [
         { kind: "vram" },
         { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
@@ -33,8 +34,8 @@ test("primary VRAM progress uses used over total memory", () => {
     const widgetData = buildHardwareSummaryWidgetData({
         widget,
         metrics: buildMetricReader({
-            [GPU_VRAM_USED_METRIC_KEY]: buildMetricValue({ current: 4096, unit: "MB" }),
-            [GPU_VRAM_TOTAL_METRIC_KEY]: buildMetricValue({ current: 8192, unit: "MB" }),
+            [GPU_VRAM_USED_METRIC_KEY]: buildMetricValue({ current: 4 * bytesPerGibibyte, unit: "B" }),
+            [GPU_VRAM_TOTAL_METRIC_KEY]: buildMetricValue({ current: 8 * bytesPerGibibyte, unit: "B" }),
             [GPU_TEMP_METRIC_KEY]: buildMetricValue({ current: 70, unit: "C" }),
             [GPU_USAGE_METRIC_KEY]: buildMetricValue({ current: 42, unit: "%" }),
         }),

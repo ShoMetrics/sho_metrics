@@ -1,18 +1,18 @@
 import { formatByteCount } from "./byte-format";
 import type { WidgetData } from "../view-rendering/widget-data";
 
-/** Builds GPU VRAM percentage data from used and total megabyte readings. */
-export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number): WidgetData {
-    const safeTotalMegabytes = totalMegabytes > 0 ? totalMegabytes : 1;
-    const usedAndTotalText = formatUsedAndTotalMegabytes(used.current, safeTotalMegabytes);
+/** Builds GPU VRAM percentage data from used and total byte readings. */
+export function buildGpuVramWidgetData(used: WidgetData, totalBytes: number): WidgetData {
+    const safeTotalBytes = totalBytes > 0 ? totalBytes : 1;
+    const usedAndTotalText = formatUsedAndTotalBytes(used.current, safeTotalBytes);
 
     return {
-        current: (used.current / safeTotalMegabytes) * 100,
-        progress: Math.min(Math.max(used.current / safeTotalMegabytes, 0), 1),
-        history: used.history.map((historyValue) => (historyValue / safeTotalMegabytes) * 100),
+        current: (used.current / safeTotalBytes) * 100,
+        progress: Math.min(Math.max(used.current / safeTotalBytes, 0), 1),
+        history: used.history.map((historyValue) => (historyValue / safeTotalBytes) * 100),
         unit: "%",
         label: "VRAM",
-        displayValue: ((used.current / safeTotalMegabytes) * 100).toFixed(0),
+        displayValue: ((used.current / safeTotalBytes) * 100).toFixed(0),
         secondaryDisplayValue: usedAndTotalText,
         sparklineScale: {
             mode: "fixed",
@@ -24,10 +24,8 @@ export function buildGpuVramWidgetData(used: WidgetData, totalMegabytes: number)
     };
 }
 
-function formatUsedAndTotalMegabytes(usedMegabytes: number, totalMegabytes: number): string {
+function formatUsedAndTotalBytes(usedBytes: number, totalBytes: number): string {
     const binaryBase = 1024;
-    const usedBytes = usedMegabytes * binaryBase * binaryBase;
-    const totalBytes = totalMegabytes * binaryBase * binaryBase;
     const formattedUsedBytes = formatByteCount({
         bytes: usedBytes,
         base: binaryBase,

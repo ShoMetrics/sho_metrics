@@ -43,7 +43,7 @@ test("percentage metric builders expose integer display values for compact widge
         {
             name: "GPU VRAM",
             widgetData: buildGpuVramWidgetData(
-                buildWidgetData({ current: 1, history: [0, 1], label: "VRAM", unit: "MB" }),
+                buildWidgetData({ current: 1, history: [0, 1], label: "VRAM", unit: "B" }),
                 100,
             ),
         },

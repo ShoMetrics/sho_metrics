@@ -234,7 +234,7 @@ export function buildGpuViewOptions(options: {
                 metrics: options.metrics,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 label: PROGRESS_CIRCLE_LABELS.vram,
-                unit: "MB",
+                unit: "B",
                 helperStatus: options.helperStatus,
                 sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
@@ -242,7 +242,7 @@ export function buildGpuViewOptions(options: {
                 metrics: options.metrics,
                 metricKey: GPU_VRAM_TOTAL_METRIC_KEY,
                 label: PROGRESS_CIRCLE_LABELS.vram,
-                unit: "MB",
+                unit: "B",
                 helperStatus: options.helperStatus,
                 sampleFreshnessBudgetMilliseconds: helperSampleFreshnessBudgetMilliseconds,
             });
