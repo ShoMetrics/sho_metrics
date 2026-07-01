@@ -22,4 +22,10 @@
 # Each release must define at least one product version. A release with neither
 # streamdeckPluginVersion nor windowsVersion is invalid because it would publish
 # an empty GitHub Release.
-releases: []
+releases:
+  - tag: v0.0.1
+    streamdeckPluginVersion: 0.0.1.0
+    windowsVersion: 0.0.1
+  - tag: v0.1.0
+    streamdeckPluginVersion: 0.1.0.0
+    windowsVersion: 0.1.0
