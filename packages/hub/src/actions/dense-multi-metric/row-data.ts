@@ -483,8 +483,8 @@ function buildGpuRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricSto
         case "vram":
             return {
                 ...buildGpuVramWidgetData(
-                    metrics.getWidgetData(GPU_VRAM_USED_METRIC_KEY, label, "MB"),
-                    metrics.getWidgetData(GPU_VRAM_TOTAL_METRIC_KEY, label, "MB").current,
+                    metrics.getWidgetData(GPU_VRAM_USED_METRIC_KEY, label, "B"),
+                    metrics.getWidgetData(GPU_VRAM_TOTAL_METRIC_KEY, label, "B").current,
                 ),
                 label,
             };

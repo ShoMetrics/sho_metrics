@@ -204,7 +204,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 metrics: options.metrics,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 label: resolveHardwareSummaryReadingLabel(options.reading.kind),
-                unit: "MB",
+                unit: "B",
                 helperStatus: options.helperStatus,
                 sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
@@ -212,7 +212,7 @@ function readGpuHardwareSummaryWidgetData(options: {
                 metrics: options.metrics,
                 metricKey: GPU_VRAM_TOTAL_METRIC_KEY,
                 label: resolveHardwareSummaryReadingLabel(options.reading.kind),
-                unit: "MB",
+                unit: "B",
                 helperStatus: options.helperStatus,
                 sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
