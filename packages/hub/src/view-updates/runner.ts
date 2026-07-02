@@ -31,6 +31,7 @@ import {
 import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color/color-compensation-filter";
 import { hasColorCompensationProfileEffect } from "../color-compensation/types";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import { observeProcessActivity, type ProcessResumeEvent } from "../shared/process-resume-detector";
 import {
     MetricImageDeliveryCoordinator,
     type MetricImageDeliveryPolicyResolver,
@@ -42,6 +43,8 @@ const log = logger.for("MetricViewUpdateRunner");
 const MAX_CONCURRENT_METRIC_VIEW_UPDATES = 1;
 const BURSTY_RENDER_LOG_THROTTLE_MILLISECONDS = resolveProductionLogThrottleMilliseconds(10000);
 const REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60000);
+const STALE_METRIC_TICK_RENDER_BASE_THRESHOLD_MILLISECONDS = 90_000;
+const STALE_METRIC_TICK_RENDER_INTERVAL_GRACE_MILLISECONDS = 5_000;
 
 interface MetricViewEvent {
     event: WillAppearEvent;
@@ -59,6 +62,8 @@ export interface MetricViewUpdateRunnerOptions {
     readonly imageDeliveryPolicyResolver?: MetricImageDeliveryPolicyResolver | undefined;
     readonly imageResendJitterWindowMilliseconds?: number | undefined;
     readonly imageResender?: MetricImageResender | undefined;
+    readonly wallClockNow?: (() => number) | undefined;
+    readonly observeProcessActivity?: ((owner: string, timestampMilliseconds: number) => ProcessResumeEvent | undefined) | undefined;
 }
 
 interface MetricViewActionState {
@@ -81,12 +86,16 @@ export class MetricViewUpdateRunner {
     private readonly metricViewActionQueue = new MetricViewUpdateQueue();
     private readonly maxConcurrentMetricViewUpdates: number;
     private readonly imageDeliveryCoordinator: MetricImageDeliveryCoordinator;
+    private readonly wallClockNow: () => number;
+    private readonly observeProcessActivity: (owner: string, timestampMilliseconds: number) => ProcessResumeEvent | undefined;
     private activeMetricViewUpdateCount = 0;
     private isMetricViewQueueDrainScheduled = false;
 
     constructor(options: MetricViewUpdateRunnerOptions = {}) {
         this.maxConcurrentMetricViewUpdates = options.maxConcurrentMetricViewUpdates
             ?? MAX_CONCURRENT_METRIC_VIEW_UPDATES;
+        this.wallClockNow = options.wallClockNow ?? wallClockNowMilliseconds;
+        this.observeProcessActivity = options.observeProcessActivity ?? observeProcessActivity;
         this.imageDeliveryCoordinator = new MetricImageDeliveryCoordinator({
             imageDeliveryPolicyResolver: options.imageDeliveryPolicyResolver,
             imageResender: options.imageResender,
@@ -98,6 +107,8 @@ export class MetricViewUpdateRunner {
         if (shouldSuppressMetricViewForColorCompensation(options.event.action.id)) {
             return;
         }
+
+        this.observeProcessActivity("metricViewUpdateRunner", this.wallClockNow());
 
         const metricViewActionState = this.getOrCreateMetricViewActionState(options.event.action.id);
 
@@ -156,7 +167,7 @@ export class MetricViewUpdateRunner {
         metricViewActionState.pendingSettingsSignature = null;
         this.activeMetricViewUpdateCount += 1;
 
-        const renderStartTimestampMilliseconds = wallClockNowMilliseconds();
+        const renderStartTimestampMilliseconds = this.wallClockNow();
         const frame = composeMetricViewFrame({
             viewOptions: options,
             renderTarget: options.event.action.isDial() ? "touch-strip" : "key",
@@ -209,7 +220,7 @@ export class MetricViewUpdateRunner {
             });
         }
 
-        const composeEndTimestampMilliseconds = wallClockNowMilliseconds();
+        const composeEndTimestampMilliseconds = this.wallClockNow();
 
         if (
             renderedSvgSignature === metricViewActionState.lastRenderedSvgSignature
@@ -220,7 +231,7 @@ export class MetricViewUpdateRunner {
                 `actionId=${options.event.action.id}`,
                 `metricKey=${options.metricKey}`,
                 `composeMs=${composeEndTimestampMilliseconds - renderStartTimestampMilliseconds}`,
-                `renderToSkipMs=${wallClockNowMilliseconds() - renderStartTimestampMilliseconds}`,
+                `renderToSkipMs=${this.wallClockNow() - renderStartTimestampMilliseconds}`,
             ].join(" "));
             recordMetricViewPerformanceSample({
                 event: options.event,
@@ -244,7 +255,7 @@ export class MetricViewUpdateRunner {
         const softwarePngDataUrl = rasterizeSvgToPngDataUrl(softwareSvg, renderPlan.pngSize);
 
         if (!softwarePngDataUrl) {
-            const rasterizeEndTimestampMilliseconds = wallClockNowMilliseconds();
+            const rasterizeEndTimestampMilliseconds = this.wallClockNow();
             logMetricViewRasterizeFailure({
                 actionId: options.event.action.id,
                 metricKey: options.metricKey,
@@ -277,7 +288,7 @@ export class MetricViewUpdateRunner {
         const hardwarePngDataUrl = hardwareSvg === softwareSvg
             ? softwarePngDataUrl
             : rasterizeSvgToPngDataUrl(hardwareSvg, renderPlan.pngSize);
-        const rasterizeEndTimestampMilliseconds = wallClockNowMilliseconds();
+        const rasterizeEndTimestampMilliseconds = this.wallClockNow();
 
         if (!hardwarePngDataUrl) {
             logMetricViewRasterizeFailure({
@@ -308,7 +319,7 @@ export class MetricViewUpdateRunner {
         }
 
         log.debug(() => {
-            const currentTimestampMilliseconds = wallClockNowMilliseconds();
+            const currentTimestampMilliseconds = this.wallClockNow();
             return [
                 "rendered",
                 `actionId=${options.event.action.id}`,
@@ -381,7 +392,7 @@ export class MetricViewUpdateRunner {
                     log.atInfo()
                         .everyMs("settings-view-update-done", BURSTY_RENDER_LOG_THROTTLE_MILLISECONDS)
                         .log(() => {
-                            const currentTimestampMilliseconds = wallClockNowMilliseconds();
+                            const currentTimestampMilliseconds = this.wallClockNow();
                             return [
                                 "settingsViewUpdateDone",
                                 `phase=${dispatchResult.donePhase}`,
@@ -398,7 +409,7 @@ export class MetricViewUpdateRunner {
                 }
 
                 log.debug(() => {
-                    const currentTimestampMilliseconds = wallClockNowMilliseconds();
+                    const currentTimestampMilliseconds = this.wallClockNow();
                     return [
                         dispatchResult.donePhase,
                         `actionId=${options.event.action.id}`,
@@ -450,7 +461,7 @@ export class MetricViewUpdateRunner {
         const settingsSignature = buildMetricViewSettingsSignature(options.resolvedSettings);
         const isSettingsChange = metricViewActionState.lastScheduledSettingsSignature !== null
             && metricViewActionState.lastScheduledSettingsSignature !== settingsSignature.signature;
-        const updateTimestampMilliseconds = wallClockNowMilliseconds();
+        const updateTimestampMilliseconds = this.wallClockNow();
 
         metricViewActionState.lastScheduledSettingsSignature = settingsSignature.signature;
 
@@ -532,6 +543,10 @@ export class MetricViewUpdateRunner {
                 continue;
             }
 
+            if (this.discardStaleQueuedMetricTick(metricViewActionState, this.wallClockNow())) {
+                continue;
+            }
+
             try {
                 this.runMetricViewUpdate(metricViewActionState, metricViewActionState.pendingOptions);
             } catch (error) {
@@ -564,6 +579,46 @@ export class MetricViewUpdateRunner {
         }
 
         this.scheduleMetricViewQueueDrain();
+    }
+
+    private discardStaleQueuedMetricTick(
+        metricViewActionState: MetricViewActionState,
+        currentTimestampMilliseconds: number,
+    ): boolean {
+        const updateTimestampMilliseconds = metricViewActionState.pendingUpdateTimestampMilliseconds;
+
+        if (
+            metricViewActionState.pendingUpdateReason !== "metric-tick"
+            || updateTimestampMilliseconds === null
+        ) {
+            return false;
+        }
+
+        const queuedMilliseconds = currentTimestampMilliseconds - updateTimestampMilliseconds;
+        const staleThresholdMilliseconds = resolveStaleMetricTickRenderThresholdMilliseconds(
+            metricViewActionState.pollingIntervalMilliseconds,
+        );
+
+        if (queuedMilliseconds < staleThresholdMilliseconds) {
+            return false;
+        }
+
+        log.atInfo()
+            .everyMs("stale-metric-tick-render-discarded", REPEATED_RENDER_FAILURE_LOG_THROTTLE_MILLISECONDS)
+            .log(() => [
+                "staleMetricTickRenderDiscarded",
+                `actionId=${metricViewActionState.actionId}`,
+                `queuedMs=${queuedMilliseconds}`,
+                `thresholdMs=${staleThresholdMilliseconds}`,
+                `pollingIntervalMs=${metricViewActionState.pollingIntervalMilliseconds}`,
+                `queueLength=${this.metricViewActionQueue.length}`,
+            ].join(" "));
+
+        metricViewActionState.pendingOptions = null;
+        metricViewActionState.pendingUpdateTimestampMilliseconds = null;
+        metricViewActionState.pendingUpdateReason = "metric-tick";
+        metricViewActionState.pendingSettingsSignature = null;
+        return true;
     }
 }
 
@@ -741,4 +796,11 @@ function formatElapsedMilliseconds(
     }
 
     return String(Math.max(0, endTimestampMilliseconds - startTimestampMilliseconds));
+}
+
+function resolveStaleMetricTickRenderThresholdMilliseconds(pollingIntervalMilliseconds: number): number {
+    return Math.max(
+        STALE_METRIC_TICK_RENDER_BASE_THRESHOLD_MILLISECONDS,
+        pollingIntervalMilliseconds + STALE_METRIC_TICK_RENDER_INTERVAL_GRACE_MILLISECONDS,
+    );
 }

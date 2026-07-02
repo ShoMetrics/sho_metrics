@@ -25,6 +25,7 @@ const REFRESH_DEMAND_SEND_WARNING_INTERVAL_MILLISECONDS = 30000;
 const DEMAND_RENEW_INTERVAL_MILLISECONDS = 8000;
 const DEMAND_RENEW_RETRY_DELAY_MILLISECONDS = 2000;
 const SUBSCRIBER_REFRESH_LOG_INTERVAL_MILLISECONDS = 5000;
+const ALL_RUNNER_REFRESH_LOG_INTERVAL_MILLISECONDS = 30000;
 const LHM_HARDWARE_POLLING_GROUP_PATTERN = /^lhm:hardware:\/([^/]+)/u;
 
 export type CollectorGroupBackoffPolicyFactory = (collectorGroup: PlannedCollectorGroup) => BackoffPolicy;
@@ -157,6 +158,47 @@ export class CollectorGroupSupervisor {
         return result;
     }
 
+    /**
+     * Requests an immediate pull for every live collector group.
+     *
+     * This is a process-lifecycle recovery hook. It does not re-plan groups;
+     * live runner ownership remains established by `reconcile()`.
+     */
+    async requestAllRefresh(reason: MetricCollectionRefreshReason): Promise<void> {
+        // Must run before the demand resend and runner reads below: the first
+        // post-resume failures would otherwise re-arm the very source cooldown
+        // this recovery pass exists to clear.
+        if (reason === "resumeRecovery") {
+            this.notifyWindowsHelperProcessResumed();
+        }
+
+        this.renewWindowsHelperRefreshDemand(reason);
+
+        const runners = [...this.runnersByCollectorGroupKey.values()];
+        const runnerResults = await Promise.all(
+            runners.map(runner => runner.requestOnDemandRefresh()),
+        );
+        const status = runners.length === 0 ? "skipped" : aggregateSubscriberRefreshStatus(runnerResults);
+
+        log.atInfo()
+            .everyMs(`all-runner-refresh:${reason}`, ALL_RUNNER_REFRESH_LOG_INTERVAL_MILLISECONDS)
+            .log(() => [
+                "allRunnerRefresh",
+                `reason=${reason}`,
+                `status=${status}`,
+                `runnerCount=${runners.length}`,
+            ].join(" "));
+    }
+
+    /**
+     * Only the Windows helper client keeps cross-request failure state worth
+     * clearing on resume today, so dispatch stays source-specific. Generalize
+     * to every live source client when a second implementer appears.
+     */
+    private notifyWindowsHelperProcessResumed(): void {
+        this.sourceRegistry.resolveSourceClient(WINDOWS_HELPER_SOURCE_ID)?.notifyProcessResumed?.();
+    }
+
     private startRunner(collectorGroup: PlannedCollectorGroup): void {
         const sourceClient = this.sourceRegistry.resolveSourceClient(collectorGroup.sourceId);
 
@@ -274,6 +316,25 @@ export class CollectorGroupSupervisor {
 
         this.shouldResendRefreshDemandAfterRecovery = false;
         this.lastAppliedWindowsHelperDemandFingerprint = undefined;
+        this.sendLatestWindowsHelperRefreshDemand();
+    }
+
+    private renewWindowsHelperRefreshDemand(reason: MetricCollectionRefreshReason): void {
+        if (this.latestWindowsHelperDemandGroups.length === 0) {
+            return;
+        }
+
+        this.clearRefreshDemandTimer();
+        this.lastAppliedWindowsHelperDemandFingerprint = undefined;
+        this.shouldResendRefreshDemandAfterRecovery = false;
+
+        log.debug(() => [
+            "windowsHelperRefreshDemandRenewed",
+            `reason=${reason}`,
+            `groupCount=${this.latestWindowsHelperDemandGroups.length}`,
+            `metricCount=${countRefreshDemandMetrics(this.latestWindowsHelperDemandGroups)}`,
+        ].join(" "));
+
         this.sendLatestWindowsHelperRefreshDemand();
     }
 

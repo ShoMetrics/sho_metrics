@@ -25,6 +25,11 @@ import {
 import { MetricStoreIngestDiagnostics } from "./metric-store-ingest-diagnostics";
 import type { SourceMetadataInvalidation } from "../sources/source-planning-metadata";
 import { monotonicNowMilliseconds } from "../../shared/clock";
+import {
+    subscribeProcessResume,
+    type ProcessResumeEvent,
+    type ProcessResumeListener,
+} from "../../shared/process-resume-detector";
 import type {
     MetricCollectionRefreshReason,
     MetricCollectionSubscriberRefreshResult,
@@ -40,6 +45,7 @@ interface BackgroundMetricCollectionOptions {
     readonly sourceMetadataRegistry: SourcePlanningMetadataRegistry;
     readonly sourceRegistry: SourceRegistry;
     readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
+    readonly subscribeProcessResume?: ((listener: ProcessResumeListener) => () => void) | undefined;
 }
 
 /**
@@ -57,6 +63,7 @@ export class BackgroundMetricCollection {
     private readonly sourceRegistry: SourceRegistry;
     private readonly metricStoreIngestDiagnostics: MetricStoreIngestDiagnostics;
     private readonly unsubscribeSourceMetadataInvalidations: () => void;
+    private readonly unsubscribeProcessResume: () => void;
 
     constructor(options: BackgroundMetricCollectionOptions) {
         this.subscriptionRegistry = options.subscriptionRegistry;
@@ -70,6 +77,9 @@ export class BackgroundMetricCollection {
                 this.notifySourceMetadataChanged(invalidation);
             },
         );
+        this.unsubscribeProcessResume = (options.subscribeProcessResume ?? subscribeProcessResume)(event => {
+            this.requestResumeRecoveryRefresh(event);
+        });
     }
 
     /**
@@ -190,6 +200,7 @@ export class BackgroundMetricCollection {
 
     /** Stops background loops and releases source resources owned by this root. */
     dispose(): void {
+        this.unsubscribeProcessResume();
         this.unsubscribeSourceMetadataInvalidations();
         this.collectorGroupSupervisor.stopAll();
         this.sourceRegistry.dispose();
@@ -206,6 +217,23 @@ export class BackgroundMetricCollection {
         ].join(" "));
 
         this.collectorGroupSupervisor.reconcile(collectorGroups);
+    }
+
+    private requestResumeRecoveryRefresh(event: ProcessResumeEvent): void {
+        log.info(() => [
+            "resumeRecoveryRefreshRequested",
+            `owner=${event.owner}`,
+            `gapMs=${event.gapMilliseconds}`,
+        ].join(" "));
+
+        this.collectorGroupSupervisor.requestAllRefresh("resumeRecovery").catch(error => {
+            log.warn(() => [
+                "resumeRecoveryRefreshFailed",
+                `owner=${event.owner}`,
+                `gapMs=${event.gapMilliseconds}`,
+                `error=${String(error)}`,
+            ].join(" "));
+        });
     }
 
     private async refreshSourceCandidateOnce(

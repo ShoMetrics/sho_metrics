@@ -70,6 +70,7 @@ export interface MetricViewPerformanceSummary {
 const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_QUEUED_MILLISECONDS = 500;
 const METRIC_VIEW_PERFORMANCE_WARNING_AVERAGE_QUEUED_MILLISECONDS = 250;
 const METRIC_VIEW_PERFORMANCE_WARNING_MAXIMUM_TOTAL_MILLISECONDS = 1000;
+const METRIC_VIEW_PERFORMANCE_TIME_JUMP_RESET_THRESHOLD_MILLISECONDS = 90_000;
 
 interface MetricViewPerformanceWindow {
     startTimestampMilliseconds: number;
@@ -102,14 +103,21 @@ interface MetricViewPerformanceWindow {
 export class MetricViewPerformanceStats {
     private performanceWindow: MetricViewPerformanceWindow | null = null;
 
-    constructor(private readonly summaryIntervalMilliseconds = 5000) {}
+    constructor(
+        private readonly summaryIntervalMilliseconds = 5000,
+        private readonly timeJumpResetThresholdMilliseconds = METRIC_VIEW_PERFORMANCE_TIME_JUMP_RESET_THRESHOLD_MILLISECONDS,
+    ) {}
 
     record(
         sample: MetricViewPerformanceSample,
         timestampMilliseconds = wallClockNowMilliseconds(),
     ): MetricViewPerformanceSummary | null {
-        const performanceWindow = this.performanceWindow
+        let performanceWindow = this.performanceWindow
             ?? createMetricViewPerformanceWindow(timestampMilliseconds);
+
+        if (timestampMilliseconds - performanceWindow.startTimestampMilliseconds >= this.timeJumpResetThresholdMilliseconds) {
+            performanceWindow = createMetricViewPerformanceWindow(timestampMilliseconds);
+        }
 
         this.performanceWindow = performanceWindow;
         addMetricViewPerformanceSample(performanceWindow, sample);

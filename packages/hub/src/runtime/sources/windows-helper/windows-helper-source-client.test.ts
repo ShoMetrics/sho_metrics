@@ -41,6 +41,8 @@ import {
 import type { SourceMetadataInvalidation } from "../source-planning-metadata";
 import {
     ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
+    ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS,
+    HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS,
     HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
     UNSUPPORTED_PROTOCOL_RETRY_COOLDOWN_MILLISECONDS,
@@ -1070,6 +1072,118 @@ test("windows helper source client cools down unavailable helper retries", async
         /pipe unavailable/u,
     );
     assert.equal(transport.requestCount, 2);
+});
+
+test("windows helper source client clears transient unavailable cooldown after process resume", async () => {
+    const nowMilliseconds = 1000;
+    let healthRequestCount = 0;
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                healthRequestCount += 1;
+                if (healthRequestCount === 1) {
+                    throw createNodeError("ECONNRESET", "connection reset");
+                }
+                return buildHealthResponse();
+            case "readMetricSnapshot":
+                return buildSnapshotResponse();
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /still inside retry cooldown/u,
+    );
+    assert.equal(transport.requests.length, 1);
+
+    client.notifyProcessResumed();
+    const readResult = await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(readResult.snapshot.metrics["cpu.usage_percent"]?.value.value, 42);
+    assert.deepEqual(
+        transport.requests.map(request => request.method),
+        ["getSourceHealth", "getSourceHealth", "readMetricSnapshot"],
+    );
+    assert.equal(client.getCachedStatus().retryAfterTimestampMilliseconds, undefined);
+});
+
+test("windows helper source client keeps resume recovery failures on the first cooldown rung", async () => {
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ECONNRESET", "connection reset"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+    });
+
+    client.notifyProcessResumed();
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+    assert.equal(transport.requestCount, 2);
+
+    nowMilliseconds += HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+});
+
+test("windows helper source client keeps pipe-missing retries fast during resume recovery grace", async () => {
+    let nowMilliseconds = 1000;
+    const pipeMissingError = createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
+    const transport = new RejectingTransport(pipeMissingError);
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+    });
+
+    client.notifyProcessResumed();
+    nowMilliseconds += ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS + 10000;
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /pipe not found/u,
+    );
+
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
+    );
 });
 
 test("windows helper source client uses active fast retry when the pipe is missing", async () => {

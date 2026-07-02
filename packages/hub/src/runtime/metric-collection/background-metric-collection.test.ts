@@ -12,6 +12,7 @@ import type { SourceMetadataInvalidation, SourceMetadataInvalidationListener } f
 import { buildMetricSnapshot, buildScalarMetricValue } from "../sources/metric-source";
 import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 import { BackoffPolicy } from "../sources/backoff-policy";
+import type { ProcessResumeEvent, ProcessResumeListener } from "../../shared/process-resume-detector";
 import { BackgroundMetricCollection } from "./background-metric-collection";
 import { CollectorGroupPlanner } from "./collector-group-planner";
 import { CollectorGroupSupervisor } from "./collector-group-supervisor";
@@ -37,6 +38,7 @@ type BuildBackgroundMetricCollectionOptions =
     ) & {
         readonly timer?: FakeTimer;
         readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
+        readonly subscribeProcessResume?: ((listener: ProcessResumeListener) => () => void) | undefined;
     };
 
 test("source metadata invalidation increments planning version only when fingerprint changes", () => {
@@ -400,15 +402,47 @@ test("requestSubscriberRefresh delegates subscriber id and reason to collector s
         collectorGroupSupervisor,
         sourceMetadataRegistry: new SourcePlanningMetadataRegistry(),
         sourceRegistry,
+        subscribeProcessResume: () => () => undefined,
     });
 
-    const result = await collection.requestSubscriberRefresh("action-1", "sourceNotification");
+    try {
+        const result = await collection.requestSubscriberRefresh("action-1", "sourceNotification");
 
-    assert.deepEqual(result, { status: "partial" });
-    assert.deepEqual(collectorGroupSupervisor.requests, [{
-        subscriberId: "action-1",
-        reason: "sourceNotification",
-    }]);
+        assert.deepEqual(result, { status: "partial" });
+        assert.deepEqual(collectorGroupSupervisor.requests, [{
+            subscriberId: "action-1",
+            reason: "sourceNotification",
+        }]);
+    } finally {
+        collection.dispose();
+    }
+});
+
+test("process resume events request collection recovery refresh", async () => {
+    let resumeListener: ProcessResumeListener | undefined;
+    const sourceRegistry = new FakeSourceRegistry([]);
+    const collectorGroupSupervisor = new RecordingCollectorGroupSupervisor({ status: "partial" });
+    const collection = new BackgroundMetricCollection({
+        subscriptionRegistry: new MetricSubscriptionRegistry(),
+        collectorGroupPlanner: new CollectorGroupPlanner(sourceRegistry),
+        collectorGroupSupervisor,
+        sourceMetadataRegistry: new SourcePlanningMetadataRegistry(),
+        sourceRegistry,
+        subscribeProcessResume: listener => {
+            resumeListener = listener;
+
+            return () => {
+                resumeListener = undefined;
+            };
+        },
+    });
+
+    resumeListener?.(buildProcessResumeEvent());
+    await Promise.resolve();
+
+    assert.deepEqual(collectorGroupSupervisor.allRefreshReasons, ["resumeRecovery"]);
+    collection.dispose();
+    assert.equal(resumeListener, undefined);
 });
 
 test("readSourceMetricDescriptors does not register collection or read snapshots", async () => {
@@ -458,6 +492,7 @@ function buildBackgroundMetricCollection(
         sourceMetadataRegistry: new SourcePlanningMetadataRegistry(),
         sourceRegistry,
         metricStoreIngestDiagnostics: options?.metricStoreIngestDiagnostics,
+        subscribeProcessResume: options?.subscribeProcessResume ?? (() => () => undefined),
     });
 }
 
@@ -586,6 +621,7 @@ class RecordingCollectorGroupSupervisor extends CollectorGroupSupervisor {
         readonly subscriberId: string;
         readonly reason: MetricCollectionRefreshReason;
     }[] = [];
+    readonly allRefreshReasons: MetricCollectionRefreshReason[] = [];
 
     constructor(private readonly result: MetricCollectionSubscriberRefreshResult) {
         super({
@@ -602,6 +638,10 @@ class RecordingCollectorGroupSupervisor extends CollectorGroupSupervisor {
     ): Promise<MetricCollectionSubscriberRefreshResult> {
         this.requests.push({ subscriberId, reason });
         return this.result;
+    }
+
+    override async requestAllRefresh(reason: MetricCollectionRefreshReason): Promise<void> {
+        this.allRefreshReasons.push(reason);
     }
 }
 
@@ -637,4 +677,13 @@ class FakeTimer {
 interface FakeTimerHandle {
     active: boolean;
     callback(): void;
+}
+
+function buildProcessResumeEvent(): ProcessResumeEvent {
+    return {
+        owner: "test",
+        gapMilliseconds: 120_000,
+        observedAtTimestampMilliseconds: 121_000,
+        previousObservedAtTimestampMilliseconds: 1_000,
+    };
 }

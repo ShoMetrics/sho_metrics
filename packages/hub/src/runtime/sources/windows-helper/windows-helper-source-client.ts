@@ -89,6 +89,9 @@ export const ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS = 60000;
 /** Retry cooldowns for transient helper failures, indexed by consecutive failure count. */
 export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000] as const;
 
+/** Window after process resume where transient helper failures stay on the first retry rung. */
+export const HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS = 90000;
+
 const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
@@ -177,6 +180,7 @@ export class WindowsHelperSourceClient implements SourceClient {
     private unsupportedProtocolRetryAfterMonotonicMilliseconds = 0;
     private helperUnavailableRetryAfterMonotonicMilliseconds = 0;
     private helperUnavailableFailureCount = 0;
+    private helperResumeRecoveryGraceEndsAtMonotonicMilliseconds = 0;
     private activeHelperDemandStartedAtMonotonicMilliseconds: number | undefined;
     private serviceStatusProbePromise: Promise<void> | undefined;
     private serviceStatusCacheExpiresAtMonotonicMilliseconds = 0;
@@ -620,6 +624,19 @@ export class WindowsHelperSourceClient implements SourceClient {
         return { ...this.status };
     }
 
+    notifyProcessResumed(): void {
+        const nowMilliseconds = this.monotonicNow();
+        this.helperUnavailableRetryAfterMonotonicMilliseconds = 0;
+        this.helperUnavailableFailureCount = 0;
+        this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds =
+            nowMilliseconds + HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS;
+        // The cached service status may predate the suspend; re-probe so
+        // pipe-missing failures classify against the current service state.
+        this.serviceStatusCacheExpiresAtMonotonicMilliseconds = 0;
+        this.refreshCachedServiceStatus();
+        this.clearUnavailableRetryAfterStatus();
+    }
+
     private async ensureProtocolSupported(): Promise<void> {
         const nowMilliseconds = this.monotonicNow();
 
@@ -745,6 +762,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.unsupportedProtocolRetryAfterMonotonicMilliseconds = 0;
         this.helperUnavailableRetryAfterMonotonicMilliseconds = 0;
         this.helperUnavailableFailureCount = 0;
+        this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds = 0;
         this.activeHelperDemandStartedAtMonotonicMilliseconds = undefined;
         this.cachedServiceStatus = "running";
         this.serviceStatusCacheExpiresAtMonotonicMilliseconds = this.monotonicNow()
@@ -770,8 +788,11 @@ export class WindowsHelperSourceClient implements SourceClient {
         const activeWindowStartedAt = this.activeHelperDemandStartedAtMonotonicMilliseconds;
 
         if (
-            activeWindowStartedAt !== undefined
-            && nowMilliseconds - activeWindowStartedAt < ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS
+            nowMilliseconds < this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds
+            || (
+                activeWindowStartedAt !== undefined
+                && nowMilliseconds - activeWindowStartedAt < ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS
+            )
         ) {
             return ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS;
         }
@@ -827,9 +848,33 @@ export class WindowsHelperSourceClient implements SourceClient {
     }
 
     private nextUnavailableRetryCooldownMilliseconds(): number {
+        // Failures inside the resume grace stay on the first rung and are not
+        // counted, so the reconnect burst right after resume cannot escalate
+        // the ladder to its longest cooldown while the helper is still waking.
+        if (this.monotonicNow() < this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds) {
+            return HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[0];
+        }
+
         this.helperUnavailableFailureCount += 1;
 
         return selectHelperUnavailableRetryCooldownMilliseconds(this.helperUnavailableFailureCount);
+    }
+
+    /**
+     * Removes the retry-after hint from the surfaced status after resume.
+     *
+     * The state deliberately stays "unavailable": resume does not prove the
+     * helper is back, it only invalidates the pre-suspend cooldown deadline
+     * that status consumers would otherwise keep displaying.
+     */
+    private clearUnavailableRetryAfterStatus(): void {
+        if (this.status.state !== "unavailable" || this.status.retryAfterTimestampMilliseconds === undefined) {
+            return;
+        }
+
+        const statusWithoutRetryAfter = { ...this.status };
+        delete statusWithoutRetryAfter.retryAfterTimestampMilliseconds;
+        this.status = statusWithoutRetryAfter;
     }
 
     private publishSourceMetadataInvalidation(reason: SourceMetadataInvalidationReason): void {

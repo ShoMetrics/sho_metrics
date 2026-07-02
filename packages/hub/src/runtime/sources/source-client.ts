@@ -235,6 +235,15 @@ export interface SourceClient extends SourceMetricPollingGroupResolver {
     getCachedStatus?(): SourceClientStatus;
 
     /**
+     * Notifies the source client that the plugin process resumed after a long wall-clock gap.
+     *
+     * Implementations may clear transient connection cooldowns whose evidence
+     * is no longer reliable after sleep/resume. Permanent compatibility state,
+     * such as protocol mismatch, must remain source-owned and unchanged.
+     */
+    notifyProcessResumed?(): void;
+
+    /**
      * Subscribes to complete source planning metadata changes.
      *
      * Source clients must call the listener only after descriptor, capability,

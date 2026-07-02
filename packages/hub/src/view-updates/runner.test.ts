@@ -61,6 +61,48 @@ test("clearing queued state before the drain prevents dispatch", async () => {
     assert.deepEqual(action.calls, []);
 });
 
+test("stale queued metric ticks are discarded after a wall-clock gap", async () => {
+    let currentTimestampMilliseconds = 1_000;
+    const action = new FakeKeyAction("stale-metric-tick-action");
+    const runner = new MetricViewUpdateRunner({
+        wallClockNow: () => currentTimestampMilliseconds,
+        observeProcessActivity: () => undefined,
+    });
+
+    runner.setMetricView(buildMetricViewOptions(action));
+    currentTimestampMilliseconds = 101_000;
+    await waitForScheduledWork();
+
+    assert.deepEqual(action.calls, []);
+});
+
+test("stale queued settings changes still render after a wall-clock gap", async () => {
+    let currentTimestampMilliseconds = 1_000;
+    const action = new FakeKeyAction("stale-settings-change-action");
+    const runner = new MetricViewUpdateRunner({
+        wallClockNow: () => currentTimestampMilliseconds,
+        observeProcessActivity: () => undefined,
+    });
+
+    try {
+        runner.setMetricView(buildMetricViewOptions(action, {
+            appearanceOverride: { view: { selectedView: "circle" } },
+        }));
+        await waitForImageCallCount(action, 1);
+
+        currentTimestampMilliseconds = 10_000;
+        runner.setMetricView(buildMetricViewOptions(action, {
+            appearanceOverride: { view: { selectedView: "bar" } },
+        }));
+        currentTimestampMilliseconds = 110_000;
+        await waitForImageCallCount(action, 2);
+
+        assert.equal(action.imageDataUrlList.length, 2);
+    } finally {
+        runner.clearMetricViewState(action.id);
+    }
+});
+
 test("updates submitted during an in-flight render are rendered after the first dispatch settles", async () => {
     const firstDispatch = createDeferred<void>();
     const firstAction = new FakeKeyAction("in-flight-action", firstDispatch.promise);

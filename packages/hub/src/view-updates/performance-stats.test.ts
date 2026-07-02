@@ -113,6 +113,96 @@ test("metric view performance summary is log-friendly", () => {
     );
 });
 
+test("metric view performance stats starts a new window after a wall-clock jump", () => {
+    const stats = new MetricViewPerformanceStats(5000, 90_000);
+    const renderContext = buildRenderContext();
+
+    assert.equal(stats.record({
+        requestReason: "metric-tick",
+        actionKind: "key",
+        outcome: "rendered",
+        renderContext,
+        queuedMilliseconds: 21_000_000,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 21_000_008,
+        queueLength: 8,
+        activeActionCount: 4,
+        titleClearRequested: false,
+    }, 1_000), null);
+
+    const summary = stats.record({
+        requestReason: "metric-tick",
+        actionKind: "key",
+        outcome: "rendered",
+        renderContext,
+        queuedMilliseconds: 3,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 11,
+        queueLength: 1,
+        activeActionCount: 1,
+        titleClearRequested: false,
+    }, 91_000);
+
+    assert.equal(summary, null);
+});
+
+test("metric view performance stats summarizes normally after a wall-clock jump reset", () => {
+    const stats = new MetricViewPerformanceStats(5000, 90_000);
+    const renderContext = buildRenderContext();
+
+    stats.record({
+        requestReason: "metric-tick",
+        actionKind: "key",
+        outcome: "rendered",
+        renderContext,
+        queuedMilliseconds: 21_000_000,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 21_000_008,
+        queueLength: 8,
+        activeActionCount: 4,
+        titleClearRequested: false,
+    }, 1_000);
+    stats.record({
+        requestReason: "metric-tick",
+        actionKind: "key",
+        outcome: "rendered",
+        renderContext,
+        queuedMilliseconds: 3,
+        composeMilliseconds: 2,
+        rasterizeMilliseconds: 5,
+        sdkPromiseMilliseconds: 1,
+        totalMilliseconds: 11,
+        queueLength: 1,
+        activeActionCount: 1,
+        titleClearRequested: false,
+    }, 91_000);
+    const summary = stats.record({
+        requestReason: "metric-tick",
+        actionKind: "key",
+        outcome: "rendered",
+        renderContext,
+        queuedMilliseconds: 4,
+        composeMilliseconds: 3,
+        rasterizeMilliseconds: 6,
+        sdkPromiseMilliseconds: 2,
+        totalMilliseconds: 15,
+        queueLength: 2,
+        activeActionCount: 1,
+        titleClearRequested: false,
+    }, 96_000);
+
+    assert.ok(summary);
+    assert.equal(summary.windowMilliseconds, 5_000);
+    assert.equal(summary.requestCount, 2);
+    assert.equal(summary.queuedDuration.maximumMilliseconds, 4);
+});
+
 test("metric view performance summary warns only on degraded view update windows", () => {
     const fastSummary = new MetricViewPerformanceStats(0).record({
         requestReason: "metric-tick",

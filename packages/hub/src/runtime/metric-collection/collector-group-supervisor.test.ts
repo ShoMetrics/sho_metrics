@@ -230,6 +230,67 @@ test("requestSubscriberRefresh refreshes every runner that backs the subscriber"
     ]);
 });
 
+test("requestAllRefresh refreshes every live runner", async () => {
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        buildSnapshot(1000, { "gpu.usage_percent": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: new FakeTimer(),
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+        }),
+        buildCollectorGroup({
+            pollingGroupId: "gpu",
+            metricKeys: ["gpu.usage_percent"],
+        }),
+    ]);
+    await supervisor.requestAllRefresh("resumeRecovery");
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["gpu.usage_percent"],
+    ]);
+});
+
+test("requestAllRefresh notifies the Windows helper source before resume recovery reads", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    sourceClient.clearOperations();
+
+    await supervisor.requestAllRefresh("resumeRecovery");
+
+    assert.deepEqual(sourceClient.operations, [
+        "notifyProcessResumed",
+        "setMetricRefreshDemand",
+        "readSnapshot",
+    ]);
+});
+
 test("requestSubscriberRefresh ignores runners for other subscribers", async () => {
     const sourceClient = new FakeSourceClient("node-system", [
         buildSnapshot(1000, { "cpu.usage_percent": 42 }),
@@ -574,6 +635,33 @@ test("Windows helper refresh demand renews while unchanged demand stays active",
     assert.deepEqual(sourceClient.refreshDemandGroups[1], sourceClient.refreshDemandGroups[0]);
 });
 
+test("requestAllRefresh renews Windows helper refresh demand immediately", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
+        buildSnapshot(1000, { "cpu.temperature": 55 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            sourceId: WINDOWS_HELPER_SOURCE_ID,
+            pollingGroupId: "lhm:hardware:cpu",
+            metricKeys: ["cpu.temperature"],
+        }),
+    ]);
+    await fakeTimer.drainMicrotasks();
+    await supervisor.requestAllRefresh("resumeRecovery");
+    await fakeTimer.drainMicrotasks();
+
+    assert.equal(sourceClient.refreshDemandGroups.length, 2);
+    assert.deepEqual(sourceClient.refreshDemandGroups[1], sourceClient.refreshDemandGroups[0]);
+});
+
 test("failed Windows helper refresh demand renewal schedules a retry", async () => {
     const fakeTimer = new FakeTimer();
     const sourceClient = new FakeSourceClient(WINDOWS_HELPER_SOURCE_ID, [
@@ -744,6 +832,7 @@ class FakeSourceRegistry {
 class FakeSourceClient implements SourceClient {
     readonly requestedMetricKeys: string[][] = [];
     readonly refreshDemandGroups: SourceRefreshDemandGroup[][] = [];
+    readonly operations: string[] = [];
     private readonly refreshDemandFailures: unknown[] = [];
     private responseIndex = 0;
 
@@ -753,6 +842,7 @@ class FakeSourceClient implements SourceClient {
     ) {}
 
     async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
+        this.operations.push("readSnapshot");
         this.requestedMetricKeys.push([...metricKeys]);
         const response = this.responses[this.responseIndex];
         this.responseIndex += 1;
@@ -773,6 +863,7 @@ class FakeSourceClient implements SourceClient {
     }
 
     async setMetricRefreshDemand(groups: readonly SourceRefreshDemandGroup[]): Promise<void> {
+        this.operations.push("setMetricRefreshDemand");
         this.refreshDemandGroups.push(groups.map(group => ({
             pollingGroupId: group.pollingGroupId,
             metricKeys: [...group.metricKeys],
@@ -787,6 +878,14 @@ class FakeSourceClient implements SourceClient {
 
     queueRefreshDemandFailure(error: unknown): void {
         this.refreshDemandFailures.push(error);
+    }
+
+    notifyProcessResumed(): void {
+        this.operations.push("notifyProcessResumed");
+    }
+
+    clearOperations(): void {
+        this.operations.splice(0);
     }
 
     resolveMetricPollingGroups(

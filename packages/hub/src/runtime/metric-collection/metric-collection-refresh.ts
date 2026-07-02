@@ -14,7 +14,15 @@ export type MetricCollectionRefreshReason =
      * This is intentionally still a pull trigger, not a source-push result
      * path.
      */
-    | "sourceNotification";
+    | "sourceNotification"
+
+    /**
+     * A large process wall-clock gap was observed after sleep/resume.
+     *
+     * This refreshes live collectors without making source adapters branch on
+     * platform-specific resume causes.
+     */
+    | "resumeRecovery";
 
 /**
  * Subscriber-level result returned after fan-out across live collector groups.
