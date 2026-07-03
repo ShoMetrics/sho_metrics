@@ -30,7 +30,6 @@ internal sealed class LibreHardwareSnapshotReader
         CancellationToken cancellationToken)
     {
         long currentTimestamp = _timeProvider.GetTimestamp();
-        DateTimeOffset capturedAt = _timeProvider.GetUtcNow();
         Dictionary<string, MetricReading> readingsByMetricId = new(StringComparer.Ordinal);
         Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId = new(StringComparer.Ordinal);
         Dictionary<string, List<RankedMetricReading>> rankedCandidatesByMetricId = new(StringComparer.Ordinal);
@@ -51,7 +50,6 @@ internal sealed class LibreHardwareSnapshotReader
                 rankedCandidatesByMetricId,
                 cpuPollingGroupIds,
                 gpuPollingGroupIds,
-                capturedAt,
                 retentionRead,
                 hardwareUpdates,
                 touchedPollingGroups,
@@ -104,6 +102,7 @@ internal sealed class LibreHardwareSnapshotReader
                 unavailableReportsByMetricId);
         }
         AddMemoryDerivedReadings(readingsByMetricId);
+        DateTimeOffset capturedAt = _timeProvider.GetUtcNow();
 
         return new LibreHardwareSnapshotReadResult
         {
@@ -126,7 +125,6 @@ internal sealed class LibreHardwareSnapshotReader
         Dictionary<string, List<RankedMetricReading>> rankedCandidatesByMetricId,
         List<string> cpuPollingGroupIds,
         List<string> gpuPollingGroupIds,
-        DateTimeOffset capturedAt,
         HardwareMetricRetentionCache.ReadScope retentionRead,
         List<HardwareRefreshDiagnostic> hardwareUpdates,
         List<TouchedPollingGroup> touchedPollingGroups,
@@ -209,7 +207,7 @@ internal sealed class LibreHardwareSnapshotReader
         {
             PollingGroupId = pollingGroupId,
             Warnings = hardwareWarnings,
-            CapturedAt = capturedAt,
+            CapturedAt = _timeProvider.GetUtcNow(),
         });
 
         if (updateError is not null)
@@ -226,7 +224,6 @@ internal sealed class LibreHardwareSnapshotReader
                 rankedCandidatesByMetricId,
                 cpuPollingGroupIds,
                 gpuPollingGroupIds,
-                capturedAt,
                 retentionRead,
                 hardwareUpdates,
                 touchedPollingGroups,

@@ -12,6 +12,8 @@ internal sealed class WindowsGrpcMetricSourceService(
     ILogger<WindowsGrpcMetricSourceService> logger) : MetricSourceService.MetricSourceServiceBase
 {
     private static readonly TimeSpan SlowUnaryDebugThreshold = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan SlowSnapshotWarningThreshold = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan StaleSnapshotWarningThreshold = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan UnaryLogThrottleInterval = TimeSpan.FromSeconds(30);
 
     public override Task<GetSourceHealthResponse> GetSourceHealth(
@@ -78,7 +80,9 @@ internal sealed class WindowsGrpcMetricSourceService(
             }
 
             TResponse response = await operation(context.CancellationToken).ConfigureAwait(false);
-            LogSlowUnaryCompleted(methodName, Stopwatch.GetElapsedTime(requestStartedTimestamp));
+            TimeSpan duration = Stopwatch.GetElapsedTime(requestStartedTimestamp);
+            LogSlowUnaryCompleted(methodName, duration);
+            LogSnapshotReadCompleted(methodName, response, duration);
             return response;
         }
         catch (SourceRequestException exception)
@@ -127,6 +131,39 @@ internal sealed class WindowsGrpcMetricSourceService(
                 "gRPC source request completed slowly. methodName={MethodName} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
                 methodName,
                 duration.TotalMilliseconds,
+                context.SuppressedCount));
+    }
+
+    private void LogSnapshotReadCompleted<TResponse>(
+        string methodName,
+        TResponse response,
+        TimeSpan duration)
+    {
+        if (methodName != nameof(ReadMetricSnapshot) || response is not ReadMetricSnapshotResponse readResponse)
+        {
+            return;
+        }
+
+        TimeSpan? snapshotAge = readResponse.Snapshot?.CapturedAt is { } capturedAt
+            ? DateTimeOffset.UtcNow - new DateTimeOffset(capturedAt.ToDateTime())
+            : null;
+
+        bool isSlow = duration >= SlowSnapshotWarningThreshold;
+        bool isStale = snapshotAge >= StaleSnapshotWarningThreshold;
+        if (!isSlow && !isStale)
+        {
+            return;
+        }
+
+        logger.AtWarning()
+            .EveryBucket("grpc-read-snapshot-slow-or-stale", UnaryLogThrottleInterval)
+            .Log(context => ThrottledLogEntry.Create(
+                "gRPC ReadMetricSnapshot returned slow or stale data. durationMs={DurationMs} snapshotAgeMs={SnapshotAgeMs} metricCount={MetricCount} unavailableMetricCount={UnavailableMetricCount} warningCount={WarningCount} suppressedLogCount={SuppressedLogCount}",
+                duration.TotalMilliseconds,
+                snapshotAge?.TotalMilliseconds,
+                readResponse.Snapshot?.Metrics.Count ?? 0,
+                readResponse.UnavailableMetrics.Count,
+                readResponse.Warnings.Count,
                 context.SuppressedCount));
     }
 

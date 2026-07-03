@@ -284,7 +284,7 @@ internal static class WindowsSourceServiceHost
                 fileSizeLimitBytes: LogFileSizeLimitBytes,
                 retainedFileCountLimit: RetainedLogFileCountLimit)
             .WriteTo.Console()
-            .CreateLogger();
+            .CreateBootstrapLogger();
     }
 
     private static void ConfigureSerilog(LoggerConfiguration loggerConfiguration, ServiceExecutableMode mode)

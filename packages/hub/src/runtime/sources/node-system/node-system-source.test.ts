@@ -140,6 +140,49 @@ test("node system source declares unsupported helper-only and macOS GPU metrics"
     });
 });
 
+test("node system source timestamps single polling group snapshots after the group finishes", async () => {
+    const callCounts = buildCallCounts();
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        wallClockNow: () => currentTimestampMilliseconds,
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                currentTimestampMilliseconds = 4000;
+                return { used: 1, total: 2 } as Systeminformation.MemData;
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+
+    assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(snapshot), 4000);
+});
+
+test("node system source does not false-fresh mixed polling group snapshots", async () => {
+    const callCounts = buildCallCounts();
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        wallClockNow: () => currentTimestampMilliseconds,
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            currentLoad: async () => {
+                callCounts.currentLoad += 1;
+                currentTimestampMilliseconds = 2000;
+                return { currentLoad: 10 } as Systeminformation.CurrentLoadData;
+            },
+            mem: async () => {
+                callCounts.mem += 1;
+                currentTimestampMilliseconds = 4000;
+                return { used: 1, total: 2 } as Systeminformation.MemData;
+            },
+        }),
+    });
+
+    const snapshot = await source.pollMetrics(["cpu.usage_percent", "ram.used"]);
+
+    assert.equal(readRequiredMetricSnapshotTimestampMilliseconds(snapshot), 1000);
+});
+
 test("node system source declares system battery unsupported outside Windows and macOS", () => {
     const source = new NodeSystemSource({ platform: "linux" });
 

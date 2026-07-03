@@ -1,4 +1,5 @@
 import { logger } from "../../../logging/logger";
+import { formatMetricKeyFieldsForLog } from "../../../logging/log-format";
 import { pluginGlobalSettingsStore } from "../../../settings/global-settings-store";
 import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";
 import { monotonicNowMilliseconds, wallClockNowMilliseconds } from "../../../shared/clock";
@@ -127,6 +128,7 @@ export class VendorHidBatterySourceClient implements SourceClient {
     private status: SourceClientStatus = { state: "unknown" };
     private deferredFullDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
     private deferredFullDiscoveryPromise: Promise<void> | undefined;
+    private lastReadSnapshotStartedAtMonotonicMilliseconds: number | undefined;
 
     constructor(options: VendorHidBatterySourceClientOptions = {}) {
         this.loadNativeHid = options.loadNativeHid ?? loadNativeHidModule;
@@ -159,11 +161,20 @@ export class VendorHidBatterySourceClient implements SourceClient {
 
     async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
         const startedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const previousReadStartedAtMonotonicMilliseconds = this.lastReadSnapshotStartedAtMonotonicMilliseconds;
+        this.lastReadSnapshotStartedAtMonotonicMilliseconds = startedAtMonotonicMilliseconds;
         const snapshotTimestampMilliseconds = this.wallClockNow();
         const requestedMetricKeys = metricKeys.filter(isVendorHidBatteryMetricKey);
         if (requestedMetricKeys.length === 0) {
             return buildSourceSnapshotReadResult(snapshotTimestampMilliseconds, {}, [], []);
         }
+
+        logVendorHidReadRequestDiagnostic({
+            requestedMetricKeys,
+            sincePreviousReadMilliseconds: previousReadStartedAtMonotonicMilliseconds === undefined
+                ? undefined
+                : startedAtMonotonicMilliseconds - previousReadStartedAtMonotonicMilliseconds,
+        });
 
         if (!this.isExperimentalVendorHidEnabled()) {
             this.status = { state: "unsupported" };
@@ -975,6 +986,22 @@ function logVendorHidSelectedDescriptorMiss(
             `requestedMetrics=${requestedMetricCount}`,
             `descriptors=${descriptorCount}`,
             "fallback=selectedRoute",
+        ].join(" "));
+}
+
+function logVendorHidReadRequestDiagnostic(options: {
+    readonly requestedMetricKeys: readonly string[];
+    readonly sincePreviousReadMilliseconds: number | undefined;
+}): void {
+    log.atInfo()
+        .everyMs(
+            "vendor-hid-battery-read-request",
+            VENDOR_HID_BATTERY_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS,
+        )
+        .log(() => [
+            "vendorHidBatteryReadRequested",
+            `sincePreviousReadMs=${options.sincePreviousReadMilliseconds ?? "first"}`,
+            ...formatMetricKeyFieldsForLog(options.requestedMetricKeys),
         ].join(" "));
 }
 

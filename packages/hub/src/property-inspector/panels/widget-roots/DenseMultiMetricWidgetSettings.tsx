@@ -66,7 +66,10 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
                     <DenseColorSettings {...props} />
                     <PollingSettings
                         {...props}
-                        optionList={resolveDensePollingFrequencyOptions(widget)}
+                        optionList={resolveDensePollingFrequencyOptions(
+                            widget,
+                            props.context.resolved.preferences.pollingFrequencySeconds,
+                        )}
                         note={resolveDensePollingNote(widget, t)}
                     />
                 </>
@@ -77,8 +80,12 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
 
 function resolveDensePollingFrequencyOptions(
     widget: ResolvedDenseMultiMetricWidget,
+    currentPollingFrequencySeconds: number,
 ): readonly { readonly value: number; readonly label: string }[] | undefined {
-    return resolveBatteryPollingFrequencyOptionsForMinimum(resolveDenseMinimumPollingFrequencySeconds(widget));
+    return resolveBatteryPollingFrequencyOptionsForMinimum({
+        minimumPollingFrequencySeconds: resolveDenseMinimumPollingFrequencySeconds(widget),
+        currentPollingFrequencySeconds,
+    });
 }
 
 function resolveDensePollingNote(

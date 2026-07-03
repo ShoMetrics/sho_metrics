@@ -177,6 +177,19 @@ test("stacked metric System slot editor bumps shared polling when selecting vend
 
     await screen.findByRole("heading", { name: "Stack" });
     assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10m/);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Battery" });
+    await user.click(screen.getByRole("combobox", { name: /Metric Type/ }));
+    await user.click(screen.getByRole("option", { name: "CPU" }));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    await screen.findByRole("heading", { name: "Stack" });
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10m/);
+    await user.click(screen.getByRole("combobox", { name: /Polling Frequency/ }));
+    await user.click(screen.getByRole("option", { name: "1s" }));
+
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /1s/);
 });
 
 test("stacked custom metric source editing hides the slot editor chrome", async () => {

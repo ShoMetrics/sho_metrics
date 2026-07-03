@@ -10,6 +10,7 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 import { metricStore, type MetricStoreReader, type MetricWidgetDataReadResult } from "../runtime/metric-store";
 import {
+    listMetricReadPlanKeys,
     normalizeMetricReadPlan,
     selectMetricReadRouteSourceCandidates,
     type MetricReadPlan,
@@ -21,6 +22,7 @@ import {
     type MetricViewOptions,
 } from "../view-updates/runner";
 import { logger } from "../logging/logger";
+import { formatMetricKeyFieldsForLog } from "../logging/log-format";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
     resolveActionSettings,
@@ -65,6 +67,14 @@ import {
     type SourceClientStatus,
 } from "../runtime/sources/source-client";
 import { wallClockNowMilliseconds } from "../shared/clock";
+import {
+    isBatteryMetricKey,
+    isVendorHidBatteryMetricKey,
+} from "../runtime/metric-keys";
+import {
+    SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS,
+    VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS,
+} from "../settings/polling-frequency-options";
 
 const log = logger.for("MetricAction");
 
@@ -285,10 +295,11 @@ export abstract class MetricAction extends SingletonAction {
 
     protected getMetricReader(event: WillAppearEvent): MetricStoreReader {
         const readPlan = this.resolveMetricReadPlan(event);
-        const fallbackReadingFreshnessBudgetMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
-            this.actionKind,
-            this.resolveSettings(event).preferences.pollingFrequencySeconds,
-        );
+        const fallbackReadingFreshnessBudgetMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds({
+            actionKind: this.actionKind,
+            pollingFrequencySeconds: this.resolveSettings(event).preferences.pollingFrequencySeconds,
+            metricKeys: listMetricReadPlanKeys(readPlan),
+        });
 
         return createFallbackMetricStoreReader(metricStore, readPlan, {
             now: () => this.currentTimestampMilliseconds(),
@@ -363,12 +374,6 @@ export abstract class MetricAction extends SingletonAction {
     private refreshSubscription(activeActionState: ActiveActionState): void {
         const { event } = activeActionState;
         const pollingFrequencySeconds = this.resolveSettings(event).preferences.pollingFrequencySeconds;
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(this.actionKind, pollingFrequencySeconds);
-        setMetricViewPollingInterval(event.action.id, pollingIntervalMilliseconds);
-        const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds(
-            this.actionKind,
-            pollingFrequencySeconds,
-        );
         const metricKeys = this.getMetricKeys(event);
 
         if (metricKeys.length === 0) {
@@ -377,8 +382,38 @@ export abstract class MetricAction extends SingletonAction {
             return;
         }
 
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds({
+            actionKind: this.actionKind,
+            pollingFrequencySeconds,
+            metricKeys,
+        });
+        if (pollingIntervalMilliseconds !== pollingFrequencySeconds * 1000) {
+            log.warn(() => [
+                "pollingFrequencyRejected",
+                `actionId=${event.action.id}`,
+                `actionKind=${this.actionKind}`,
+                `pollingFrequencySeconds=${pollingFrequencySeconds}`,
+                `fallbackIntervalMs=${pollingIntervalMilliseconds}`,
+                ...formatMetricKeyFieldsForLog(metricKeys),
+            ].join(" "));
+        }
+        setMetricViewPollingInterval(event.action.id, pollingIntervalMilliseconds);
+        const maximumSampleAgeMilliseconds = resolveFallbackReadingFreshnessBudgetMilliseconds({
+            actionKind: this.actionKind,
+            pollingFrequencySeconds,
+            metricKeys,
+        });
         const readPlan = this.buildMetricCollectionReadPlan(event, metricKeys);
         const metricCollectionBinding = this.getOrCreateMetricCollectionBinding(event.action.id);
+
+        log.info(() => [
+            "metricCollectionSubscriptionResolved",
+            `actionId=${event.action.id}`,
+            `actionKind=${this.actionKind}`,
+            `pollingFrequencySeconds=${pollingFrequencySeconds}`,
+            `pollingIntervalMs=${pollingIntervalMilliseconds}`,
+            ...formatMetricKeyFieldsForLog(metricKeys),
+        ].join(" "));
 
         metricCollectionBinding.refresh({
             subscriberId: event.action.id,
@@ -572,10 +607,11 @@ export abstract class MetricAction extends SingletonAction {
         const outcome = buildDisplayedMetricReadOutcome(readResult);
         const activeActionState = this.activeActionStates.get(event.action.id);
         const settings = activeActionState?.resolvedSettings ?? this.resolveSettings(event);
-        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds(
-            this.actionKind,
-            settings.preferences.pollingFrequencySeconds,
-        );
+        const pollingIntervalMilliseconds = resolvePollingIntervalMilliseconds({
+            actionKind: this.actionKind,
+            pollingFrequencySeconds: settings.preferences.pollingFrequencySeconds,
+            metricKeys: listMetricReadPlanKeys(readPlan),
+        });
 
         if (activeActionState) {
             // The observer is event-fed by render ticks; no-data sustained and
@@ -658,39 +694,69 @@ export abstract class MetricAction extends SingletonAction {
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
 const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
 const CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS = 86400;
-const SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS = new Set([60, 180, 300, 600, 1200, 1800, 3600]);
+const SYSTEM_BATTERY_POLLING_FREQUENCY_SECOND_SET: ReadonlySet<number>
+    = new Set(SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS);
+const VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECOND_SET: ReadonlySet<number>
+    = new Set(VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS);
+const SYSTEM_BATTERY_MINIMUM_POLLING_INTERVAL_MILLISECONDS = SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS[0] * 1000;
+const VENDOR_HID_BATTERY_MINIMUM_POLLING_INTERVAL_MILLISECONDS
+    = VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS[0] * 1000;
 // Gives the background collector one missed interval before fallback render treats its reading as expired.
 const FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS = 5000;
-
-function resolvePollingIntervalMilliseconds(actionKind: ActionKind, pollingFrequencySeconds: number): number {
+/**
+ * Resolves a stored polling frequency into an actual interval, clamping illegal
+ * values instead of throwing so a bad persisted setting cannot brick a widget.
+ *
+ * Checks run in priority order: a vendor HID battery key forces the slowest
+ * floor (shared device queue), then any value already in the system-battery set
+ * is honored regardless of metric kind, then a plain battery key gets the 60s
+ * floor, then the standard fast set, then the 1s default. The unconditional
+ * system-battery acceptance is deliberate: a Dense/Stacked widget that dropped
+ * its battery slot keeps the saved slow value, mirroring the PI rule that
+ * removing a slow slot does not auto-restore a faster interval. Callers should
+ * `log.warn` when the returned interval differs from the requested one.
+ */
+function resolvePollingIntervalMilliseconds(options: {
+    readonly actionKind: ActionKind;
+    readonly pollingFrequencySeconds: number;
+    readonly metricKeys: readonly string[];
+}): number {
     if (
-        actionKind === "customMetric"
-        && Number.isInteger(pollingFrequencySeconds)
-        && pollingFrequencySeconds >= 1
-        && pollingFrequencySeconds <= CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS
+        options.actionKind === "customMetric"
+        && Number.isInteger(options.pollingFrequencySeconds)
+        && options.pollingFrequencySeconds >= 1
+        && options.pollingFrequencySeconds <= CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS
     ) {
-        return pollingFrequencySeconds * 1000;
+        return options.pollingFrequencySeconds * 1000;
     }
 
-    if (
-        actionKind === "system"
-        && SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)
-    ) {
-        return pollingFrequencySeconds * 1000;
+    if (options.metricKeys.some(isVendorHidBatteryMetricKey)) {
+        return VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECOND_SET.has(options.pollingFrequencySeconds)
+            ? options.pollingFrequencySeconds * 1000
+            : VENDOR_HID_BATTERY_MINIMUM_POLLING_INTERVAL_MILLISECONDS;
     }
 
-    if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(pollingFrequencySeconds)) {
-        return pollingFrequencySeconds * 1000;
+    if (SYSTEM_BATTERY_POLLING_FREQUENCY_SECOND_SET.has(options.pollingFrequencySeconds)) {
+        return options.pollingFrequencySeconds * 1000;
+    }
+
+    if (options.metricKeys.some(isBatteryMetricKey)) {
+        return SYSTEM_BATTERY_MINIMUM_POLLING_INTERVAL_MILLISECONDS;
+    }
+
+    if (ALLOWED_POLLING_FREQUENCY_SECONDS.has(options.pollingFrequencySeconds)) {
+        return options.pollingFrequencySeconds * 1000;
     }
 
     return DEFAULT_POLLING_INTERVAL_MILLISECONDS;
 }
 
-function resolveFallbackReadingFreshnessBudgetMilliseconds(
-    actionKind: ActionKind,
-    pollingFrequencySeconds: number,
-): number {
-    return resolvePollingIntervalMilliseconds(actionKind, pollingFrequencySeconds)
+function resolveFallbackReadingFreshnessBudgetMilliseconds(options: {
+    readonly actionKind: ActionKind;
+    readonly pollingFrequencySeconds: number;
+    readonly metricKeys: readonly string[];
+}): number {
+    return resolvePollingIntervalMilliseconds(options)
         + FALLBACK_READING_FRESHNESS_GRACE_MILLISECONDS;
 }
 

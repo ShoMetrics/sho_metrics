@@ -24,6 +24,11 @@ import {
     NODE_SYSTEM_SOURCE_ID,
     WINDOWS_HELPER_SOURCE_ID,
 } from "../runtime/sources/source-ids";
+import {
+    buildBluetoothBatteryPercentMetricKey,
+    buildVendorHidBatteryPercentMetricKey,
+    SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+} from "../runtime/metric-keys";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import { requireResolvedSingleMetricWidget } from "../settings/resolved-settings";
 import { resolveQuickStartStoredWidgetSettings } from "../settings/storage/quick-start-widget-settings";
@@ -131,6 +136,126 @@ test("changed polling plan resubscribes and forces an immediate update", () => {
         assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[0].readPlan), ["net.down"]);
         assert.deepEqual(listMetricReadPlanKeys(action.bindings[0].refreshOptionsList[1].readPlan), ["net.up"]);
         assert.equal(action.metricsUpdateSnapshots.length, 2);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("battery metrics accept long polling intervals outside the system action", () => {
+    const action = new TestStaticMetricKeysAction([SYSTEM_BATTERY_PERCENT_METRIC_KEY]);
+    const streamDeckAction = new FakeStreamDeckAction("battery-long-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 3600,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 3_600_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 3_605_000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("Bluetooth battery metrics use system battery polling intervals", () => {
+    const action = new TestStaticMetricKeysAction([
+        buildBluetoothBatteryPercentMetricKey("device-1111111111111111111111111111111111111111111111111111111111111111"),
+    ]);
+    const streamDeckAction = new FakeStreamDeckAction("bluetooth-battery-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 60,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 60_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 65_000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("non-battery metrics keep previously saved slow battery polling intervals", () => {
+    const action = new TestStaticMetricKeysAction(["net.down"]);
+    const streamDeckAction = new FakeStreamDeckAction("non-battery-saved-slow-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 3600,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 3_600_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 3_605_000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("non-battery metrics reject unknown polling intervals", () => {
+    const action = new TestStaticMetricKeysAction(["net.down"]);
+    const streamDeckAction = new FakeStreamDeckAction("non-battery-unknown-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 999,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 1000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 6000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("vendor HID battery metrics accept vendor battery polling intervals", () => {
+    const action = new TestStaticMetricKeysAction([
+        buildVendorHidBatteryPercentMetricKey("vendor_unit.vendor_id-046d.identity-test"),
+    ]);
+    const streamDeckAction = new FakeStreamDeckAction("vendor-battery-long-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 3600,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 3_600_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 3_605_000);
+    } finally {
+        action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
+    }
+});
+
+test("vendor HID battery metrics reject short system-battery polling intervals", () => {
+    const action = new TestStaticMetricKeysAction([
+        buildVendorHidBatteryPercentMetricKey("vendor_unit.vendor_id-046d.identity-test"),
+    ]);
+    const streamDeckAction = new FakeStreamDeckAction("vendor-battery-short-polling-action");
+    const settings = buildNetworkWidgetSettings({
+        preferences: {
+            pollingFrequencySeconds: 60,
+        },
+    });
+
+    try {
+        action.onWillAppear(buildWillAppearEvent(streamDeckAction, settings));
+
+        assert.equal(action.bindings[0].refreshOptionsList[0].pollingIntervalMilliseconds, 600_000);
+        assert.equal(action.bindings[0].refreshOptionsList[0].maximumSampleAgeMilliseconds, 605_000);
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
     }

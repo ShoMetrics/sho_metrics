@@ -1,4 +1,5 @@
 import { logger } from "../../logging/logger";
+import { formatMetricKeyFieldsForLog } from "../../logging/log-format";
 import { backgroundMetricCollection } from "../../runtime/metric-collection/background-metric-collection";
 import { createFallbackMetricStoreReader } from "../../runtime/metric-collection/fallback-composer";
 import { metricStore } from "../../runtime/metric-store";
@@ -108,13 +109,14 @@ export class BackgroundCollectionBinding {
         this.readPlanSignature = nextReadPlanSignature;
         this.pollingIntervalMilliseconds = options.pollingIntervalMilliseconds;
         this.subscriberId = options.subscriberId;
-        this.metricCount = listMetricReadPlanKeys(options.readPlan).length;
+        const metricKeys = listMetricReadPlanKeys(options.readPlan);
+        this.metricCount = metricKeys.length;
 
         log.info(() => [
             "backgroundCollectionBindingStarted",
             `subscriberId=${options.subscriberId}`,
             `intervalMs=${options.pollingIntervalMilliseconds}`,
-            `metricCount=${this.metricCount}`,
+            ...formatMetricKeyFieldsForLog(metricKeys),
         ].join(" "));
     }
 

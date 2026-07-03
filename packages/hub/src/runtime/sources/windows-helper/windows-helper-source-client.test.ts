@@ -40,8 +40,10 @@ import {
 } from "../metric-source";
 import type { SourceMetadataInvalidation } from "../source-planning-metadata";
 import {
+    ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS,
     ACTIVE_HELPER_PIPE_RETRY_MILLISECONDS,
     ACTIVE_HELPER_PIPE_RETRY_WINDOW_MILLISECONDS,
+    HELPER_REFRESH_DEMAND_TTL_MILLISECONDS,
     HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS,
     HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS,
     SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
@@ -132,16 +134,18 @@ test("windows helper declares cached descriptor metrics with descriptor polling 
 });
 
 test("windows helper sends refresh demand through the grpc transport", async () => {
+    let demandResponse: SetMetricRefreshDemandResponse | undefined;
     const transport = new FakeWindowsHelperGrpcTransport(request => {
         switch (request.method) {
             case "getSourceHealth":
                 return buildHealthResponse();
             case "setMetricRefreshDemand":
-                return create(SetMetricRefreshDemandResponseSchema, {
+                demandResponse = create(SetMetricRefreshDemandResponseSchema, {
                     acceptedGroupCount: 1,
                     effectiveMinimumIntervalMilliseconds: 1000,
                     demandTtlMilliseconds: 15000,
                 });
+                return demandResponse;
             default:
                 throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
         }
@@ -163,6 +167,7 @@ test("windows helper sends refresh demand through the grpc transport", async () 
     assert.equal(demandRequest.value.groups[0]?.pollingGroupId, CPU_HELPER_POLLING_GROUP_ID);
     assert.deepEqual(demandRequest.value.groups[0]?.metricIds, ["cpu.temp", "cpu.power"]);
     assert.equal(demandRequest.value.groups[0]?.requestedIntervalMilliseconds, 1000);
+    assert.equal(demandResponse?.demandTtlMilliseconds, HELPER_REFRESH_DEMAND_TTL_MILLISECONDS);
 });
 
 test("windows helper treats unimplemented refresh demand as optional version skew", async () => {
@@ -1161,6 +1166,37 @@ test("windows helper source client keeps resume recovery failures on the first c
     );
 });
 
+test("windows helper source client keeps startup recovery failures on the first cooldown rung", async () => {
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ECONNRESET", "connection reset"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+    });
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+    assert.equal(transport.requestCount, 2);
+});
+
 test("windows helper source client keeps pipe-missing retries fast during resume recovery grace", async () => {
     let nowMilliseconds = 1000;
     const pipeMissingError = createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
@@ -1274,18 +1310,20 @@ test("windows helper source client backs off repeated transient failures", async
         serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
     });
 
+    nowMilliseconds += HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS + 1;
+
     await assert.rejects(
-        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        async () => await client.checkHealth(),
         /connection reset/u,
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
-        1000 + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
     );
 
     nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await assert.rejects(
-        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        async () => await client.checkHealth(),
         /connection reset/u,
     );
     assert.equal(
@@ -1295,7 +1333,7 @@ test("windows helper source client backs off repeated transient failures", async
 
     nowMilliseconds += ESCALATED_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await assert.rejects(
-        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        async () => await client.checkHealth(),
         /connection reset/u,
     );
     assert.equal(
@@ -1305,12 +1343,56 @@ test("windows helper source client backs off repeated transient failures", async
 
     nowMilliseconds += MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
     await assert.rejects(
-        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        async () => await client.checkHealth(),
         /connection reset/u,
     );
     assert.equal(
         client.getCachedStatus().retryAfterTimestampMilliseconds,
         nowMilliseconds + MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+});
+
+test("windows helper source client keeps active demand cooldown below the helper demand ttl", async () => {
+    assert.ok(ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS < HELPER_REFRESH_DEMAND_TTL_MILLISECONDS);
+
+    let nowMilliseconds = 1000;
+    const transport = new RejectingTransport(createNodeError("ECONNRESET", "connection reset"));
+    const client = new WindowsHelperSourceClient({
+        transport,
+        monotonicNow: () => nowMilliseconds,
+        wallClockNow: () => nowMilliseconds,
+        serviceStatusReader: UNKNOWN_SERVICE_STATUS_READER,
+    });
+
+    nowMilliseconds += HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS + 1;
+
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS,
+    );
+
+    nowMilliseconds += INITIAL_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS,
+    );
+
+    nowMilliseconds += ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS;
+    await assert.rejects(
+        async () => await client.readSnapshot(["cpu.usage_percent"]),
+        /connection reset/u,
+    );
+    assert.equal(
+        client.getCachedStatus().retryAfterTimestampMilliseconds,
+        nowMilliseconds + ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS,
     );
 });
 

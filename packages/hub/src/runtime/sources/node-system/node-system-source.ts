@@ -259,7 +259,7 @@ export class NodeSystemSource implements MetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         const metrics: Record<string, MetricValue> = {};
         const metricGroups = resolveCollectorGroups(metricKeys);
-        const snapshotTimestampMilliseconds = this.wallClockNow();
+        const pollStartedAtTimestampMilliseconds = this.wallClockNow();
 
         const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, batteryMetrics, gpu] = await Promise.all([
             metricGroups.has("cpu") ? this.pollCpu() : Promise.resolve({}),
@@ -305,7 +305,14 @@ export class NodeSystemSource implements MetricSource {
         }
 
         return buildMetricSnapshot({
-            timestampMilliseconds: snapshotTimestampMilliseconds,
+            // A single-group poll stamps at completion so a slow collector (e.g.
+            // GPU via nvidia-smi taking seconds) does not backdate its own sample
+            // into false-stale. A multi-group poll stamps at the start instead:
+            // the shared timestamp must not make a fast family (cpu) look fresh
+            // when it was actually gathered before a slow sibling resolved.
+            timestampMilliseconds: metricGroups.size === 1
+                ? this.wallClockNow()
+                : pollStartedAtTimestampMilliseconds,
             metrics,
         });
     }

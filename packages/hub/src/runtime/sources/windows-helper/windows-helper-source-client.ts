@@ -92,6 +92,18 @@ export const HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS = [5000, 15000, 60000
 /** Window after process resume where transient helper failures stay on the first retry rung. */
 export const HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS = 90000;
 
+/**
+ * Helper-side TTL for active metric refresh demand.
+ *
+ * Keep this in sync with `MetricRefreshDemandConstants.DemandTtl` in the
+ * Windows helper until the client derives the cap from the helper-advertised
+ * `demandTtlMilliseconds` response field.
+ */
+export const HELPER_REFRESH_DEMAND_TTL_MILLISECONDS = 15000;
+
+/** Longest transient unavailable cooldown allowed while active demand needs renewal. */
+export const ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS = 10000;
+
 const CPU_USAGE_METRIC_KEY = "cpu.usage_percent";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 750;
 const DEFAULT_READ_SNAPSHOT_TIMEOUT_MILLISECONDS = 2000;
@@ -99,6 +111,8 @@ const DEFAULT_LIST_DESCRIPTORS_TIMEOUT_MILLISECONDS = 5000;
 const DEFAULT_SET_REFRESH_DEMAND_TIMEOUT_MILLISECONDS = 1000;
 const HELPER_SNAPSHOT_FULL_KEY_LOG_LIMIT = 16;
 const HELPER_SNAPSHOT_READ_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60000);
+const HELPER_SNAPSHOT_STALE_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = 5000;
+const HELPER_SNAPSHOT_STALE_DIAGNOSTIC_THRESHOLD_MILLISECONDS = 2000;
 
 /**
  * Startup retry interval for descriptor preload. This closes the common
@@ -219,6 +233,7 @@ export class WindowsHelperSourceClient implements SourceClient {
             ?? DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS;
         this.descriptorPreloadTimer = options.descriptorPreloadTimer ?? nodeDescriptorPreloadTimer;
         this.serviceStatusReader = options.serviceStatusReader ?? windowsServiceStatusReader;
+        this.beginHelperRecoveryGrace(monotonicNow());
     }
 
     async readSnapshot(metricKeys: readonly string[]): Promise<SourceSnapshotReadResult> {
@@ -628,8 +643,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         const nowMilliseconds = this.monotonicNow();
         this.helperUnavailableRetryAfterMonotonicMilliseconds = 0;
         this.helperUnavailableFailureCount = 0;
-        this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds =
-            nowMilliseconds + HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS;
+        this.beginHelperRecoveryGrace(nowMilliseconds);
         // The cached service status may predate the suspend; re-probe so
         // pipe-missing failures classify against the current service state.
         this.serviceStatusCacheExpiresAtMonotonicMilliseconds = 0;
@@ -741,7 +755,7 @@ export class WindowsHelperSourceClient implements SourceClient {
         const failure = classifyHelperRequestFailure(error);
         const cooldownMilliseconds = failure.reason === "pipeMissing"
             ? this.selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds)
-            : this.nextUnavailableRetryCooldownMilliseconds();
+            : this.nextUnavailableRetryCooldownMilliseconds(nowMilliseconds);
 
         this.helperUnavailableRetryAfterMonotonicMilliseconds = nowMilliseconds + cooldownMilliseconds;
         this.status = {
@@ -782,6 +796,11 @@ export class WindowsHelperSourceClient implements SourceClient {
 
         this.activeHelperDemandStartedAtMonotonicMilliseconds = this.monotonicNow();
         this.refreshCachedServiceStatus();
+    }
+
+    private beginHelperRecoveryGrace(nowMilliseconds: number): void {
+        this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds =
+            nowMilliseconds + HELPER_RESUME_RECOVERY_GRACE_MILLISECONDS;
     }
 
     private selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds: number): number {
@@ -847,17 +866,25 @@ export class WindowsHelperSourceClient implements SourceClient {
             });
     }
 
-    private nextUnavailableRetryCooldownMilliseconds(): number {
-        // Failures inside the resume grace stay on the first rung and are not
-        // counted, so the reconnect burst right after resume cannot escalate
-        // the ladder to its longest cooldown while the helper is still waking.
-        if (this.monotonicNow() < this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds) {
+    private nextUnavailableRetryCooldownMilliseconds(nowMilliseconds: number): number {
+        // Failures inside the startup/resume grace stay on the first rung and
+        // are not counted, so a correlated reconnect burst cannot escalate the
+        // ladder while the helper is still waking.
+        if (nowMilliseconds < this.helperResumeRecoveryGraceEndsAtMonotonicMilliseconds) {
             return HELPER_UNAVAILABLE_RETRY_BACKOFF_MILLISECONDS[0];
         }
 
         this.helperUnavailableFailureCount += 1;
 
-        return selectHelperUnavailableRetryCooldownMilliseconds(this.helperUnavailableFailureCount);
+        const cooldownMilliseconds = selectHelperUnavailableRetryCooldownMilliseconds(
+            this.helperUnavailableFailureCount,
+        );
+
+        if (this.activeHelperDemandStartedAtMonotonicMilliseconds === undefined) {
+            return cooldownMilliseconds;
+        }
+
+        return Math.min(cooldownMilliseconds, ACTIVE_HELPER_DEMAND_UNAVAILABLE_RETRY_CAP_MILLISECONDS);
     }
 
     /**
@@ -918,6 +945,21 @@ export class WindowsHelperSourceClient implements SourceClient {
                 `sampleAgeMs=${completedAtWallClockTimestampMilliseconds - sampleTimestampMilliseconds}`,
                 `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
                 `cpuUsagePercent=${readScalarMetricValue(snapshot, CPU_USAGE_METRIC_KEY) ?? ""}`,
+            ].join(" "));
+
+        const sampleAgeMilliseconds = completedAtWallClockTimestampMilliseconds - sampleTimestampMilliseconds;
+        if (sampleAgeMilliseconds < HELPER_SNAPSHOT_STALE_DIAGNOSTIC_THRESHOLD_MILLISECONDS) {
+            return;
+        }
+
+        log.atInfo()
+            .everyMs("helper-snapshot-stale", HELPER_SNAPSHOT_STALE_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS)
+            .log(() => [
+                "helperSnapshotReadStale",
+                ...formatHelperSnapshotMetricKeys(metricKeys),
+                `durationMs=${completedAtMonotonicMilliseconds - requestStartedAtMonotonicMilliseconds}`,
+                `sampleAgeMs=${sampleAgeMilliseconds}`,
+                `snapshotMetricCount=${Object.keys(snapshot.metrics).length}`,
             ].join(" "));
     }
 }

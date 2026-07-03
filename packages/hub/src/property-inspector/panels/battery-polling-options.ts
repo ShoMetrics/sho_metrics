@@ -1,6 +1,11 @@
 import type { ResolvedSystemPeripheralIdentity } from "../../settings/resolved-settings";
 import { readSystemVendorHidPeripheralIdentity } from "../../settings/resolved-settings";
+import {
+    SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS,
+    VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS,
+} from "../../settings/polling-frequency-options";
 import type { SelectOption } from "../inspector/types";
+import { pollingFrequencyOptionList } from "./setting-options";
 
 /**
  * Lists safe polling choices for vendor HID peripheral battery reads.
@@ -9,21 +14,18 @@ import type { SelectOption } from "../inspector/types";
  * intentionally prevents short polling intervals when such a device is selected.
  */
 export const VENDOR_HID_BATTERY_POLLING_FREQUENCY_OPTIONS = [
-    { value: 600, label: "10m" },
-    { value: 1200, label: "20m" },
-    { value: 1800, label: "30m" },
-    { value: 3600, label: "60m" },
+    ...VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS.map(value => ({
+        value,
+        label: formatBatteryPollingFrequencyLabel(value),
+    })),
 ] as const satisfies readonly SelectOption<number>[];
 
 /** Lists polling choices for OS-provided battery values, including Bluetooth. */
 export const SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS = [
-    { value: 60, label: "60s" },
-    { value: 180, label: "3m" },
-    { value: 300, label: "5m" },
-    { value: 600, label: "10m" },
-    { value: 1200, label: "20m" },
-    { value: 1800, label: "30m" },
-    { value: 3600, label: "60m" },
+    ...SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS.map(value => ({
+        value,
+        label: formatBatteryPollingFrequencyLabel(value),
+    })),
 ] as const satisfies readonly SelectOption<number>[];
 
 /** Resolves the polling choices for a selected system battery target. */
@@ -50,16 +52,41 @@ export function resolveMinimumBatteryPollingFrequencySeconds(
  * automatically restore an older faster value because the previous value is not
  * tracked as user intent.
  */
-export function resolveBatteryPollingFrequencyOptionsForMinimum(
-    minimumPollingFrequencySeconds: number,
-): readonly SelectOption<number>[] | undefined {
-    if (minimumPollingFrequencySeconds >= VENDOR_HID_BATTERY_POLLING_FREQUENCY_OPTIONS[0].value) {
+export function resolveBatteryPollingFrequencyOptionsForMinimum(options: {
+    readonly minimumPollingFrequencySeconds: number;
+    readonly currentPollingFrequencySeconds: number;
+}): readonly SelectOption<number>[] | undefined {
+    if (options.minimumPollingFrequencySeconds >= VENDOR_HID_BATTERY_POLLING_FREQUENCY_OPTIONS[0].value) {
         return VENDOR_HID_BATTERY_POLLING_FREQUENCY_OPTIONS;
     }
 
-    if (minimumPollingFrequencySeconds >= SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS[0].value) {
+    if (
+        options.minimumPollingFrequencySeconds >= SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS[0].value
+    ) {
         return SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS;
     }
 
+    // The battery slot is gone (floor dropped to the fast range) but the saved
+    // value is still a battery-range frequency. Show the standard fast list so
+    // the user can lower it, and append the saved value as a disabled option so
+    // SelectSetting displays the real stored value instead of silently rendering
+    // it as the first fast option (which looked like an unwanted reset to 1s).
+    const currentSlowOption = SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS.find(
+        option => option.value === options.currentPollingFrequencySeconds,
+    );
+    if (currentSlowOption !== undefined) {
+        return [
+            ...pollingFrequencyOptionList,
+            {
+                ...currentSlowOption,
+                disabled: true,
+            },
+        ];
+    }
+
     return undefined;
+}
+
+function formatBatteryPollingFrequencyLabel(value: number): string {
+    return value <= 60 ? `${value}s` : `${value / 60}m`;
 }

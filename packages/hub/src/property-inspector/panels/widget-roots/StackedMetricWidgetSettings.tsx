@@ -107,7 +107,10 @@ export function StackedMetricWidgetSettings(props: WidgetSettingsPanelProps & {
             />
             <PollingSettings
                 {...props}
-                optionList={resolveStackedPollingFrequencyOptions(widget)}
+                optionList={resolveStackedPollingFrequencyOptions(
+                    widget,
+                    props.context.resolved.preferences.pollingFrequencySeconds,
+                )}
                 note={resolveStackedPollingNote(widget, t)}
             />
         </>
@@ -366,8 +369,12 @@ function buildStackedSlotVisibilityContext(
 
 function resolveStackedPollingFrequencyOptions(
     widget: ResolvedStackedMetricWidget,
+    currentPollingFrequencySeconds: number,
 ): readonly SelectOption<number>[] | undefined {
-    return resolveBatteryPollingFrequencyOptionsForMinimum(resolveStackedMinimumPollingFrequencySeconds(widget));
+    return resolveBatteryPollingFrequencyOptionsForMinimum({
+        minimumPollingFrequencySeconds: resolveStackedMinimumPollingFrequencySeconds(widget),
+        currentPollingFrequencySeconds,
+    });
 }
 
 function resolveStackedPollingNote(
