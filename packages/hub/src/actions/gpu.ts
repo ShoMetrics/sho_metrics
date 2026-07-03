@@ -9,7 +9,7 @@ import { buildGpuVramWidgetData } from "../metrics/gpu-vram-widget-data";
 import { formatCompactHardwareModelLabel } from "../metrics/hardware-model-format";
 import { buildPercentageWidgetData } from "../metrics/percentage-widget-data";
 import { buildTemperatureWidgetData } from "../metrics/temperature-widget-data";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { buildMetricViewIcons } from "../widgets/icons/metric-view-icons";
 import { PROGRESS_CIRCLE_LABELS } from "../widgets/primitives/progress-circle-label";
 import {

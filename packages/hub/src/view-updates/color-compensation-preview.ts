@@ -5,7 +5,7 @@ import {
     clearColorCompensationPreviewSession as clearColorCompensationRuntimePreviewSession,
     setColorCompensationPatternPreview,
 } from "../color-compensation/runtime-store";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { wrapSvgWithColorCompensationFilter } from "../view-rendering/color/color-compensation-filter";
 import { renderColorCompensationSampleSvg } from "../view-rendering/color/color-compensation-patterns";
 import { rasterizeSvgToPngDataUrl } from "../view-rendering/rasterize/rasterizer";

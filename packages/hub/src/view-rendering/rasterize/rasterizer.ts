@@ -1,6 +1,6 @@
 import { Resvg } from "@resvg/resvg-js";
 import type { KeySize } from "../widget-data";
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
 import { wallClockNowMilliseconds } from "../../shared/clock";
 import {

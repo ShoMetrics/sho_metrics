@@ -10,7 +10,7 @@ import {
     type MetricRenderOptions,
     type SingleMetricRenderOptions,
 } from "../view-rendering/frame/metric-view-frame";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { resolveProductionLogThrottleMilliseconds } from "../logging/log-throttle";
 import type { ResolvedAppearanceSettings } from "../settings/resolved-settings";
 import { MetricViewUpdateQueue, type MetricViewUpdatePriority } from "./update-queue";

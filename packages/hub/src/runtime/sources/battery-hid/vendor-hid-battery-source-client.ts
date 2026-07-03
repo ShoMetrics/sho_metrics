@@ -1,4 +1,4 @@
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { formatMetricKeyFieldsForLog } from "../../../logging/log-format";
 import { pluginGlobalSettingsStore } from "../../../settings/global-settings-store";
 import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";

@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { resolveProductionLogThrottleMilliseconds } from "../../../logging/log-throttle";
 import {
     monotonicNowMilliseconds,

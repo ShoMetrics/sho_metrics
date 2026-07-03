@@ -2,7 +2,7 @@ import { action, PropertyInspectorDidAppearEvent, WillAppearEvent } from "@elgat
 import { MetricAction } from "./metric-action";
 import type { MetricStoreReader } from "../runtime/metric-store";
 import { setMetricView } from "../view-updates/runner";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { diskVolumeRegistry, type DiskVolumeOption } from "../runtime/disk-volumes";
 import {
     getDefaultDiskUsageMetricKey,

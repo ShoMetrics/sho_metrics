@@ -6,7 +6,7 @@ import {
     resolveCustomHttpFetchPolicy,
     resolveCustomHttpRetryDelayMilliseconds,
 } from "./custom-http-request-policy";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { lookup as lookupDns } from "node:dns/promises";
 
 const log = logger.for("Source:CustomHTTP:Fetch");

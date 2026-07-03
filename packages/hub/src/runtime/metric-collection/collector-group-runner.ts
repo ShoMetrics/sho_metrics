@@ -6,7 +6,7 @@ import type {
 } from "../sources/source-client";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import { monotonicNowMilliseconds } from "../../shared/clock";
 import {
     DefaultCollectorGroupNoDataObserver,

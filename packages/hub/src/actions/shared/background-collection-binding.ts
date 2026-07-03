@@ -1,4 +1,4 @@
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import { formatMetricKeyFieldsForLog } from "../../logging/log-format";
 import { backgroundMetricCollection } from "../../runtime/metric-collection/background-metric-collection";
 import { createFallbackMetricStoreReader } from "../../runtime/metric-collection/fallback-composer";

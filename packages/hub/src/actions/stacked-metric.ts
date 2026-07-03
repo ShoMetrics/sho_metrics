@@ -39,7 +39,7 @@ import type { StackedMetricIndicator } from "../view-rendering/frame/stacked-met
 import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
 import { refreshDiskVolumeRuntimeCache } from "./shared/disk-volume-runtime-cache";
 import { refreshNetworkInterfaceRuntimeCache } from "./shared/network-interface-runtime-cache";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import type { MetricDescriptorSnapshot } from "../runtime/sources/source-client";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";

@@ -1,5 +1,5 @@
 import { pluginGlobalSettingsStore } from "../../settings/global-settings-store";
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import type { ActionKind } from "../../shared/stream-deck-actions";
 import type { WidgetRuntimeCachePatch } from "../../runtime/widget-runtime-cache";
 import type { ResolvedWidgetSettings } from "../../settings/resolved-settings";

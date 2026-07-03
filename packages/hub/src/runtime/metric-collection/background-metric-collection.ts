@@ -1,4 +1,4 @@
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import { metricStore } from "../metric-store";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import {

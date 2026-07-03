@@ -10,7 +10,7 @@ import { CatalogMetric } from "./actions/catalog-metric";
 import { CustomMetric } from "./actions/custom-metric";
 import { DenseMultiMetric } from "./actions/dense-multi-metric";
 import { StackedMetric } from "./actions/stacked-metric";
-import { logger } from "./logging/logger";
+import { logger } from "./logging/node-logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 import { backgroundMetricCollection } from "./runtime/metric-collection/background-metric-collection";
 import { updateCommittedColorCompensationProfileFromStoredSettings } from "./color-compensation/runtime-store";

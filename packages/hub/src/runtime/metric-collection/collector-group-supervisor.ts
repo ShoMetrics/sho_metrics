@@ -1,4 +1,4 @@
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/node-logger";
 import { BackoffPolicy } from "../sources/backoff-policy";
 import { WINDOWS_HELPER_SOURCE_ID } from "../sources/source-ids";
 import type { SourceRegistry } from "../sources/source-registry";

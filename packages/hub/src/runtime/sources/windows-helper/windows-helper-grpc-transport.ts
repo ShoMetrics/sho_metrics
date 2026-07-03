@@ -6,7 +6,7 @@ import {
     type MessageShape,
 } from "@bufbuild/protobuf";
 import * as grpc from "@grpc/grpc-js";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import {
     monotonicNowMilliseconds,
     wallClockNowMilliseconds,

@@ -23,7 +23,7 @@ import {
 } from "./dense-multi-metric/row-data";
 import { getMetricStatusIcon } from "../widgets/icons/metric-status-icons";
 import { refreshCatalogMetricDescriptorRuntimeCache } from "./shared/catalog-metric-descriptor-runtime-cache";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import type { MetricDescriptorSnapshot } from "../runtime/sources/source-client";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";

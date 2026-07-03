@@ -13,7 +13,7 @@ import {
     setColorCompensationWidgetPreview,
     startColorCompensationPreviewSession,
 } from "./runtime-store";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import {
     showColorCompensationSamplePreview,
 } from "../view-updates/color-compensation-preview";

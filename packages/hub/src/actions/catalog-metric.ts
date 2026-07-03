@@ -11,7 +11,7 @@ import {
     resolveHelperBackedSampleFreshnessBudgetMilliseconds,
     resolveHelperRequiredInstallNoticeText,
 } from "./shared/helper-backed-widget-data";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { WINDOWS_HELPER_SOURCE_ID } from "../runtime/sources/source-ids";
 import type { MetricDescriptorSnapshot, SourceClientStatus } from "../runtime/sources/source-client";
 import { backgroundMetricCollection } from "../runtime/metric-collection/background-metric-collection";

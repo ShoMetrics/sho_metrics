@@ -1,6 +1,8 @@
 import streamDeck from "@elgato/streamdeck";
 import { monotonicNowMilliseconds } from "../shared/clock";
 
+// Node/plugin-side logging only. Property Inspector React code runs in the PI
+// browser context and must report diagnostics through PI messaging instead.
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
 export type LogEntryData = unknown[] | [string, ...unknown[]];
 
@@ -341,6 +343,8 @@ class ShoLoggerImpl implements ShoLogger {
 
 const NO_OP_BUILDER = new NoOpLogBuilder();
 const LOG_PROVIDER_FAILURE_MESSAGE = "Log provider failed";
+// Per scoped logger, not global. The cap bounds accidental dynamic throttle
+// keys without coupling unrelated logger scopes to one shared budget.
 const MAXIMUM_THROTTLE_KEY_COUNT = 128;
 
 /**

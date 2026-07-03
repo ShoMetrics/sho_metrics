@@ -1,5 +1,5 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import type { SourceClientStatusReason } from "../source-client";
 
 const log = logger.for("Source:WindowsHelper");

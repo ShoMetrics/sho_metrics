@@ -16,7 +16,7 @@ import { readBatteryDeviceDescriptorSnapshotForPropertyInspector } from "../runt
 import { resolveBatteryDeviceCachePatchForPropertyInspector } from "../runtime/sources/battery/battery-device-cache-patch";
 import { SelectedBatteryRouteRegistrar } from "../runtime/sources/battery/selected-battery-route-registrar";
 import { setMetricView } from "../view-updates/runner";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { STREAM_DECK_ACTION_UUID_BY_KIND } from "../shared/stream-deck-actions";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import type {

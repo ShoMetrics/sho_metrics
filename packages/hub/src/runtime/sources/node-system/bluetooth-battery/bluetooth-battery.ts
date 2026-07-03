@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import si, { type Systeminformation } from "systeminformation";
-import { logger } from "../../../../logging/logger";
+import { logger } from "../../../../logging/node-logger";
 import type {
     ResolvedSystemBluetoothPeripheralIdentifier,
     ResolvedSystemPeripheralIdentity,

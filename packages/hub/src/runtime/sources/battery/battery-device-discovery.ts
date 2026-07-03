@@ -4,7 +4,7 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../settings/resolved-settings";
 import { readSystemVendorHidPeripheralIdentity } from "../../../settings/resolved-settings";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { buildVendorHidBatteryPercentMetricKey } from "../../metric-keys";
 import {
     buildBatteryDeviceDescriptorIdFromIdentity,

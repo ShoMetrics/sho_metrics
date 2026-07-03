@@ -1,4 +1,4 @@
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import type { ResolvedGlobalSettings } from "./resolved-settings";
 import { readStoredGlobalSettings } from "./storage/codec";
 import { resolveStoredGlobalSettings } from "./storage/resolver";

@@ -1,4 +1,4 @@
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { monotonicNowMilliseconds } from "../../../shared/clock";
 
 const log = logger.for("Source:BatteryHID");

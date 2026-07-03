@@ -5,7 +5,7 @@ import {
     type LoggerSink,
     type LogEntryData,
     type LogLevel,
-} from "./logger";
+} from "./node-logger";
 
 type RecordedLogEntry = {
     readonly level: LogLevel;

@@ -5,7 +5,7 @@ import type {
     SystemPeripheralReceiverKind,
 } from "../../../../settings/resolved-settings";
 import { readSystemVendorHidPeripheralIdentity } from "../../../../settings/resolved-settings";
-import { logger } from "../../../../logging/logger";
+import { logger } from "../../../../logging/node-logger";
 import { monotonicNowMilliseconds } from "../../../../shared/clock";
 import { buildBatteryMetricKeyFromIdentity } from "../../battery/battery-metric-key";
 import type {

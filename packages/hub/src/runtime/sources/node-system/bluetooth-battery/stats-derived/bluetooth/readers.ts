@@ -37,7 +37,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { logger } from "../../../../../../logging/logger";
+import { logger } from "../../../../../../logging/node-logger";
 import { fetchAppleDeviceManagementHIDEventServiceProperties } from "../../iokit-hid-event-service";
 import {
     asArray,

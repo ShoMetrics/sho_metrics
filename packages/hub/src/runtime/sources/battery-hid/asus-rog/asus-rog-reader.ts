@@ -1,5 +1,5 @@
 import { monotonicNowMilliseconds } from "../../../../shared/clock";
-import { logger } from "../../../../logging/logger";
+import { logger } from "../../../../logging/node-logger";
 import type {
     NativeHidDevice,
     NativeHidDeviceInfo,

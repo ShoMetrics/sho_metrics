@@ -1,5 +1,5 @@
 import type { WillAppearEvent } from "@elgato/streamdeck";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { resolveProductionLogThrottleMilliseconds } from "../logging/log-throttle";
 import {
     MetricViewPerformanceStats,

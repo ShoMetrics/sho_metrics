@@ -1,4 +1,4 @@
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { wallClockNowMilliseconds } from "../../../shared/clock";
 import {
     buildMetricSnapshot,

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
 import { toError } from "./windows-helper-grpc-errors";
 
 const log = logger.for("Source:WindowsHelper");
