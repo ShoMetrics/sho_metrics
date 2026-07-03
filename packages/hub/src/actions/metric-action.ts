@@ -46,6 +46,10 @@ import {
     handleColorCompensationPluginMessage,
 } from "../color-compensation/plugin-controller";
 import {
+    readPropertyInspectorDiagnosticMessage,
+    type PropertyInspectorDiagnosticLevel,
+} from "../property-inspector/diagnostic-messages";
+import {
     BackgroundCollectionBinding,
     type BackgroundCollectionBindingRefreshOptions,
 } from "./shared/background-collection-binding";
@@ -199,6 +203,12 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
+        const diagnosticMessage = readPropertyInspectorDiagnosticMessage(event.payload);
+        if (diagnosticMessage !== null) {
+            writePropertyInspectorDiagnosticLog(diagnosticMessage.level, diagnosticMessage.message);
+            return;
+        }
+
         const activeActionState = this.activeActionStates.get(event.action.id);
 
         handleColorCompensationPluginMessage({
@@ -215,6 +225,11 @@ export abstract class MetricAction extends SingletonAction {
     override onPropertyInspectorDidAppear(event: PropertyInspectorDidAppearEvent): void {
         const activeActionState = this.activeActionStates.get(event.action.id);
         if (!activeActionState) {
+            log.warn(() => [
+                "propertyInspectorDidAppearMissingAction",
+                `actionId=${event.action.id}`,
+                `actionKind=${this.actionKind}`,
+            ].join(" "));
             return;
         }
 
@@ -764,5 +779,20 @@ function formatResolvedWidgetForLog(settings: ResolvedWidgetSettings): string {
             return `stackedMetric:${settings.widget.slots.length}`;
         case "hardwareSummary":
             return `hardwareSummary:${settings.widget.target.domain}`;
+    }
+}
+
+function writePropertyInspectorDiagnosticLog(level: PropertyInspectorDiagnosticLevel, message: string): void {
+    switch (level) {
+        case "error":
+            log.atError()
+                .everyMs("property-inspector-diagnostic-error", 10_000)
+                .log(() => message);
+            return;
+        case "warn":
+            log.atWarn()
+                .everyMs("property-inspector-diagnostic-warn", 10_000)
+                .log(() => message);
+            return;
     }
 }

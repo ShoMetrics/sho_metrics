@@ -1,7 +1,4 @@
-import {
-    GENERATED_METRIC_LUCIDE_ICON_ENTRIES,
-    type GeneratedMetricLucideIconEntry,
-} from "../../generated/metric-lucide-search-index.generated";
+import type { GeneratedMetricLucideIconEntry } from "../../generated/metric-lucide-search-index.generated";
 
 export const METRIC_ICON_SEARCH_RESULT_LIMIT = 20;
 
@@ -11,11 +8,14 @@ export interface MetricIconMetadata {
     readonly terms: readonly string[];
 }
 
-/** Searches Lucide icon ids, labels, and metadata terms for the icon picker. */
-export function searchMetricIconOptions(query: string): {
+/** Search result plus total count so the PI can render a bounded list with overflow guidance. */
+export interface MetricIconSearchResult {
     readonly options: readonly MetricIconMetadata[];
     readonly totalMatchCount: number;
-} {
+}
+
+/** Searches Lucide icon ids, labels, and metadata terms for the icon picker. */
+export async function searchMetricIconOptions(query: string): Promise<MetricIconSearchResult> {
     const normalizedQuery = query.trim().toLowerCase();
     if (normalizedQuery.length === 0) {
         return {
@@ -24,7 +24,8 @@ export function searchMetricIconOptions(query: string): {
         };
     }
 
-    const scoredEntries = GENERATED_METRIC_LUCIDE_ICON_ENTRIES
+    const iconEntries = await loadMetricIconSearchEntries();
+    const scoredEntries = iconEntries
         .map(entry => ({
             entry,
             score: scoreIconSearchEntry(entry, normalizedQuery),
@@ -39,9 +40,26 @@ export function searchMetricIconOptions(query: string): {
 }
 
 /** Reads generated Lucide metadata for a stored metric icon id. */
-export function readMetricIconMetadata(iconId: string): MetricIconMetadata | undefined {
-    const entry = GENERATED_METRIC_LUCIDE_ICON_ENTRIES.find(candidate => candidate.id === iconId);
+export async function readMetricIconMetadata(iconId: string): Promise<MetricIconMetadata | undefined> {
+    const iconEntries = await loadMetricIconSearchEntries();
+    const entry = iconEntries.find(candidate => candidate.id === iconId);
     return entry === undefined ? undefined : toMetadata(entry);
+}
+
+let metricIconSearchEntriesPromise: Promise<readonly GeneratedMetricLucideIconEntry[]> | undefined;
+
+function loadMetricIconSearchEntries(): Promise<readonly GeneratedMetricLucideIconEntry[]> {
+    // The Lucide search index is large and only needed when the user edits an
+    // icon, so it stays out of the first PI bundle. A failed chunk load must not
+    // poison the session; clearing the cached promise lets the next search retry.
+    metricIconSearchEntriesPromise ??= import("../../generated/metric-lucide-search-index.generated")
+        .then(module => module.GENERATED_METRIC_LUCIDE_ICON_ENTRIES)
+        .catch((error: unknown) => {
+            metricIconSearchEntriesPromise = undefined;
+            throw error;
+        });
+
+    return metricIconSearchEntriesPromise;
 }
 
 function scoreIconSearchEntry(entry: GeneratedMetricLucideIconEntry, query: string): number {

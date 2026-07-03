@@ -34,29 +34,29 @@ test("generated metric Lucide icon search terms are lower-case", () => {
     }
 });
 
-test("metric icon search hides autocomplete results for empty query", () => {
-    const searchResult = searchMetricIconOptions("");
+test("metric icon search hides autocomplete results for empty query", async () => {
+    const searchResult = await searchMetricIconOptions("");
 
     assert.equal(searchResult.options.length, 0);
     assert.equal(searchResult.totalMatchCount, 0);
 });
 
-test("metric icon search lowercases queries and uses Lucide metadata terms", () => {
-    const searchResult = searchMetricIconOptions("4k");
-    const upperCaseSearchResult = searchMetricIconOptions("TV");
+test("metric icon search lowercases queries and uses Lucide metadata terms", async () => {
+    const searchResult = await searchMetricIconOptions("4k");
+    const upperCaseSearchResult = await searchMetricIconOptions("TV");
 
     assert.equal(searchResult.options.some(option => option.id === "tv"), true);
     assert.equal(upperCaseSearchResult.options.some(option => option.id === "tv"), true);
 });
 
-test("metric icon search matches substrings inside metadata terms", () => {
-    const searchResult = searchMetricIconOptions("igh-definition");
+test("metric icon search matches substrings inside metadata terms", async () => {
+    const searchResult = await searchMetricIconOptions("igh-definition");
 
     assert.equal(searchResult.options.some(option => option.id === "tv"), true);
 });
 
-test("metric icon search keeps DOM results bounded", () => {
-    const searchResult = searchMetricIconOptions("c");
+test("metric icon search keeps DOM results bounded", async () => {
+    const searchResult = await searchMetricIconOptions("c");
 
     assert.equal(searchResult.options.length, METRIC_ICON_SEARCH_RESULT_LIMIT);
     assert.equal(searchResult.totalMatchCount > METRIC_ICON_SEARCH_RESULT_LIMIT, true);

@@ -24,4 +24,3 @@ test("property inspector root renders the first visible tab in the Stream Deck l
     assert.equal((await screen.findByRole("tab", { name: "组件" })).getAttribute("aria-selected"), "true");
     assert.equal(screen.queryByRole("tab", { name: "Widget" }), null);
 });
-

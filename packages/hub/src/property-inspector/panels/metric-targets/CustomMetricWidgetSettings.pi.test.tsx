@@ -552,7 +552,7 @@ test("custom metric icon picker writes and clears the widget icon id", async () 
     const iconInput = screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement;
     await user.type(iconInput, "temp");
 
-    await user.click(screen.getByRole("option", { name: /^Thermometer$/ }));
+    await user.click(await screen.findByRole("option", { name: /^Thermometer$/ }));
     assert.equal(iconInput.value, "Thermometer");
     assert.equal(screen.queryByRole("listbox", { name: /^Widget Icon:/ }), null);
     assert.equal(screen.getByText(/Icon is used in some views only/).textContent?.length > 0, true);
@@ -562,7 +562,7 @@ test("custom metric icon picker writes and clears the widget icon id", async () 
     assert.equal(screen.getByText(/Icon is used in some views only/).textContent?.length > 0, true);
 });
 
-test("custom metric icon picker shows the stored icon label", () => {
+test("custom metric icon picker shows the stored icon label", async () => {
     const client = new TestPropertyInspectorClient({
         actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
     });
@@ -574,10 +574,8 @@ test("custom metric icon picker shows the stored icon label", () => {
         customIconId: "tv",
     })} />);
 
-    assert.equal(
-        (screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement).value,
-        "TV",
-    );
+    const iconInput = screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement;
+    await waitFor(() => assert.equal(iconInput.value, "TV"));
 });
 
 test("custom metric icon picker supports keyboard selection", async () => {
@@ -594,6 +592,7 @@ test("custom metric icon picker supports keyboard selection", async () => {
 
     const iconInput = screen.getByRole("combobox", { name: /^Widget Icon:/ }) as HTMLInputElement;
     await user.type(iconInput, "thermometer");
+    await screen.findByRole("listbox", { name: /^Widget Icon:/ });
     await user.keyboard("{Enter}");
 
     assert.equal(iconInput.value, "Thermometer");
@@ -617,8 +616,28 @@ test("custom metric icon picker renders a bounded result list", async () => {
 
     await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "c");
 
+    await screen.findByRole("listbox", { name: /^Widget Icon:/ });
     assert.equal(document.querySelectorAll(".metric-icon-option").length, 20);
     assert.match(screen.getByText(/Keep typing to narrow the list/).textContent ?? "", /Keep typing/);
+});
+
+test("custom metric icon picker opens results after the first lazy search", async () => {
+    const user = userEvent.setup();
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.customMetric,
+    });
+
+    render(<CustomMetricSettingsHarness client={client} settings={buildCustomMetricSettings({
+        url: "https://api.example.com/weather",
+        userIntent: "Display temperature",
+        jqTransform: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }",
+    })} />);
+
+    await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "q");
+
+    const listbox = await screen.findByRole("listbox", { name: /^Widget Icon:/ });
+    const labelledBy = listbox.getAttribute("aria-labelledby") ?? "";
+    assert.equal(labelledBy.length > 0, true);
 });
 
 test("custom metric icon picker includes the status row in listbox height", async () => {
@@ -635,6 +654,7 @@ test("custom metric icon picker includes the status row in listbox height", asyn
 
     await user.type(screen.getByRole("combobox", { name: /^Widget Icon:/ }), "map pin x");
 
+    await screen.findByRole("listbox", { name: /^Widget Icon:/ });
     assert.equal(screen.getAllByRole("option").length, 2);
     assert.equal(screen.getByRole("listbox", { name: /^Widget Icon:/ }).style.maxHeight, "92px");
 });

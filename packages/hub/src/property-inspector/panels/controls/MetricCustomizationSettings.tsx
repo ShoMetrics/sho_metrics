@@ -19,6 +19,7 @@ import {
     readMetricIconMetadata,
     searchMetricIconOptions,
     type MetricIconMetadata,
+    type MetricIconSearchResult,
 } from "../../../widgets/icons/metric-icon-search";
 import { InspectorItem } from "../../components/InspectorItem";
 import { NumberSetting } from "../../controls/NumberSetting";
@@ -32,6 +33,8 @@ import { SettingsSection } from "./SettingsSection";
 import { scaleModeOptionList } from "../setting-options";
 import type { ScaleMode } from "../../../settings/resolved-settings";
 import { limitMetricCustomLabelCharacters } from "../../../settings/metric-custom-label-policy";
+import { writePropertyInspectorWarningLog } from "../../diagnostics";
+import { useStreamDeckClient } from "../../stream-deck/stream-deck-client-context";
 
 export interface MetricCustomizationLabelSetting {
     readonly value: string | undefined;
@@ -184,22 +187,30 @@ function commitMetricLabelDraft(label: MetricCustomizationLabelSetting, draftVal
     label.onValueChange(normalizedDraftValue);
 }
 
+const EMPTY_METRIC_ICON_SEARCH_RESULT: MetricIconSearchResult = {
+    options: [],
+    totalMatchCount: 0,
+};
+
 function MetricIconSetting({
     iconId,
     onIconIdChange,
 }: MetricCustomizationIconSetting): React.JSX.Element {
     const { t } = useI18n();
+    const streamDeckClient = useStreamDeckClient();
     const inputId = useId();
     const labelId = `${inputId}-label`;
     const listboxId = `${inputId}-listbox`;
     const rootElementRef = useRef<HTMLDivElement>(null);
     const inputElementRef = useRef<HTMLInputElement>(null);
-    const [query, setQuery] = useState(() => iconId === undefined
-        ? ""
-        : readMetricIconMetadata(iconId)?.label ?? "");
+    const [query, setQuery] = useState(() => iconId ?? "");
+    const [searchResult, setSearchResult] = useState<MetricIconSearchResult>(EMPTY_METRIC_ICON_SEARCH_RESULT);
+    const [isMetricIconSearchPending, setIsMetricIconSearchPending] = useState(false);
+    // Listbox opening waits for the lazy search result that belongs to the
+    // current query; otherwise the first keystroke can consume stale results.
+    const [completedSearchQuery, setCompletedSearchQuery] = useState("");
     const [shouldOpenIconListboxAfterSearch, setShouldOpenIconListboxAfterSearch] = useState(false);
     const hasQuery = query.trim().length > 0;
-    const searchResult = useMemo(() => searchMetricIconOptions(query), [query]);
     const iconOptionList = useMemo(() => searchResult.options.map(option => ({
         value: option.id,
         label: option.label,
@@ -223,7 +234,7 @@ function MetricIconSetting({
         onValueChange: onIconIdChange,
         shouldFocusAfterSelection: false,
         onOptionSelected: (selectedIconId) => {
-            setQuery(readMetricIconMetadata(selectedIconId)?.label ?? selectedIconId);
+            setQuery(searchResult.options.find(option => option.id === selectedIconId)?.label ?? selectedIconId);
         },
     });
     const shouldShowListbox = hasQuery && isOpen;
@@ -232,11 +243,70 @@ function MetricIconSetting({
         : undefined;
 
     useEffect(() => {
-        setQuery(iconId === undefined ? "" : readMetricIconMetadata(iconId)?.label ?? "");
-    }, [iconId]);
+        if (iconId === undefined) {
+            setQuery("");
+            return;
+        }
+
+        let isCurrent = true;
+        setQuery(iconId);
+        void readMetricIconMetadata(iconId)
+            .then((metadata) => {
+                if (isCurrent) {
+                    setQuery(metadata?.label ?? iconId);
+                }
+            })
+            .catch(() => {
+                if (isCurrent) {
+                    setQuery(iconId);
+                }
+                writePropertyInspectorWarningLog(streamDeckClient, "metricIconMetadataLoadFailed");
+            });
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [iconId, streamDeckClient]);
+
+    useEffect(() => {
+        let isCurrent = true;
+        const searchQuery = query;
+        setIsMetricIconSearchPending(true);
+
+        void searchMetricIconOptions(searchQuery)
+            .then((nextSearchResult) => {
+                if (isCurrent) {
+                    setSearchResult(nextSearchResult);
+                    setCompletedSearchQuery(searchQuery);
+                    setIsMetricIconSearchPending(false);
+                }
+            })
+            .catch(() => {
+                if (isCurrent) {
+                    setSearchResult(EMPTY_METRIC_ICON_SEARCH_RESULT);
+                    setCompletedSearchQuery(searchQuery);
+                    setIsMetricIconSearchPending(false);
+                }
+                // The shared diagnostics path is throttled and redacted; keep
+                // the query text out of logs because it is user input.
+                writePropertyInspectorWarningLog(streamDeckClient, "metricIconSearchLoadFailed");
+            });
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [query, streamDeckClient]);
 
     useEffect(() => {
         if (!shouldOpenIconListboxAfterSearch) {
+            return;
+        }
+
+        if (isMetricIconSearchPending) {
+            return;
+        }
+
+        if (completedSearchQuery !== query) {
             return;
         }
 
@@ -244,7 +314,15 @@ function MetricIconSetting({
         if (hasQuery && iconOptionList.length > 0) {
             openListbox(0);
         }
-    }, [hasQuery, iconOptionList.length, openListbox, shouldOpenIconListboxAfterSearch]);
+    }, [
+        completedSearchQuery,
+        hasQuery,
+        iconOptionList.length,
+        isMetricIconSearchPending,
+        openListbox,
+        query,
+        shouldOpenIconListboxAfterSearch,
+    ]);
 
     return (
         <>

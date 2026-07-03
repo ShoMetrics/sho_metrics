@@ -3,6 +3,7 @@ import { I18nProvider } from "../i18n/react";
 import { resolveHubLocale } from "../i18n/locale";
 import type { HubLocale } from "../i18n/types";
 import { App } from "./App";
+import { PropertyInspectorErrorBoundary } from "./diagnostics";
 import {
     readPropertyInspectorLanguageValue,
     type StreamDeckPropertyInspectorClient,
@@ -41,7 +42,9 @@ export function PropertyInspectorRoot({ client }: PropertyInspectorRootProps): R
 
     return (
         <I18nProvider locale={locale}>
-            <App client={client} />
+            <PropertyInspectorErrorBoundary client={client}>
+                <App client={client} />
+            </PropertyInspectorErrorBoundary>
         </I18nProvider>
     );
 }

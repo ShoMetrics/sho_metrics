@@ -16,6 +16,7 @@ const logLevel = normalizeLogLevel(process.env.SHO_METRICS_LOG_LEVEL ?? (buildMo
 const pluginBinDirectory = `${sdPlugin}/bin`;
 const propertyInspectorScriptPath = `${sdPlugin}/ui/property-inspector.js`;
 const propertyInspectorSourceMapPath = `${propertyInspectorScriptPath}.map`;
+const propertyInspectorChunkDirectory = `${sdPlugin}/ui/property-inspector-chunks`;
 
 const typescriptOptions = {
     compilerOptions: {
@@ -91,6 +92,7 @@ function cleanPropertyInspectorOutput() {
         buildStart() {
             fs.rmSync(propertyInspectorScriptPath, { force: true });
             fs.rmSync(propertyInspectorSourceMapPath, { force: true });
+            fs.rmSync(propertyInspectorChunkDirectory, { recursive: true, force: true });
         },
     };
 }
@@ -214,7 +216,9 @@ const pluginConfig = {
 const propertyInspectorConfig = {
     input: "src/property-inspector/property-inspector.tsx",
     output: {
-        file: propertyInspectorScriptPath,
+        dir: `${sdPlugin}/ui`,
+        entryFileNames: "property-inspector.js",
+        chunkFileNames: "property-inspector-chunks/[name]-[hash].js",
         format: "es",
         sourcemap: isWatching,
         sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
