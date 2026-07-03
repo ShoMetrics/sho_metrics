@@ -467,6 +467,76 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task RefreshPollingGroupPublishesRetainedReadingWhenHardwareUpdateFails()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Load("CPU Total", value: 42),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware], provider, timeProvider);
+
+        await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        cpuHardware.OnUpdate = () => throw new InvalidOperationException("simulated update failure");
+        timeProvider.Advance(MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval);
+        MetricSnapshotRefreshResult result = await session.RefreshPollingGroupWithDiagnosticsAsync(
+            LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(cpuHardware),
+            CancellationToken.None);
+
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is
+            {
+                MetricId: "cpu.usage_percent",
+                Value: 42,
+                ValueFreshness: MetricValueFreshness.Retained,
+            });
+        Assert.DoesNotContain(result.Snapshot.Readings, reading =>
+            reading.MetricId == "cpu.usage_percent"
+                && reading.ValueFreshness == MetricValueFreshness.Fresh);
+        HardwareRefreshDiagnostic updateDiagnostic = Assert.Single(result.Diagnostics.HardwareUpdates);
+        Assert.False(updateDiagnostic.UpdateSucceeded);
+        Assert.Contains("InvalidOperationException", updateDiagnostic.UpdateError);
+    }
+
+    [Fact]
+    public async Task RefreshSnapshotPublishesRetainedSubHardwareReadingsWhenParentUpdateFails()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeSensor childCpuLoad = FakeSensor.Load("CPU Total", value: 42);
+        FakeHardware childCpuHardware = FakeHardware.Cpu();
+        childCpuHardware.Sensors = [childCpuLoad];
+        FakeHardware motherboardHardware = FakeHardware.Motherboard();
+        motherboardHardware.SubHardware = [childCpuHardware];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([motherboardHardware], provider, timeProvider);
+
+        await session.RefreshSnapshotWithDiagnosticsAsync(CancellationToken.None);
+
+        motherboardHardware.OnUpdate = () => throw new InvalidOperationException("simulated parent update failure");
+        childCpuLoad.Value = 99;
+        timeProvider.Advance(MetricRefreshDemandConstants.MinimumCoreLhmRefreshInterval);
+        MetricSnapshotRefreshResult result = await session.RefreshSnapshotWithDiagnosticsAsync(CancellationToken.None);
+
+        Assert.Contains(result.Snapshot.Readings, reading =>
+            reading is
+            {
+                MetricId: "cpu.usage_percent",
+                Value: 42,
+                ValueFreshness: MetricValueFreshness.Retained,
+            });
+        Assert.DoesNotContain(result.Snapshot.Readings, reading =>
+            reading.MetricId == "cpu.usage_percent"
+                && reading.Value == 99);
+    }
+
+    [Fact]
     public async Task RefreshPollingGroupExpiresRetainedCpuSensorAfterAgeLimit()
     {
         var timeProvider = new ManualTimeProvider();
@@ -582,6 +652,35 @@ public sealed class LibreHardwareMonitorSessionTests
         Assert.Equal(2, cpuHardware.UpdateCount);
     }
 
+    [Fact]
+    public async Task PollingGroupSnapshotsUseEachHardwareCaptureTime()
+    {
+        var timeProvider = new ManualTimeProvider();
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Load("CPU Total", value: 42),
+        ];
+        FakeHardware gpuHardware = FakeHardware.Gpu();
+        gpuHardware.Sensors =
+        [
+            FakeSensor.Load("GPU Core", value: 75),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware, gpuHardware], provider, timeProvider);
+        cpuHardware.OnUpdate = () => timeProvider.Advance(TimeSpan.FromSeconds(2));
+        gpuHardware.OnUpdate = () => timeProvider.Advance(TimeSpan.FromSeconds(5));
+
+        await session.RefreshSnapshotAsync(CancellationToken.None);
+
+        MetricSnapshot cpuSnapshot = await session.ReadSnapshotAsync(["cpu.usage_percent"], CancellationToken.None);
+        MetricSnapshot gpuSnapshot = await session.ReadSnapshotAsync(["gpu.usage_percent"], CancellationToken.None);
+
+        Assert.Equal(DateTimeOffset.UnixEpoch.AddSeconds(2), cpuSnapshot.CapturedAt);
+        Assert.Equal(DateTimeOffset.UnixEpoch.AddSeconds(7), gpuSnapshot.CapturedAt);
+    }
+
     private sealed class FakeSystemTotalDiskCounterReader : IWindowsSystemTotalDiskThroughputCounterReader
     {
         private readonly WindowsSystemTotalDiskThroughputCounterSample _sample;
@@ -607,10 +706,16 @@ public sealed class LibreHardwareMonitorSessionTests
     private sealed class ManualTimeProvider : TimeProvider
     {
         private long _timestamp;
+        private DateTimeOffset _utcNow = DateTimeOffset.UnixEpoch;
 
         public override long GetTimestamp()
         {
             return _timestamp;
+        }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _utcNow;
         }
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
@@ -618,6 +723,7 @@ public sealed class LibreHardwareMonitorSessionTests
         public void Advance(TimeSpan duration)
         {
             _timestamp += duration.Ticks;
+            _utcNow += duration;
         }
     }
 }

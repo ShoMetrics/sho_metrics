@@ -15,6 +15,11 @@ internal sealed class FakeHardware : IHardware
         return new FakeHardware(HardwareType.Cpu, "cpu/0");
     }
 
+    public static FakeHardware Motherboard()
+    {
+        return new FakeHardware(HardwareType.Motherboard, "mainboard/0");
+    }
+
     public static FakeHardware Gpu()
     {
         return new FakeHardware(HardwareType.GpuNvidia, "gpu/0");
@@ -67,6 +72,8 @@ internal sealed class FakeHardware : IHardware
 
     public string Name { get; set; } = "Fake Hardware";
 
+    public Action? OnUpdate { get; set; }
+
     public IHardware? Parent => null;
 
     public ISensor[] Sensors { get; set; } = [];
@@ -104,6 +111,7 @@ internal sealed class FakeHardware : IHardware
     public void Update()
     {
         UpdateCount++;
+        OnUpdate?.Invoke();
     }
 
     public void ResetUpdateCount()

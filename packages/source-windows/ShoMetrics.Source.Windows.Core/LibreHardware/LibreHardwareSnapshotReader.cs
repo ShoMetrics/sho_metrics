@@ -178,6 +178,12 @@ internal sealed class LibreHardwareSnapshotReader
         if (updateError is not null)
         {
             hardwareWarnings.Add($"Hardware update failed for {hardware.Name}: {updateError}");
+            AddRetainedSensorReadingsForFailedUpdate(
+                hardware,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                pollingGroupId,
+                retentionRead);
         }
 
         if (updateError is null && LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
@@ -212,6 +218,19 @@ internal sealed class LibreHardwareSnapshotReader
 
         if (updateError is not null)
         {
+            foreach (IHardware childHardware in hardware.SubHardware)
+            {
+                ReadHardwareRetainedOnly(
+                    childHardware,
+                    readingsByMetricId,
+                    unavailableReportsByMetricId,
+                    cpuPollingGroupIds,
+                    gpuPollingGroupIds,
+                    retentionRead,
+                    touchedPollingGroups,
+                    cancellationToken);
+            }
+
             return;
         }
 
@@ -229,6 +248,118 @@ internal sealed class LibreHardwareSnapshotReader
                 touchedPollingGroups,
                 warnings,
                 cancellationToken);
+        }
+    }
+
+    private void ReadHardwareRetainedOnly(
+        IHardware hardware,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        List<string> cpuPollingGroupIds,
+        List<string> gpuPollingGroupIds,
+        HardwareMetricRetentionCache.ReadScope retentionRead,
+        List<TouchedPollingGroup> touchedPollingGroups,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string pollingGroupId = LibreHardwareMetricCatalog.BuildHardwarePollingGroupId(hardware);
+        retentionRead.TouchPollingGroup(pollingGroupId);
+
+        if (hardware.HardwareType is HardwareType.Cpu
+            && !cpuPollingGroupIds.Contains(pollingGroupId, StringComparer.Ordinal))
+        {
+            cpuPollingGroupIds.Add(pollingGroupId);
+        }
+        if (hardware.HardwareType is HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia
+            && !gpuPollingGroupIds.Contains(pollingGroupId, StringComparer.Ordinal))
+        {
+            gpuPollingGroupIds.Add(pollingGroupId);
+        }
+
+        AddRetainedSensorReadingsForFailedUpdate(
+            hardware,
+            readingsByMetricId,
+            unavailableReportsByMetricId,
+            pollingGroupId,
+            retentionRead);
+
+        touchedPollingGroups.Add(new TouchedPollingGroup
+        {
+            PollingGroupId = pollingGroupId,
+            Warnings = [],
+            CapturedAt = _timeProvider.GetUtcNow(),
+        });
+
+        foreach (IHardware childHardware in hardware.SubHardware)
+        {
+            ReadHardwareRetainedOnly(
+                childHardware,
+                readingsByMetricId,
+                unavailableReportsByMetricId,
+                cpuPollingGroupIds,
+                gpuPollingGroupIds,
+                retentionRead,
+                touchedPollingGroups,
+                cancellationToken);
+        }
+    }
+
+    private void AddRetainedSensorReadingsForFailedUpdate(
+        IHardware hardware,
+        Dictionary<string, MetricReading> readingsByMetricId,
+        Dictionary<string, MetricUnavailableReport> unavailableReportsByMetricId,
+        string hardwarePollingGroupId,
+        HardwareMetricRetentionCache.ReadScope retentionRead)
+    {
+        if (!LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
+        {
+            return;
+        }
+
+        foreach (ISensor sensor in hardware.Sensors)
+        {
+            string sourceSensorMetricId = LibreHardwareMetricCatalog.BuildDynamicMetricId(sensor);
+            if (retentionRead.TryReadSourceSensor(
+                sensor.Identifier.ToString(),
+                hardwarePollingGroupId,
+                out MetricReading retainedCatalogReading,
+                out bool sourceSensorExpired))
+            {
+                AddReading(readingsByMetricId, retainedCatalogReading);
+            }
+            else if (sourceSensorExpired)
+            {
+                unavailableReportsByMetricId[sourceSensorMetricId] = BuildUnavailableReport(
+                    sourceSensorMetricId,
+                    MetricUnavailableReason.Expired,
+                    BuildRawSensorIdentity(retainedCatalogReading));
+            }
+
+            if (!LibreHardwareMetricCatalog.TryGetStableMetricId(hardware, sensor, out string? stableMetricId))
+            {
+                continue;
+            }
+
+            string ownerPollingGroupId = LibreHardwareMetricCatalog.BuildPollingGroupId(hardware, stableMetricId);
+            if (retentionRead.TryReadStableAlias(
+                stableMetricId,
+                ownerPollingGroupId,
+                out MetricReading retainedStableReading,
+                out bool stableAliasExpired))
+            {
+                AddReading(readingsByMetricId, retainedStableReading);
+                unavailableReportsByMetricId.Remove(stableMetricId);
+                continue;
+            }
+
+            if (stableAliasExpired)
+            {
+                unavailableReportsByMetricId[stableMetricId] = BuildUnavailableReport(
+                    stableMetricId,
+                    MetricUnavailableReason.Expired,
+                    BuildRawSensorIdentity(retainedStableReading));
+            }
         }
     }
 
