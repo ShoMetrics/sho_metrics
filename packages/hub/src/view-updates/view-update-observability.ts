@@ -28,6 +28,8 @@ function resolveMetricViewPerformanceActionKind(event: WillAppearEvent): MetricV
 }
 
 export function recordMetricViewPerformanceSample(options: {
+    actionId: string;
+    metricKey: string;
     event: WillAppearEvent;
     updateReason: MetricViewUpdatePriority;
     outcome: MetricViewPerformanceOutcome;
@@ -43,6 +45,8 @@ export function recordMetricViewPerformanceSample(options: {
     activeActionCount: number;
 }): void {
     const summary = metricViewPerformanceStats.record({
+        actionId: options.actionId,
+        metricKey: options.metricKey,
         requestReason: options.updateReason,
         actionKind: resolveMetricViewPerformanceActionKind(options.event),
         outcome: options.outcome,

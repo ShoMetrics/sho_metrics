@@ -13,6 +13,8 @@ test("metric view performance stats aggregates render windows", () => {
     const renderContext = buildRenderContext();
 
     const firstSummary = stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -28,6 +30,8 @@ test("metric view performance stats aggregates render windows", () => {
     }, 1000);
 
     const secondSummary = stats.record({
+        actionId: "action-2",
+        metricKey: "cpu.usage_percent",
         requestReason: "settings-change",
         actionKind: "dial",
         outcome: "skipped",
@@ -57,17 +61,25 @@ test("metric view performance stats aggregates render windows", () => {
     assert.equal(secondSummary.rasterizeDuration.count, 1);
     assert.equal(secondSummary.rasterizeDuration.maximumMilliseconds, 120);
     assert.deepEqual(secondSummary.slowestRasterizeSample, {
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         renderContext,
         rasterizeMilliseconds: 120,
         totalMilliseconds: 223,
         queuedMilliseconds: 100,
         sdkPromiseMilliseconds: 1,
     });
+    assert.match(
+        formatMetricViewPerformanceSummary(secondSummary),
+        /slowestActionId=action-1 slowestMetricKey=cpu\.usage_percent/,
+    );
 });
 
 test("metric view performance summary is log-friendly", () => {
     const stats = new MetricViewPerformanceStats(0);
     const summary = stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "failed",
@@ -118,6 +130,8 @@ test("metric view performance stats starts a new window after a wall-clock jump"
     const renderContext = buildRenderContext();
 
     assert.equal(stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -133,6 +147,8 @@ test("metric view performance stats starts a new window after a wall-clock jump"
     }, 1_000), null);
 
     const summary = stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -155,6 +171,8 @@ test("metric view performance stats summarizes normally after a wall-clock jump 
     const renderContext = buildRenderContext();
 
     stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -169,6 +187,8 @@ test("metric view performance stats summarizes normally after a wall-clock jump 
         titleClearRequested: false,
     }, 1_000);
     stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -183,6 +203,8 @@ test("metric view performance stats summarizes normally after a wall-clock jump 
         titleClearRequested: false,
     }, 91_000);
     const summary = stats.record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -205,6 +227,8 @@ test("metric view performance stats summarizes normally after a wall-clock jump 
 
 test("metric view performance summary warns only on degraded view update windows", () => {
     const fastSummary = new MetricViewPerformanceStats(0).record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -219,6 +243,8 @@ test("metric view performance summary warns only on degraded view update windows
         titleClearRequested: false,
     }, 2000);
     const queuedSummary = new MetricViewPerformanceStats(0).record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "rendered",
@@ -233,6 +259,8 @@ test("metric view performance summary warns only on degraded view update windows
         titleClearRequested: false,
     }, 2000);
     const failedSummary = new MetricViewPerformanceStats(0).record({
+        actionId: "action-1",
+        metricKey: "cpu.usage_percent",
         requestReason: "metric-tick",
         actionKind: "key",
         outcome: "failed",

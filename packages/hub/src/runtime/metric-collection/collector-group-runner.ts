@@ -277,6 +277,7 @@ export class CollectorGroupRunner {
             `groupId=${formatCollectorGroupId(this.collectorGroup)}`,
             `metricCount=${this.collectorGroup.metricKeys.length}`,
             `subscriberCount=${this.collectorGroup.subscriberIds.length}`,
+            `intervalMs=${this.collectorGroup.intervalMilliseconds}`,
             `durationMs=${durationMilliseconds}`,
             `backoffDelayMs=${result.backoffDelayMilliseconds ?? 0}`,
             `error=${result.error == null ? "" : String(result.error)}`,
@@ -292,6 +293,16 @@ export class CollectorGroupRunner {
         }
 
         if (result.status === "refreshed") {
+            if (durationMilliseconds > this.collectorGroup.intervalMilliseconds) {
+                log.atInfo()
+                    .everyMs(
+                        this.buildLogThrottleKey("slowRefreshed"),
+                        REFRESH_SUCCESS_LOG_INTERVAL_MILLISECONDS,
+                    )
+                    .log(logMessage);
+                return result;
+            }
+
             log.atDebug()
                 .everyMs(this.buildLogThrottleKey(result.status), REFRESH_SUCCESS_LOG_INTERVAL_MILLISECONDS)
                 .log(logMessage);
@@ -304,7 +315,7 @@ export class CollectorGroupRunner {
         return result;
     }
 
-    private buildLogThrottleKey(status: CollectorGroupRefreshStatus): string {
+    private buildLogThrottleKey(status: CollectorGroupRefreshStatus | "slowRefreshed"): string {
         return [
             "collectorGroupRefresh",
             status,

@@ -1,16 +1,19 @@
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
-import { logger, type ScopedLogger } from "../../logging/logger";
+import { logger, type ScopedLogger } from "../../logging/node-logger";
 import { monotonicNowMilliseconds } from "../../shared/clock";
 import type {
+    MetricStoreAcceptedScalarDiagnosticSample,
     MetricStoreIngestRejection,
     MetricStoreIngestRejectionReason,
     MetricStoreIngestReport,
 } from "../metric-store";
+import { CUSTOM_HTTP_SOURCE_ID } from "../sources/source-ids";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 
 const log = logger.for("MetricStoreIngestDiagnostics");
 const INVALID_VALUES_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(60_000);
 const MAX_SAMPLE_REJECTIONS = 8;
+const MAX_FIRST_SCALAR_DIAGNOSTIC_SAMPLES = 8;
 
 /** Identifies the source boundary that owns one MetricStore ingest call. */
 export interface MetricStoreIngestDiagnosticContext {
@@ -39,6 +42,17 @@ export interface MetricStoreInvalidValueReasonCount {
     readonly count: number;
 }
 
+export interface MetricStoreFirstScalarDiagnosticSamplesLogEntry {
+    readonly sourceId: string;
+    readonly sourceScopeId: string | undefined;
+    readonly groupKind: string | undefined;
+    readonly groupId: string | undefined;
+    readonly sampleCount: number;
+    readonly deferredSampleCount: number;
+    readonly samples: readonly MetricStoreAcceptedScalarDiagnosticSample[];
+    readonly intervalMilliseconds: number | undefined;
+}
+
 interface MetricStoreIngestDiagnosticsOptions {
     readonly logWriter?: MetricStoreIngestDiagnosticsLogWriter;
     readonly nowMilliseconds?: () => number;
@@ -46,6 +60,7 @@ interface MetricStoreIngestDiagnosticsOptions {
 }
 
 interface MetricStoreIngestDiagnosticsLogWriter {
+    writeFirstScalarDiagnosticSamples(entry: MetricStoreFirstScalarDiagnosticSamplesLogEntry): void;
     write(entry: MetricStoreInvalidValuesLogEntry): void;
 }
 
@@ -71,6 +86,7 @@ export class MetricStoreIngestDiagnostics {
     private readonly nowMilliseconds: () => number;
     private readonly throttleMilliseconds: number;
     private readonly bucketsByKey = new Map<string, PendingInvalidValuesBucket>();
+    private readonly loggedFirstScalarDiagnosticSampleKeys = new Set<string>();
 
     constructor(options: MetricStoreIngestDiagnosticsOptions = {}) {
         this.logWriter = options.logWriter ?? new LoggerMetricStoreIngestDiagnosticsLogWriter(log);
@@ -79,6 +95,8 @@ export class MetricStoreIngestDiagnostics {
     }
 
     record(context: MetricStoreIngestDiagnosticContext, report: MetricStoreIngestReport): void {
+        this.recordFirstScalarDiagnosticSamples(context, report);
+
         if (report.rejectedCount === 0) {
             return;
         }
@@ -152,6 +170,42 @@ export class MetricStoreIngestDiagnostics {
         this.bucketsByKey.set(bucketKey, bucket);
         return bucket;
     }
+
+    private recordFirstScalarDiagnosticSamples(
+        context: MetricStoreIngestDiagnosticContext,
+        report: MetricStoreIngestReport,
+    ): void {
+        if (context.sourceId === CUSTOM_HTTP_SOURCE_ID) {
+            return;
+        }
+
+        const unloggedSamples = report.acceptedScalarDiagnosticSamples.filter(sample => (
+            !this.loggedFirstScalarDiagnosticSampleKeys.has(
+                buildFirstScalarDiagnosticSampleKey(context, sample.metricKey),
+            )
+        ));
+        const samplesToWrite = unloggedSamples.slice(0, MAX_FIRST_SCALAR_DIAGNOSTIC_SAMPLES);
+
+        for (const sample of samplesToWrite) {
+            const sampleKey = buildFirstScalarDiagnosticSampleKey(context, sample.metricKey);
+            this.loggedFirstScalarDiagnosticSampleKeys.add(sampleKey);
+        }
+
+        if (samplesToWrite.length === 0) {
+            return;
+        }
+
+        this.logWriter.writeFirstScalarDiagnosticSamples({
+            sourceId: context.sourceId,
+            sourceScopeId: context.sourceScopeId,
+            groupKind: context.groupKind,
+            groupId: context.groupId,
+            sampleCount: samplesToWrite.length,
+            deferredSampleCount: Math.max(unloggedSamples.length - MAX_FIRST_SCALAR_DIAGNOSTIC_SAMPLES, 0),
+            samples: samplesToWrite,
+            intervalMilliseconds: context.intervalMilliseconds,
+        });
+    }
 }
 
 /** Carries collector ownership into MetricStore rejection logs without teaching sources store rules. */
@@ -179,6 +233,14 @@ function buildDiagnosticsBucketKey(context: MetricStoreIngestDiagnosticContext):
     ]);
 }
 
+function buildFirstScalarDiagnosticSampleKey(context: MetricStoreIngestDiagnosticContext, metricKey: string): string {
+    return JSON.stringify([
+        context.sourceId,
+        context.sourceScopeId ?? "",
+        metricKey,
+    ]);
+}
+
 function formatReasonCounts(
     reasonCounts: ReadonlyMap<MetricStoreIngestRejectionReason, number>,
 ): readonly MetricStoreInvalidValueReasonCount[] {
@@ -195,6 +257,20 @@ function formatCollectorGroupId(collectorGroup: PlannedCollectorGroup): string {
 
 class LoggerMetricStoreIngestDiagnosticsLogWriter implements MetricStoreIngestDiagnosticsLogWriter {
     constructor(private readonly scopedLogger: ScopedLogger) {}
+
+    writeFirstScalarDiagnosticSamples(entry: MetricStoreFirstScalarDiagnosticSamplesLogEntry): void {
+        this.scopedLogger.info(() => [
+            "metricStoreFirstScalarDiagnosticSamples",
+            `sourceId=${entry.sourceId}`,
+            `sourceScopeId=${entry.sourceScopeId ?? ""}`,
+            `groupKind=${entry.groupKind ?? ""}`,
+            `groupId=${entry.groupId ?? ""}`,
+            `sampleCount=${entry.sampleCount}`,
+            `deferredSampleCount=${entry.deferredSampleCount}`,
+            `samples=${formatFirstScalarDiagnosticSamplesForLog(entry.samples)}`,
+            `intervalMs=${entry.intervalMilliseconds ?? ""}`,
+        ].join(" "));
+    }
 
     write(entry: MetricStoreInvalidValuesLogEntry): void {
         this.scopedLogger.warn(() => [
@@ -218,4 +294,14 @@ function formatReasonCountsForLog(reasonCounts: readonly MetricStoreInvalidValue
 
 function formatSampleRejectionsForLog(rejections: readonly MetricStoreIngestRejection[]): string {
     return rejections.map(rejection => `${rejection.metricKey}(${rejection.reason})`).join(",");
+}
+
+function formatFirstScalarDiagnosticSamplesForLog(samples: readonly MetricStoreAcceptedScalarDiagnosticSample[]): string {
+    return samples
+        .map(sample => `${sample.metricKey}=${formatScalarDiagnosticSampleValue(sample.value)}:${sample.unit}`)
+        .join(",");
+}
+
+function formatScalarDiagnosticSampleValue(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toPrecision(6);
 }

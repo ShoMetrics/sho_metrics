@@ -1,6 +1,10 @@
 import { RingBuffer } from "./ring-buffer";
 import type { WidgetData } from "../view-rendering/widget-data";
-import { readRequiredMetricSnapshotTimestampMilliseconds, type MetricSnapshot } from "./sources/metric-source";
+import {
+    MetricUnit,
+    readRequiredMetricSnapshotTimestampMilliseconds,
+    type MetricSnapshot,
+} from "./sources/metric-source";
 import type {
     MetricUnavailableReport,
     SourceMetricValueMetadata,
@@ -15,6 +19,18 @@ export interface MetricStoreIngestRejection {
 }
 
 /**
+ * Diagnostic copy of a scalar value accepted during ingest.
+ *
+ * MetricStore still owns render state privately; this copy exists only so
+ * first-sample logs can explain source units and suspicious magnitudes.
+ */
+export interface MetricStoreAcceptedScalarDiagnosticSample {
+    readonly metricKey: string;
+    readonly value: number;
+    readonly unit: MetricUnit;
+}
+
+/**
  * Summarizes one ingest without changing the store mutation contract.
  *
  * Callers use this only for diagnostics. A rejected value means MetricStore
@@ -25,6 +41,8 @@ export interface MetricStoreIngestRejection {
 export interface MetricStoreIngestReport {
     readonly acceptedScalarCount: number;
     readonly acceptedTextCount: number;
+    /** Diagnostic-only value copies; renderers must read MetricStore state instead. */
+    readonly acceptedScalarDiagnosticSamples: readonly MetricStoreAcceptedScalarDiagnosticSample[];
     readonly rejectedCount: number;
     readonly rejections: readonly MetricStoreIngestRejection[];
 }
@@ -143,6 +161,7 @@ export class MetricStore {
             sourceMetadata.valueMetadata?.map(metadata => [metadata.metricId, metadata]) ?? [],
         );
         const rejections: MetricStoreIngestRejection[] = [];
+        const acceptedScalarDiagnosticSamples: MetricStoreAcceptedScalarDiagnosticSample[] = [];
         let acceptedScalarCount = 0;
         let acceptedTextCount = 0;
 
@@ -157,6 +176,11 @@ export class MetricStore {
                 }
 
                 acceptedScalarCount += 1;
+                acceptedScalarDiagnosticSamples.push({
+                    metricKey,
+                    value: value.value.value,
+                    unit: value.unit,
+                });
                 const valueMetadata = valueMetadataByMetricKey.get(metricKey);
                 this.recordValueMetadata(sourceScopeId, metricKey, valueMetadata);
                 this.clearUnavailableMetric(sourceScopeId, metricKey);
@@ -192,6 +216,7 @@ export class MetricStore {
         return {
             acceptedScalarCount,
             acceptedTextCount,
+            acceptedScalarDiagnosticSamples,
             rejectedCount: rejections.length,
             rejections,
         };

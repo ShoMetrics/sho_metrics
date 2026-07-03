@@ -21,7 +21,6 @@ test("missing metric returns render-safe numeric defaults without a value timest
         sampleTimestampMilliseconds: undefined,
     });
 });
-
 test("scalar values keep history, latest value, progress, and timestamp", () => {
     const metricStore = new MetricStore();
     const metrics = metricStore.forScope(LOCAL_SOURCE_SCOPE_ID);
@@ -273,6 +272,7 @@ test("invalid scalar and empty text values are ignored and reported", () => {
     assert.deepEqual(ingestReport, {
         acceptedScalarCount: 0,
         acceptedTextCount: 0,
+        acceptedScalarDiagnosticSamples: [],
         rejectedCount: 4,
         rejections: [
             { metricKey: "cpu.usage_percent", reason: "nonFiniteScalar" },
@@ -302,6 +302,9 @@ test("ingest report counts accepted scalar and text values", () => {
     assert.deepEqual(ingestReport, {
         acceptedScalarCount: 1,
         acceptedTextCount: 1,
+        acceptedScalarDiagnosticSamples: [
+            { metricKey: "cpu.usage_percent", value: 25, unit: MetricUnit.PERCENT },
+        ],
         rejectedCount: 0,
         rejections: [],
     });

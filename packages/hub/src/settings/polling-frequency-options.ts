@@ -1,3 +1,14 @@
+export const STANDARD_POLLING_FREQUENCY_SECONDS = [
+    1,
+    2,
+    3,
+    5,
+    10,
+    15,
+    30,
+    60,
+] as const;
+
 export const SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS = [
     60,
     180,

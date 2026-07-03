@@ -22,16 +22,10 @@ import {
 } from "../../runtime/sources/custom-http/custom-http-request-policy";
 import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing/metric-source-preferences";
 import type { MetricSupportPlatform } from "../../runtime/source-capabilities/metric-support-platform";
+import { STANDARD_POLLING_FREQUENCY_SECONDS } from "../../settings/polling-frequency-options";
 
 export const pollingFrequencyOptionList = [
-    { value: 1, label: "1s" },
-    { value: 2, label: "2s" },
-    { value: 3, label: "3s" },
-    { value: 5, label: "5s" },
-    { value: 10, label: "10s" },
-    { value: 15, label: "15s" },
-    { value: 30, label: "30s" },
-    { value: 60, label: "60s" },
+    ...STANDARD_POLLING_FREQUENCY_SECONDS.map(value => ({ value, label: `${value}s` })),
 ] as const satisfies readonly SelectOption<number>[];
 
 export const customHttpPollingFrequencyOptionList = [

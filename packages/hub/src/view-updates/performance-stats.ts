@@ -22,6 +22,8 @@ export interface MetricViewPerformanceRenderContext {
 }
 
 export interface MetricViewPerformanceSlowestRasterizeSample {
+    readonly actionId: string;
+    readonly metricKey: string;
     readonly renderContext: MetricViewPerformanceRenderContext;
     readonly rasterizeMilliseconds: number;
     readonly totalMilliseconds: number;
@@ -30,6 +32,8 @@ export interface MetricViewPerformanceSlowestRasterizeSample {
 }
 
 export interface MetricViewPerformanceSample {
+    actionId: string;
+    metricKey: string;
     requestReason: MetricViewPerformanceReason;
     actionKind: MetricViewPerformanceActionKind;
     outcome: MetricViewPerformanceOutcome;
@@ -231,6 +235,8 @@ function addMetricViewPerformanceSample(
         || sample.rasterizeMilliseconds > performanceWindow.slowestRasterizeSample.rasterizeMilliseconds
     ) {
         performanceWindow.slowestRasterizeSample = {
+            actionId: sample.actionId,
+            metricKey: sample.metricKey,
             renderContext: sample.renderContext,
             rasterizeMilliseconds: sample.rasterizeMilliseconds,
             totalMilliseconds: sample.totalMilliseconds,
@@ -276,6 +282,8 @@ function formatSlowestRasterizeSample(sample: MetricViewPerformanceSlowestRaster
         `slowestTotalMs=${sample.totalMilliseconds.toFixed(0)}`,
         `slowestQueuedMs=${formatNullableDuration(sample.queuedMilliseconds)}`,
         `slowestSdkPromiseMs=${formatNullableDuration(sample.sdkPromiseMilliseconds)}`,
+        `slowestActionId=${sample.actionId}`,
+        `slowestMetricKey=${sample.metricKey}`,
         `slowestMetricFamily=${sample.renderContext.metricFamily}`,
         `slowestViewKind=${sample.renderContext.metricRenderKind}`,
         `slowestPrimitive=${sample.renderContext.renderPrimitive}`,

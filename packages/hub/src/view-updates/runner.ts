@@ -234,6 +234,8 @@ export class MetricViewUpdateRunner {
                 `renderToSkipMs=${this.wallClockNow() - renderStartTimestampMilliseconds}`,
             ].join(" "));
             recordMetricViewPerformanceSample({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
                 event: options.event,
                 updateReason,
                 outcome: "skipped",
@@ -265,6 +267,8 @@ export class MetricViewUpdateRunner {
                 activeActionCount: this.metricViewActionStates.size,
             });
             recordMetricViewPerformanceSample({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
                 event: options.event,
                 updateReason,
                 outcome: "failed",
@@ -300,6 +304,8 @@ export class MetricViewUpdateRunner {
                 activeActionCount: this.metricViewActionStates.size,
             });
             recordMetricViewPerformanceSample({
+                actionId: options.event.action.id,
+                metricKey: options.metricKey,
                 event: options.event,
                 updateReason,
                 outcome: "failed",
@@ -366,6 +372,8 @@ export class MetricViewUpdateRunner {
                 }
 
                 recordMetricViewPerformanceSample({
+                    actionId: options.event.action.id,
+                    metricKey: options.metricKey,
                     event: options.event,
                     updateReason,
                     outcome: dispatchResult.status === "rendered" ? "rendered" : "failed",

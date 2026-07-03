@@ -1,5 +1,5 @@
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
-import { logger, type LogLevel, type ScopedLogger } from "../../logging/logger";
+import { logger, type LogLevel, type ScopedLogger } from "../../logging/node-logger";
 import {
     STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS,
     StatusEdgeDetector,
@@ -12,6 +12,7 @@ import type {
 import type { SourceClientStatus } from "../../runtime/sources/source-client";
 
 const log = logger.for("DisplayedMetricNoData");
+const SUSTAINED_NO_DATA_WARNING_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(600_000);
 
 /** Render-path trace sample for the primary metric shown by one action. */
 export interface DisplayedMetricNoDataObservation {
@@ -244,7 +245,7 @@ class LoggerDisplayedMetricNoDataLogWriter implements DisplayedMetricNoDataLogWr
             this.scopedLogger.atWarn()
                 .everyMs(
                     buildDisplayedMetricNoDataThrottleKey(entry),
-                    resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
+                    resolveDisplayedMetricNoDataLogIntervalMilliseconds(entry),
                 )
                 .log(message);
             return;
@@ -253,10 +254,16 @@ class LoggerDisplayedMetricNoDataLogWriter implements DisplayedMetricNoDataLogWr
         this.scopedLogger.atInfo()
             .everyMs(
                 buildDisplayedMetricNoDataThrottleKey(entry),
-                resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
+                resolveDisplayedMetricNoDataLogIntervalMilliseconds(entry),
             )
             .log(message);
     }
+}
+
+function resolveDisplayedMetricNoDataLogIntervalMilliseconds(entry: DisplayedMetricNoDataLogEntry): number {
+    return entry.event === "displayedMetricNoDataSustained" && entry.level === "warn"
+        ? SUSTAINED_NO_DATA_WARNING_LOG_INTERVAL_MILLISECONDS
+        : resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS);
 }
 
 /** Preserves per-key enter/recover trace details while collapsing sustained source outages. */

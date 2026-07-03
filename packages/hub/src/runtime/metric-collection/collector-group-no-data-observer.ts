@@ -1,5 +1,5 @@
 import { resolveProductionLogThrottleMilliseconds } from "../../logging/log-throttle";
-import { logger, type LogLevel, type ScopedLogger } from "../../logging/logger";
+import { logger, type LogLevel, type ScopedLogger } from "../../logging/node-logger";
 import {
     STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS,
     StatusEdgeDetector,
@@ -11,6 +11,7 @@ import type { PlannedCollectorGroup } from "./collector-group-planner";
 
 const log = logger.for("CollectorGroupNoData");
 const MAX_SAMPLE_METRIC_KEYS = 8;
+const SUSTAINED_NO_DATA_WARNING_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(600_000);
 
 /** Observes whether a refreshed collector group produced any requested key. */
 export interface CollectorGroupNoDataObserver {
@@ -121,7 +122,7 @@ class LoggerCollectorGroupNoDataLogWriter implements CollectorGroupNoDataLogWrit
         logAtLevel
             .everyMs(
                 `collector-group-no-data:${entry.event}:${entry.sourceId}:${entry.groupId}`,
-                resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS),
+                resolveCollectorGroupNoDataLogIntervalMilliseconds(entry),
             )
             .log(() => [
                 entry.event,
@@ -136,6 +137,13 @@ class LoggerCollectorGroupNoDataLogWriter implements CollectorGroupNoDataLogWrit
                 `sustainedMs=${entry.sustainedMilliseconds}`,
             ].join(" "));
     }
+}
+
+function resolveCollectorGroupNoDataLogIntervalMilliseconds(entry: CollectorGroupNoDataLogEntry): number {
+    return entry.event === "collectorGroupNoDataSustained"
+        && resolveCollectorGroupNoDataLogLevel(entry.event) === "warn"
+        ? SUSTAINED_NO_DATA_WARNING_LOG_INTERVAL_MILLISECONDS
+        : resolveProductionLogThrottleMilliseconds(STATUS_EDGE_PRODUCTION_LOG_INTERVAL_MILLISECONDS);
 }
 
 /** Keeps recovery out of WARN so transient source gaps do not count as active failures. */

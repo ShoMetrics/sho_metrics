@@ -8,7 +8,8 @@ import {
     type MetricSnapshot,
     type MetricValue,
 } from "../metric-source";
-import { logger } from "../../../logging/logger";
+import { logger } from "../../../logging/node-logger";
+import { resolveProductionLogThrottleMilliseconds } from "../../../logging/log-throttle";
 import {
     monotonicNowMilliseconds,
     wallClockNowMilliseconds,
@@ -98,6 +99,7 @@ const networkLog = logger.for("Source:NodeSystem:Network");
 const gpuLog = logger.for("Source:NodeSystem:GPU");
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
 const HERTZ_PER_GIGAHERTZ = 1000 * 1000 * 1000;
+const MULTI_GROUP_POLL_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS = resolveProductionLogThrottleMilliseconds(30_000);
 
 const {
     // Do not use. systeminformation v5 documents this as unreliable on Windows
@@ -259,6 +261,7 @@ export class NodeSystemSource implements MetricSource {
     async pollMetrics(metricKeys: readonly string[]): Promise<MetricSnapshot> {
         const metrics: Record<string, MetricValue> = {};
         const metricGroups = resolveCollectorGroups(metricKeys);
+        const pollStartedAtMonotonicMilliseconds = this.monotonicNow();
         const pollStartedAtTimestampMilliseconds = this.wallClockNow();
 
         const [cpuMetrics, memoryMetrics, diskMetrics, networkMetrics, batteryMetrics, gpu] = await Promise.all([
@@ -303,6 +306,11 @@ export class NodeSystemSource implements MetricSource {
                 metrics[GPU_POWER_LIMIT_METRIC_KEY] = buildScalarMetricValue(gpu.powerLimit, { unit: MetricUnit.WATTS });
             }
         }
+        this.logMultiGroupPollDiagnostic(
+            metricGroups,
+            metricKeys,
+            this.monotonicNow() - pollStartedAtMonotonicMilliseconds,
+        );
 
         return buildMetricSnapshot({
             // A single-group poll stamps at completion so a slow collector (e.g.
@@ -315,6 +323,30 @@ export class NodeSystemSource implements MetricSource {
                 : pollStartedAtTimestampMilliseconds,
             metrics,
         });
+    }
+
+    private logMultiGroupPollDiagnostic(
+        metricGroups: ReadonlySet<NodeSystemMetricGroup>,
+        metricKeys: readonly string[],
+        durationMilliseconds: number,
+    ): void {
+        if (metricGroups.size <= 1) {
+            return;
+        }
+
+        log.atInfo()
+            .everyMs(
+                "node-system-multi-group-poll",
+                MULTI_GROUP_POLL_DIAGNOSTIC_LOG_INTERVAL_MILLISECONDS,
+            )
+            .log(() => [
+                "nodeSystemMultiGroupPoll",
+                `durationMs=${durationMilliseconds}`,
+                `metricGroupCount=${metricGroups.size}`,
+                `metricGroups=${Array.from(metricGroups).sort().join(",")}`,
+                `metricCount=${metricKeys.length}`,
+                "timestampMode=start",
+            ].join(" "));
     }
 
     private async pollMemory(): Promise<Record<string, MetricValue>> {

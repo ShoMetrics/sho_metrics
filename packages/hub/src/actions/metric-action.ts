@@ -21,7 +21,7 @@ import {
     setMetricViewPollingInterval,
     type MetricViewOptions,
 } from "../view-updates/runner";
-import { logger } from "../logging/logger";
+import { logger } from "../logging/node-logger";
 import { formatMetricKeyFieldsForLog } from "../logging/log-format";
 import { pluginGlobalSettingsStore } from "../settings/global-settings-store";
 import {
@@ -72,6 +72,7 @@ import {
     isVendorHidBatteryMetricKey,
 } from "../runtime/metric-keys";
 import {
+    STANDARD_POLLING_FREQUENCY_SECONDS,
     SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS,
     VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS,
 } from "../settings/polling-frequency-options";
@@ -692,7 +693,7 @@ export abstract class MetricAction extends SingletonAction {
 }
 
 const DEFAULT_POLLING_INTERVAL_MILLISECONDS = 1000;
-const ALLOWED_POLLING_FREQUENCY_SECONDS = new Set([1, 2, 3, 5, 10, 15, 30, 60]);
+const ALLOWED_POLLING_FREQUENCY_SECONDS: ReadonlySet<number> = new Set(STANDARD_POLLING_FREQUENCY_SECONDS);
 const CUSTOM_METRIC_MAX_POLLING_FREQUENCY_SECONDS = 86400;
 const SYSTEM_BATTERY_POLLING_FREQUENCY_SECOND_SET: ReadonlySet<number>
     = new Set(SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS);

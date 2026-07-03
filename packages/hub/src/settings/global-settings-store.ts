@@ -20,6 +20,7 @@ class GlobalSettingsStore {
     }
 
     update(rawSettings: unknown): StoredGlobalSettings {
+        const previousSettingsSummary = summarizeGlobalSettingsForLog(this.settings);
         const globalSettingsRead = readStoredGlobalSettings(rawSettings);
         const readWarning = globalSettingsRead.warning;
         if (readWarning) {
@@ -27,6 +28,11 @@ class GlobalSettingsStore {
         }
 
         this.settings = globalSettingsRead.settings;
+        const nextSettingsSummary = summarizeGlobalSettingsForLog(this.settings);
+        if (nextSettingsSummary !== previousSettingsSummary) {
+            log.info(() => `globalSettingsChanged ${nextSettingsSummary}`);
+        }
+
         for (const listener of this.listeners) {
             listener(this.settings);
         }
@@ -40,3 +46,21 @@ class GlobalSettingsStore {
 }
 
 export const pluginGlobalSettingsStore = new GlobalSettingsStore();
+
+function summarizeGlobalSettingsForLog(settings: StoredGlobalSettings): string {
+    return [
+        `defaultSourceProfileId=${settings.defaultSourceProfileId ?? ""}`,
+        `sourceProfileCount=${settings.sourceProfiles.length}`,
+        `customHttpCredentialCount=${settings.customHttpCredentials.length}`,
+        `globalOverridesEnabled=${formatOptionalBoolean(settings.overrides?.enabled)}`,
+        `viewOverrideEnabled=${formatOptionalBoolean(settings.overrides?.view?.enabled)}`,
+        `themeOverrideEnabled=${formatOptionalBoolean(settings.overrides?.theme?.enabled)}`,
+        `paintOverrideEnabled=${formatOptionalBoolean(settings.overrides?.paint?.enabled)}`,
+        `transparentSurfaceOverrideEnabled=${formatOptionalBoolean(settings.overrides?.transparentSurface?.enabled)}`,
+        `vendorHidBatteryEnabled=${formatOptionalBoolean(settings.system?.experimentalVendorHidBatteryEnabled)}`,
+    ].join(" ");
+}
+
+function formatOptionalBoolean(value: boolean | undefined): string {
+    return value === undefined ? "unset" : String(value);
+}

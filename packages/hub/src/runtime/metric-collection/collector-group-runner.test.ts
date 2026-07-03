@@ -3,7 +3,10 @@ import { test } from "vitest";
 import { CollectorGroupRunner } from "./collector-group-runner";
 import type { PlannedCollectorGroup } from "./collector-group-planner";
 import type { CollectorGroupNoDataObserver } from "./collector-group-no-data-observer";
-import { MetricStoreIngestDiagnostics } from "./metric-store-ingest-diagnostics";
+import {
+    MetricStoreIngestDiagnostics,
+    type MetricStoreFirstScalarDiagnosticSamplesLogEntry,
+} from "./metric-store-ingest-diagnostics";
 import { MetricStore } from "../metric-store";
 import {
     buildMetricSnapshot,
@@ -730,6 +733,10 @@ class RecordingMetricStoreIngestDiagnosticsLogWriter {
         readonly uniqueMetricCount: number;
         readonly intervalMilliseconds: number | undefined;
     }> = [];
+
+    writeFirstScalarDiagnosticSamples(entry: MetricStoreFirstScalarDiagnosticSamplesLogEntry): void {
+        void entry;
+    }
 
     write(entry: RecordingMetricStoreIngestDiagnosticsLogWriter["entries"][number]): void {
         this.entries.push(entry);

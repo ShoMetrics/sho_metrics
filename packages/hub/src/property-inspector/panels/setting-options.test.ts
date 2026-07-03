@@ -6,9 +6,17 @@ import {
     isGpuHardwareSummarySupportedOnPlatform,
     pollingFrequencyOptionList,
 } from "./setting-options";
+import { STANDARD_POLLING_FREQUENCY_SECONDS } from "../../settings/polling-frequency-options";
 
 test("Custom HTTP polling options extend ordinary widget polling up to 24 hours", () => {
-    assert.equal(pollingFrequencyOptionList.at(-1)?.value, 60);
+    assert.deepEqual(
+        pollingFrequencyOptionList.map(option => option.value),
+        [...STANDARD_POLLING_FREQUENCY_SECONDS],
+    );
+    assert.deepEqual(
+        pollingFrequencyOptionList.map(option => option.label),
+        STANDARD_POLLING_FREQUENCY_SECONDS.map(value => `${value}s`),
+    );
     assert.deepEqual(
         customHttpPollingFrequencyOptionList.slice(-6).map(option => option.value),
         [3600, 7200, 10800, 21600, 43200, 86400],

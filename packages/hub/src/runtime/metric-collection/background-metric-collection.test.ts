@@ -22,6 +22,7 @@ import type {
 } from "./metric-collection-refresh";
 import {
     MetricStoreIngestDiagnostics,
+    type MetricStoreFirstScalarDiagnosticSamplesLogEntry,
     type MetricStoreInvalidValuesLogEntry,
 } from "./metric-store-ingest-diagnostics";
 import { MetricSubscriptionRegistry } from "./metric-subscription-registry";
@@ -500,6 +501,7 @@ function emptyMetricStoreIngestReport() {
     return {
         acceptedScalarCount: 0,
         acceptedTextCount: 0,
+        acceptedScalarDiagnosticSamples: [],
         rejectedCount: 0,
         rejections: [],
     };
@@ -610,6 +612,10 @@ class FakeSourceClient implements SourceClient {
 
 class RecordingMetricStoreIngestDiagnosticsLogWriter {
     readonly entries: MetricStoreInvalidValuesLogEntry[] = [];
+
+    writeFirstScalarDiagnosticSamples(entry: MetricStoreFirstScalarDiagnosticSamplesLogEntry): void {
+        void entry;
+    }
 
     write(entry: MetricStoreInvalidValuesLogEntry): void {
         this.entries.push(entry);
