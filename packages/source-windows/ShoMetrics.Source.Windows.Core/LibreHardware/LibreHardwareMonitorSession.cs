@@ -52,7 +52,7 @@ public sealed class LibreHardwareMonitorSession : IDisposable
             warnings.Add(new HardwareSourceWarning
             {
                 Code = "lhm_init_failed",
-                Message = "LibreHardwareMonitor initialization failed.",
+                Message = $"LibreHardwareMonitor initialization failed: {exception.Message}",
             });
             computer.Close();
         }

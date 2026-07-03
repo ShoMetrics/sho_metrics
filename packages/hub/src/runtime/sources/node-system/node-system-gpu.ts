@@ -10,6 +10,7 @@ let lastNvidiaSmiFailureLogMonotonicMilliseconds = 0;
 let nextGpuPollDebugSequence = 1;
 let nextNvidiaSmiQueryDebugSequence = 1;
 let activeNvidiaSmiQueryCount = 0;
+let nvidiaSmiMissingRetryAfterMonotonicMilliseconds = 0;
 
 const NVIDIA_SMI_QUERY_FIELDS = [
     "utilization.gpu",
@@ -28,6 +29,7 @@ const NVIDIA_SMI_ARGUMENTS = [
 
 const NVIDIA_SMI_TIMEOUT_MS = 3000;
 const NVIDIA_SMI_FAILURE_LOG_INTERVAL_MS = 30000;
+const NVIDIA_SMI_MISSING_RETRY_INTERVAL_MS = 60 * 60 * 1000;
 // Do not add `-k PerformanceStatistics`: on Apple Silicon it can return zeroed
 // utilization counters while the unfiltered IOAccelerator object has live values.
 const IOREG_ARGUMENTS = ["-r", "-c", "IOAccelerator", "-d", "1", "-w", "0"] as const;
@@ -142,8 +144,13 @@ function runIoregIoAcceleratorQuery(): Promise<string | null> {
 }
 
 function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
+    const currentMonotonicMilliseconds = monotonicNowMilliseconds();
+    if (currentMonotonicMilliseconds < nvidiaSmiMissingRetryAfterMonotonicMilliseconds) {
+        return Promise.resolve(null);
+    }
+
     return new Promise(resolve => {
-        const queryStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const queryStartedAtMonotonicMilliseconds = currentMonotonicMilliseconds;
         const querySequence = nextNvidiaSmiQueryDebugSequence++;
         activeNvidiaSmiQueryCount += 1;
         gpuLog.debug(() => [
@@ -166,6 +173,20 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
                 activeNvidiaSmiQueryCount = Math.max(0, activeNvidiaSmiQueryCount - 1);
 
                 if (error) {
+                    if (isNvidiaSmiExecutableMissing(error)) {
+                        nvidiaSmiMissingRetryAfterMonotonicMilliseconds =
+                            monotonicNowMilliseconds() + NVIDIA_SMI_MISSING_RETRY_INTERVAL_MS;
+                        gpuLog.info(() => [
+                            "nvidiaSmiNotInstalled",
+                            `queryId=${querySequence}`,
+                            `elapsedMs=${elapsedMilliseconds}`,
+                            `retryMs=${NVIDIA_SMI_MISSING_RETRY_INTERVAL_MS}`,
+                            `code=${String(error.code ?? "unknown")}`,
+                        ].join(" "));
+                        resolve(null);
+                        return;
+                    }
+
                     logNvidiaSmiFailure({
                         error,
                         elapsedMilliseconds,
@@ -189,6 +210,10 @@ function runNvidiaSmiTelemetryQuery(): Promise<string | null> {
             },
         );
     });
+}
+
+function isNvidiaSmiExecutableMissing(error: ExecFileException): boolean {
+    return error.code === "ENOENT";
 }
 
 function logIoregFailure(error: ExecFileException, elapsedMilliseconds: number): void {
