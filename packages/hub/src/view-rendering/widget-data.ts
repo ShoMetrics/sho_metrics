@@ -76,15 +76,23 @@ export const WIDGET_LOGICAL_SIZE: KeySize = { width: 144, height: 144 };
 export const TOUCH_STRIP_LOGICAL_SIZE: KeySize = { width: 200, height: 100 };
 
 /**
- * Keypad PNG target.
+ * Default keypad PNG target.
  *
- * A 288x288 target was tested for virtual-key sharpness and showed no visible
- * benefit. It increased terminal-vintage PNG output from about 24-25 KB to
- * about 71 KB and pushed worst-case rasterization from about 80-103 ms to
- * about 266-336 ms. Do not raise this without a measured visual gain; larger
- * PNGs also add I/O pressure during bursty startup and refresh rendering.
+ * A global 288x288 target was tested for virtual-key sharpness and showed no
+ * visible benefit on most themes. It increased terminal-vintage PNG output from
+ * about 24-25 KB to about 71 KB and pushed worst-case rasterization from about
+ * 80-103 ms to about 266-336 ms. Do not raise the global default without a
+ * measured visual gain; larger PNGs also add I/O pressure during bursty startup
+ * and refresh rendering.
  */
 export const KEYPAD_PNG_SIZE: KeySize = { width: 144, height: 144 };
+
+/**
+ * Pixel Window renders metric content inside a nested framed viewport; the 2x
+ * target preserves that second-stage composition better without taxing other
+ * themes on every refresh.
+ */
+export const PIXEL_WINDOW_KEYPAD_PNG_SIZE: KeySize = { width: 288, height: 288 };
 
 /** Full-width Stream Deck+ touch strip action region, used by wide bar views. */
 export const TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE: KeySize = { width: 200, height: 100 };

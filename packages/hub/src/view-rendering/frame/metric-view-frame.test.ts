@@ -10,6 +10,7 @@ import type { HardwareSummaryWidgetData } from "../../actions/hardware-summary/w
 import {
     KEYPAD_PNG_SIZE,
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+    PIXEL_WINDOW_KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
@@ -509,6 +510,22 @@ test("key render plan uses keypad PNG dimensions and no touch strip layout", () 
     assert.deepEqual(renderPlan.bodyRenderSize, WIDGET_LOGICAL_SIZE);
     assert.equal(renderPlan.bodyViewport, undefined);
     assert.deepEqual(renderPlan.pngSize, KEYPAD_PNG_SIZE);
+});
+
+test("pixel window key render plan uses the high-resolution keypad PNG dimensions", () => {
+    const renderPlan = buildMetricViewRenderPlan({
+        viewOptions: buildSingleMetricRenderOptions({
+            widgetData: buildWidgetData({ sampleTimestampMilliseconds: 1000 }),
+            resolvedSettings: {
+                theme: { selectedTheme: "pixel-window" },
+                view: { selectedView: "text" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.deepEqual(renderPlan.renderSize, WIDGET_LOGICAL_SIZE);
+    assert.deepEqual(renderPlan.pngSize, PIXEL_WINDOW_KEYPAD_PNG_SIZE);
 });
 
 test("pixel window keeps square text body inside the client viewport", () => {

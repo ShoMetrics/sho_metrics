@@ -18,6 +18,7 @@ import { renderSingleMetricBodyView } from "../views/single-metric-view";
 import {
     KEYPAD_PNG_SIZE,
     PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
+    PIXEL_WINDOW_KEYPAD_PNG_SIZE,
     TOUCH_STRIP_LOGICAL_SIZE,
     TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE,
     WIDGET_LOGICAL_SIZE,
@@ -263,6 +264,10 @@ export function buildMetricViewRenderPlan(options: {
     });
     const bodyViewport = bodyViewports[0];
 
+    const resolvedKeypadPngSize = renderAppearance.themePreset === "pixel-window"
+        ? PIXEL_WINDOW_KEYPAD_PNG_SIZE
+        : KEYPAD_PNG_SIZE;
+
     return {
         renderAppearance,
         centerContent,
@@ -276,7 +281,7 @@ export function buildMetricViewRenderPlan(options: {
             : bodyViewport.body.renderSize,
         bodyViewport,
         bodyViewports,
-        pngSize: touchStripMetricLayout?.pngSize ?? KEYPAD_PNG_SIZE,
+        pngSize: touchStripMetricLayout?.pngSize ?? resolvedKeypadPngSize,
     };
 }
 
