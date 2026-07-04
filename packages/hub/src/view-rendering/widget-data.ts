@@ -75,8 +75,16 @@ export const WIDGET_LOGICAL_SIZE: KeySize = { width: 144, height: 144 };
 /** Stream Deck+ gives each dial action one 200x100 px touch strip quarter. */
 export const TOUCH_STRIP_LOGICAL_SIZE: KeySize = { width: 200, height: 100 };
 
-/** High-resolution keypad PNG target. Stream Deck downsamples for hardware and keeps virtual keys sharper. */
-export const KEYPAD_PNG_SIZE: KeySize = { width: 288, height: 288 };
+/**
+ * Keypad PNG target.
+ *
+ * A 288x288 target was tested for virtual-key sharpness and showed no visible
+ * benefit. It increased terminal-vintage PNG output from about 24-25 KB to
+ * about 71 KB and pushed worst-case rasterization from about 80-103 ms to
+ * about 266-336 ms. Do not raise this without a measured visual gain; larger
+ * PNGs also add I/O pressure during bursty startup and refresh rendering.
+ */
+export const KEYPAD_PNG_SIZE: KeySize = { width: 144, height: 144 };
 
 /** Full-width Stream Deck+ touch strip action region, used by wide bar views. */
 export const TOUCH_STRIP_SINGLE_METRIC_PNG_SIZE: KeySize = { width: 200, height: 100 };
