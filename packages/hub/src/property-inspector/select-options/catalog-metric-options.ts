@@ -650,6 +650,10 @@ function resolveSelection(
 
     // Once the user picks a type, complete the lower levels to the first valid
     // concrete metric. Before that, keep the picker unselected and avoid writes.
+    // A vanished stored metricId is not preserved as an unavailable option in
+    // this picker today: after an explicit type choice, the remaining fields
+    // re-complete within that type. Revisit with preserveMissingCurrentOption
+    // if helper or catalog churn strands stored catalog widgets in practice.
     const typeEntries = entries.filter(entry => entry.typeId === selection.typeId);
     const hardwareId = selectExistingOrFirst(
         typeEntries.map(entry => entry.hardwareId),

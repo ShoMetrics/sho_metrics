@@ -6,6 +6,7 @@ import {
 } from "../../settings/polling-frequency-options";
 import type { SelectOption } from "../inspector/types";
 import { pollingFrequencyOptionList } from "./setting-options";
+import { preserveMissingCurrentOption } from "../select-options/preserve-current-option";
 
 /**
  * Lists safe polling choices for vendor HID peripheral battery reads.
@@ -45,10 +46,10 @@ export function resolveMinimumBatteryPollingFrequencySeconds(
 }
 
 /**
- * Resolves the shared Stacked polling choices from the slowest configured slot.
+ * Resolves the shared Stacked/Dense polling choices from the slowest configured slot.
  *
- * Stacked uses one widget-level polling interval for all slots. Adding a slower
- * battery slot raises the allowed interval floor; removing that slot does not
+ * These widgets use one polling interval for all slots. Adding a slower battery
+ * slot raises the allowed interval floor; removing that slot does not
  * automatically restore an older faster value because the previous value is not
  * tracked as user intent.
  */
@@ -71,20 +72,24 @@ export function resolveBatteryPollingFrequencyOptionsForMinimum(options: {
     // the user can lower it, and append the saved value as a disabled option so
     // SelectSetting displays the real stored value instead of silently rendering
     // it as the first fast option (which looked like an unwanted reset to 1s).
-    const currentSlowOption = SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS.find(
-        option => option.value === options.currentPollingFrequencySeconds,
-    );
-    if (currentSlowOption !== undefined) {
-        return [
-            ...pollingFrequencyOptionList,
-            {
-                ...currentSlowOption,
-                disabled: true,
-            },
-        ];
-    }
+    const optionList = preserveMissingCurrentOption({
+        optionList: pollingFrequencyOptionList,
+        currentValue: options.currentPollingFrequencySeconds,
+        placement: "end",
+        resolveCurrentOption: currentValue => {
+            const currentSlowOption = SYSTEM_BATTERY_POLLING_FREQUENCY_OPTIONS.find(
+                option => option.value === currentValue,
+            );
 
-    return undefined;
+            return currentSlowOption === undefined
+                ? undefined
+                : { ...currentSlowOption, disabled: true };
+        },
+    });
+
+    return optionList.length === pollingFrequencyOptionList.length
+        ? undefined
+        : optionList;
 }
 
 function formatBatteryPollingFrequencyLabel(value: number): string {

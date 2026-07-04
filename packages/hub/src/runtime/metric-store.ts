@@ -269,6 +269,10 @@ export class MetricStore {
         maxValue = 100,
     ): WidgetData {
         const metricRecord = this.readRecord(sourceScopeId, metricKey);
+        // A missing record reads as current=0 with an undefined
+        // sampleTimestampMilliseconds. That zero is a placeholder, not data:
+        // render paths must treat a missing timestamp as N/A and must never
+        // use `current` alone as evidence that a sample exists.
         const current = metricRecord?.kind === "scalar" ? metricRecord.current : 0;
 
         return {

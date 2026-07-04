@@ -124,6 +124,9 @@ function largestConfiguredOrRuntimeMaximum(
 }
 
 export function readPositiveRuntimeMaximum(value: number | undefined): number | undefined {
+    // Runtime maxima are observations from sources, not user intent. Ignore
+    // missing or invalid maxima so configured limits remain stable instead of
+    // letting one bad source sample collapse a gauge scale.
     return value !== undefined && Number.isFinite(value) && value > 0
         ? value
         : undefined;

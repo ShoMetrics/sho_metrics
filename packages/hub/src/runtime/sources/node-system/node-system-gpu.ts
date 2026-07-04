@@ -69,6 +69,12 @@ export async function pollWindowsNvidiaGpuTelemetry(): Promise<NodeSystemGpuTele
     const gpuData = parseNvidiaSmiTelemetryLine(firstGpuLine);
 
     if (!gpuData) {
+        // Returning null makes every GPU metric go no-data, which the collector
+        // no-data observer already logs. This stays debug-only because line
+        // format varies by driver version and a warn would repeat every poll on
+        // an incompatible driver without adding signal beyond those no-data
+        // logs. Promote to a throttled warn (with the raw line) if prod ever
+        // shows GPU no-data while nvidia-smi is installed and running.
         gpuLog.debug(() => [
             "nvidiaSmiNoParsedFields",
             `raw=${firstGpuLine}`,

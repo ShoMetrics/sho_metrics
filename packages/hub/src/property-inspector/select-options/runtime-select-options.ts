@@ -10,10 +10,19 @@ import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 import type { NetworkInterfaceOption } from "../../runtime/network-interfaces";
 import { requireResolvedSingleMetricWidget } from "../../settings/resolved-settings";
 import type { SelectOption, VisibilityContext } from "../inspector/types";
+import { preserveMissingCurrentOption } from "./preserve-current-option";
 
 /** Builds localized network interface picker options while preserving dynamic interface labels. */
-export function resolveNetworkInterfaceOptions(context: VisibilityContext, i18n?: I18n): SelectOption[] {
-    return buildNetworkInterfaceOptions(context.runtimeCache.availableNetworkInterfaces, i18n);
+export function resolveNetworkInterfaceOptions(
+    context: VisibilityContext,
+    selectedNetworkInterfaceId = "",
+    i18n?: I18n,
+): readonly SelectOption[] {
+    return buildNetworkInterfaceOptions(
+        context.runtimeCache.availableNetworkInterfaces,
+        selectedNetworkInterfaceId,
+        i18n,
+    );
 }
 
 /** Builds localized disk volume picker options while preserving dynamic volume labels. */
@@ -21,12 +30,16 @@ export function resolveDiskVolumeOptions(
     context: VisibilityContext,
     selectedDiskVolumeId = "",
     i18n?: I18n,
-): SelectOption[] {
+): readonly SelectOption[] {
     return buildDiskVolumeOptions(context, i18n, selectedDiskVolumeId);
 }
 
-function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfaceOption[], i18n: I18n | undefined): SelectOption[] {
-    return [
+function buildNetworkInterfaceOptions(
+    networkInterfaces: readonly NetworkInterfaceOption[],
+    selectedNetworkInterfaceId: string,
+    i18n: I18n | undefined,
+): readonly SelectOption[] {
+    const networkInterfaceOptions = [
         { value: "", label: translate(i18n, optionMessages.automaticOption) },
         ...networkInterfaces.map((networkInterface) => {
             const speedLabel = networkInterface.speedMegabitsPerSecond
@@ -43,9 +56,26 @@ function buildNetworkInterfaceOptions(networkInterfaces: readonly NetworkInterfa
             };
         }),
     ];
+
+    return preserveMissingCurrentOption({
+        optionList: networkInterfaceOptions,
+        currentValue: selectedNetworkInterfaceId.length > 0 ? selectedNetworkInterfaceId : undefined,
+        placement: "start",
+        resolveCurrentOption: currentValue => ({
+            value: currentValue,
+            label: translate(i18n, optionMessages.unavailableOptionLabel, {
+                label: currentValue,
+            }),
+            disabled: true,
+        }),
+    });
 }
 
-function buildDiskVolumeOptions(context: VisibilityContext, i18n: I18n | undefined, selectedDiskVolumeId: string): SelectOption[] {
+function buildDiskVolumeOptions(
+    context: VisibilityContext,
+    i18n: I18n | undefined,
+    selectedDiskVolumeId: string,
+): readonly SelectOption[] {
     const diskVolumes = context.runtimeCache.availableDiskVolumes;
     const diskVolumeOptions = diskVolumes.map((diskVolume) => ({
         value: diskVolume.id,
@@ -54,17 +84,22 @@ function buildDiskVolumeOptions(context: VisibilityContext, i18n: I18n | undefin
     const hasSelectedDiskVolume = selectedDiskVolumeId.length > 0
         && diskVolumeOptions.some(option => option.value === selectedDiskVolumeId);
 
-    if (selectedDiskVolumeId.length > 0 && !hasSelectedDiskVolume) {
-        diskVolumeOptions.unshift({
-            value: selectedDiskVolumeId,
+    const preservedDiskVolumeOptions = preserveMissingCurrentOption({
+        optionList: diskVolumeOptions,
+        currentValue: selectedDiskVolumeId.length > 0 && !hasSelectedDiskVolume
+            ? selectedDiskVolumeId
+            : undefined,
+        placement: "start",
+        resolveCurrentOption: currentValue => ({
+            value: currentValue,
             label: translate(i18n, optionMessages.unavailableOptionLabel, {
-                label: formatDiskVolumeSelectionText(selectedDiskVolumeId),
+                label: formatDiskVolumeSelectionText(currentValue),
             }),
-        });
-    }
+        }),
+    });
 
-    if (diskVolumeOptions.length > 0) {
-        return diskVolumeOptions;
+    if (preservedDiskVolumeOptions.length > 0) {
+        return preservedDiskVolumeOptions;
     }
 
     let volumeOptionLabel: string;

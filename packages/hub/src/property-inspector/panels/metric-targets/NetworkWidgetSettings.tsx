@@ -197,7 +197,7 @@ function NetworkTrafficMetricSettings({
             <SelectSetting
                 label={t(networkMessages.networkInterfaceLabel)}
                 value={reading.interfaceId ?? ""}
-                optionList={resolveNetworkInterfaceOptions(context, i18n)}
+                optionList={resolveNetworkInterfaceOptions(context, reading.interfaceId ?? "", i18n)}
                 onValueChange={(interfaceId) => onSettingsPatch({
                     network: { interfaceId },
                 })}

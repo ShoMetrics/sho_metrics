@@ -622,7 +622,7 @@ function DenseNetworkMetricSettings({
             <SelectSetting
                 label={t(networkMessages.networkInterfaceLabel)}
                 value={interfaceId}
-                optionList={resolveNetworkInterfaceOptions(context, i18n)}
+                optionList={resolveNetworkInterfaceOptions(context, interfaceId, i18n)}
                 onValueChange={(nextInterfaceId) => {
                     writeDenseSlotTargetPreservingCustomDisplay(onSettingsPatch, slotId, {
                         domain: "network",

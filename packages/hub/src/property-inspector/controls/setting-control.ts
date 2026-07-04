@@ -16,6 +16,10 @@ export function resolveSelectedOptionValue<TValue extends SelectOptionValue>(opt
         return options.value;
     }
 
+    // Generic controls do not know whether a missing value is stale runtime
+    // state, unsupported platform state, or an illegal setting. Dynamic option
+    // builders that must preserve the stored value should add an explicit
+    // preserved option before reaching this generic fallback.
     return options.optionList.find(isSelectableOption)?.value ?? "";
 }
 

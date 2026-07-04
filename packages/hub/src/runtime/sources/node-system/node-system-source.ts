@@ -243,6 +243,10 @@ export class NodeSystemSource implements MetricSource {
         for (const metricKey of metricKeys) {
             const metricGroup = resolveNodeSystemMetricGroup(metricKey);
             if (!metricGroup) {
+                // Unknown keys here are planner/programmer errors, not external
+                // data. Report them through source resolution so the collector
+                // can surface no-data diagnostics without polluting source logs
+                // on every tick.
                 resolutions.set(metricKey, { state: "unknown" });
                 continue;
             }

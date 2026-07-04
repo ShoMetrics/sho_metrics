@@ -36,6 +36,30 @@ test("network interface options include automatic and formatted interfaces", () 
     ]);
 });
 
+test("network interface options preserve selected unavailable interface", () => {
+    const context = buildContext({
+        runtimeCache: {
+            availableNetworkInterfaces: [
+                {
+                    id: "eth0",
+                    name: "Ethernet",
+                    type: "wired",
+                    isDefault: true,
+                    speedMegabitsPerSecond: 2500,
+                },
+            ],
+        },
+    });
+
+    const optionList = resolveNetworkInterfaceOptions(context, "wifi0");
+
+    assert.deepEqual(optionList, [
+        { value: "wifi0", label: "wifi0 (Unavailable)", disabled: true },
+        { value: "", label: "Automatic" },
+        { value: "eth0", label: "Ethernet (default, wired, eth0, 2500 Mbps)" },
+    ]);
+});
+
 test("disk volume options include explicit volumes and compact capacity labels", () => {
     const context = buildContext({
         runtimeCache: {

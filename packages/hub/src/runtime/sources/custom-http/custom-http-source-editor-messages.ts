@@ -183,7 +183,10 @@ export interface CustomHttpSourceEditorBlockedRedirect {
  *
  * The Stream Deck SDK delivers plugin messages as arbitrary JSON. Keep the
  * parameter `unknown` at this wire boundary, then narrow before action code
- * handles the request.
+ * handles the request. Malformed matching messages are ignored here rather
+ * than logged per event: this narrow editor channel can contain URL and auth
+ * references, and shape drift should fail closed without leaking those details
+ * into logs.
  */
 export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpSourceEditorRequest | undefined {
     if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE) {
@@ -240,7 +243,8 @@ export function readCustomHttpSourceEditorRequest(payload: unknown): CustomHttpS
  *
  * Responses cross the same Stream Deck JSON boundary as requests. Property
  * Inspector code should receive this typed union only after this reader has
- * validated the payload shape.
+ * validated the payload shape. Invalid response payloads are ignored instead of
+ * rendered so version skew cannot display a partially trusted result.
  */
 export function readCustomHttpSourceEditorResponse(payload: unknown): CustomHttpSourceEditorResponse | undefined {
     if (!isRecord(payload) || payload["type"] !== CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE) {

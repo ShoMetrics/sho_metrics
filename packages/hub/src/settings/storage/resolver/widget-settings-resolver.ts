@@ -468,6 +468,12 @@ function resolveWidgetPreferences(
     storedWidgetSettings: StoredWidgetSettings,
     resolvedTarget?: ResolvedMetricTarget,
 ): ResolvedWidgetPreferences {
+    // pollingFrequencySeconds is deliberately passed through unvalidated.
+    // resolvePollingIntervalMilliseconds in metric-action.ts is the single
+    // validator, and its subscription caller logs pollingFrequencyRejected
+    // when the stored value gets clamped; adding a second check here would
+    // recreate the resolver/runtime drift that once silently forced Dense
+    // battery widgets from 60m down to 1s polling.
     return {
         pollingFrequencySeconds: storedWidgetSettings.preferences?.pollingFrequencySeconds
             ?? (resolvedTarget === undefined

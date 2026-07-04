@@ -67,6 +67,9 @@ internal static class UpdateAppcastParser
 
         if (string.IsNullOrWhiteSpace(version))
         {
+            // Appcast data is release-owned. Skip malformed items so one bad
+            // entry cannot hide other valid updates; release validation should
+            // catch feed mistakes before users see them.
             item = null;
             return false;
         }
@@ -77,6 +80,9 @@ internal static class UpdateAppcastParser
 
         if (downloadUri is null && infoUri is null)
         {
+            // An update item without a safe destination is not actionable in
+            // the control panel, so it is ignored rather than guessed from feed
+            // context.
             item = null;
             return false;
         }

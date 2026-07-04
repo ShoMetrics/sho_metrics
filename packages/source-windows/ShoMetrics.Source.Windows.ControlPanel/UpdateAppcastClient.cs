@@ -57,6 +57,9 @@ internal sealed class UpdateAppcastClient : IDisposable
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            // The control panel update check is user-initiated and surfaces a
+            // generic Failed state. Keep this quiet unless update-check support
+            // cases show that exception details are needed in the product log.
             return UpdateAppcastStatus.Failed(currentVersion, checkedAt);
         }
     }
