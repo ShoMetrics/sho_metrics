@@ -12,6 +12,13 @@ begin
   if not InstallService then
     RaiseException('ShoMetrics Helper service could not be installed. The files were copied, but the service is not registered.');
 
+  WizardForm.StatusLabel.Caption := 'Configuring ShoMetrics Helper service recovery...';
+  WizardForm.ProgressGauge.Position := 60;
+  WizardForm.Update;
+
+  if not ConfigureServiceRecovery then
+    Log('Warning: ShoMetrics Helper service crash recovery could not be configured. Setup will continue without service failure recovery.');
+
   WizardForm.StatusLabel.Caption := 'Starting ShoMetrics Helper service...';
   WizardForm.ProgressGauge.Position := 65;
   WizardForm.Update;

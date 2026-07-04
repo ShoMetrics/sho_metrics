@@ -13,7 +13,7 @@ public sealed class LibreHardwareComputerFactoryTests
         Assert.True(computer.IsGpuEnabled);
         Assert.True(computer.IsMemoryEnabled);
         Assert.True(computer.IsMotherboardEnabled);
-        Assert.True(computer.IsNetworkEnabled);
+        Assert.False(computer.IsNetworkEnabled);
         Assert.False(computer.IsStorageEnabled);
     }
 

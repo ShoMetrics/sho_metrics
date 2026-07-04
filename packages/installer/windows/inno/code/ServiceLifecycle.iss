@@ -208,6 +208,25 @@ begin
     RunSc('description ' + Quote(ServiceName) + ' "Provides Windows sensor data for ShoMetrics Stream Deck widgets."', ResultCode);
 end;
 
+function ConfigureServiceRecovery: Boolean;
+var
+  ResultCode: Integer;
+begin
+  // The trailing empty action is intentional: restart twice, then stop. This
+  // recovers from one-off crashes without turning a persistent helper crash
+  // into an endless restart loop on the user's machine.
+  Result := RunSc(
+    'failure ' + Quote(ServiceName) +
+    ' reset= 86400' +
+    ' actions= restart/5000/restart/30000//',
+    ResultCode) and (ResultCode = 0);
+
+  if not Result then
+    Exit;
+
+  Result := RunSc('failureflag ' + Quote(ServiceName) + ' 1', ResultCode) and (ResultCode = 0);
+end;
+
 function StartService: Boolean;
 var
   ResultCode: Integer;

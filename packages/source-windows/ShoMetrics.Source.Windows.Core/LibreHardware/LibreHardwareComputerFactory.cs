@@ -22,7 +22,12 @@ internal static class LibreHardwareComputerFactory
             IsGpuEnabled = true,
             IsMemoryEnabled = true,
             IsMotherboardEnabled = true,
-            IsNetworkEnabled = true,
+            // LHM 0.9.6 can crash the process from its NetworkChange callback
+            // when an interface disappears during sleep/resume. Upstream fixed
+            // this in PR #2308 (commit 44c1ceb), but no NuGet release contains
+            // it yet. Keep LHM network disabled until the package is upgraded;
+            // hub network widgets use the node-system source instead.
+            IsNetworkEnabled = false,
             IsStorageEnabled = enableStorage,
         };
     }
