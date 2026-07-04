@@ -66,6 +66,7 @@ RestartApplications=no
 RestartIfNeededByRun=no
 ; Keep this explicit because setup runs elevated and creates ProgramData paths.
 RedirectionGuard=yes
+SetupLogging=yes
 UninstallDisplayName=ShoMetrics Helper
 UninstallDisplayIcon={app}\ControlPanel\ShoMetricsHelper.exe
 VersionInfoCompany=ShoMetrics

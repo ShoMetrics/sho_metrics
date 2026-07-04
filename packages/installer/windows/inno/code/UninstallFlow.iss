@@ -22,7 +22,7 @@ begin
   if CurUninstallStep <> usUninstall then
     Exit;
 
-  ErrorMessage := StopAndDeleteExistingService('uninstall again');
+  ErrorMessage := StopAndDeleteExistingService('uninstall again', True);
   if ErrorMessage = '' then
     Exit;
 

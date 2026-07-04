@@ -105,7 +105,20 @@ begin
   end;
 end;
 
-function StopExistingService(const RetryActionText: String): String;
+procedure SetServiceCleanupStatus(const StatusText: String; const IsUninstall: Boolean);
+begin
+  if IsUninstall then
+  begin
+    UninstallProgressForm.StatusLabel.Caption := StatusText;
+    UninstallProgressForm.Update;
+    Exit;
+  end;
+
+  WizardForm.StatusLabel.Caption := StatusText;
+  WizardForm.Update;
+end;
+
+function StopExistingService(const RetryActionText: String; const IsUninstall: Boolean): String;
 var
   ResultCode: Integer;
 begin
@@ -114,8 +127,7 @@ begin
   if not ServiceRegistryKeyExists then
     Exit;
 
-  WizardForm.StatusLabel.Caption := 'Stopping ShoMetrics Helper service...';
-  WizardForm.Update;
+  SetServiceCleanupStatus('Stopping ShoMetrics Helper service...', IsUninstall);
 
   if not RunSc('stop ' + Quote(ServiceName), ResultCode) then
   begin
@@ -135,7 +147,7 @@ begin
   end;
 end;
 
-function DeleteExistingService(const RetryActionText: String): String;
+function DeleteExistingService(const RetryActionText: String; const IsUninstall: Boolean): String;
 var
   ResultCode: Integer;
 begin
@@ -144,8 +156,7 @@ begin
   if not ServiceRegistryKeyExists then
     Exit;
 
-  WizardForm.StatusLabel.Caption := 'Removing the previous ShoMetrics Helper service registration...';
-  WizardForm.Update;
+  SetServiceCleanupStatus('Removing the previous ShoMetrics Helper service registration...', IsUninstall);
 
   if not RunSc('delete ' + Quote(ServiceName), ResultCode) then
   begin
@@ -172,13 +183,13 @@ begin
   end;
 end;
 
-function StopAndDeleteExistingService(const RetryActionText: String): String;
+function StopAndDeleteExistingService(const RetryActionText: String; const IsUninstall: Boolean): String;
 begin
-  Result := StopExistingService(RetryActionText);
+  Result := StopExistingService(RetryActionText, IsUninstall);
   if Result <> '' then
     Exit;
 
-  Result := DeleteExistingService(RetryActionText);
+  Result := DeleteExistingService(RetryActionText, IsUninstall);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -187,7 +198,7 @@ begin
   // flow. If the old service cannot be stopped/deleted cleanly, setup aborts
   // and asks the user to restart manually before trying again.
   NeedsRestart := False;
-  Result := StopAndDeleteExistingService('run setup again');
+  Result := StopAndDeleteExistingService('run setup again', False);
 end;
 
 function InstallService: Boolean;
