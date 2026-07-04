@@ -18,6 +18,7 @@ internal sealed class WindowsMetricSnapshotWorker(
     private const int SummaryHardwareLimit = 3;
     private const int SummaryWarningLimit = 3;
     private const int InitializationWarningSampleLimit = 3;
+    private const string RefreshDurationMayIncludeSleepResumeNote = "duration may include suspended time after system sleep/resume";
 
     private readonly Dictionary<string, long> _lastRefreshTimestampsByPollingGroupId = new(StringComparer.Ordinal);
     private long _refreshCount;
@@ -101,19 +102,21 @@ internal sealed class WindowsMetricSnapshotWorker(
             logger.AtWarning()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
-                    "Windows metric snapshot refresh failed. pollingGroupId={PollingGroupId} durationMs={DurationMs} errorType={ErrorType} errorMessage={ErrorMessage} suppressedLogCount={SuppressedLogCount}",
+                    "Windows metric snapshot refresh failed. pollingGroupId={PollingGroupId} durationMs={DurationMs} errorType={ErrorType} errorMessage={ErrorMessage} note={DurationNote} suppressedLogCount={SuppressedLogCount}",
                     demand.PollingGroupId,
                     duration.TotalMilliseconds,
                     exception.GetType().Name,
                     exception.Message,
+                    RefreshDurationMayIncludeSleepResumeNote,
                     context.SuppressedCount));
             logger.AtDebug()
                 .Every(RefreshWarningThrottleInterval)
                 .Log(context => ThrottledLogEntry.Create(
                     exception,
-                    "Windows metric snapshot refresh failure detail. pollingGroupId={PollingGroupId} durationMs={DurationMs} suppressedLogCount={SuppressedLogCount}",
+                    "Windows metric snapshot refresh failure detail. pollingGroupId={PollingGroupId} durationMs={DurationMs} note={DurationNote} suppressedLogCount={SuppressedLogCount}",
                     demand.PollingGroupId,
                     duration.TotalMilliseconds,
+                    RefreshDurationMayIncludeSleepResumeNote,
                     context.SuppressedCount));
         }
         finally
@@ -328,7 +331,7 @@ internal sealed class WindowsMetricSnapshotWorker(
         _maxRefreshDurationMs = 0;
 
         return ThrottledLogEntry.Create(
-            "Windows metric snapshot refresh summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} coreGatewaySkips={CoreGatewaySkipCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} latestPollingGroupId={LatestPollingGroupId} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} suppressedLogCount={SuppressedLogCount}",
+            "Windows metric snapshot refresh summary. refreshes={RefreshCount} slowRefreshes={SlowRefreshCount} coreGatewaySkips={CoreGatewaySkipCount} maxDurationMs={MaxDurationMs} latestDurationMs={LatestDurationMs} latestPollingGroupId={LatestPollingGroupId} readings={ReadingCount} unavailableMetrics={UnavailableMetricCount} unavailableReasons={UnavailableReasons} warnings={WarningCount} warningSamples={WarningSamples} hardwareUpdates={HardwareUpdateCount} failedHardwareUpdates={FailedHardwareUpdateCount} slowHardware={SlowHardware} note={DurationNote} suppressedLogCount={SuppressedLogCount}",
             refreshCount,
             slowRefreshCount,
             coreGatewaySkipCount,
@@ -343,6 +346,7 @@ internal sealed class WindowsMetricSnapshotWorker(
             result.Diagnostics.HardwareUpdates.Count,
             CountFailedHardwareUpdates(result.Diagnostics),
             BuildDetailedHardwareSummary(result.Diagnostics),
+            RefreshDurationMayIncludeSleepResumeNote,
             context.SuppressedCount);
     }
 

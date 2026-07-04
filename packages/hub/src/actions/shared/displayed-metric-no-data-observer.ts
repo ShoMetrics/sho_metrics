@@ -143,6 +143,9 @@ export class DefaultDisplayedMetricNoDataObserver implements DisplayedMetricNoDa
                     : undefined,
             lastValueAgeMilliseconds: resolveLastValueAgeMilliseconds(observation),
             pollingIntervalMilliseconds: observation.pollingIntervalMilliseconds,
+            // This is wall-clock state duration. If the action entered no-data
+            // before sleep and recovers after wake, sustainedMs can include the
+            // time the system was suspended.
             sustainedMilliseconds: event.sustainedMilliseconds,
         });
     }

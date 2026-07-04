@@ -267,6 +267,9 @@ export class CollectorGroupRunner {
         result: CollectorGroupRefreshResult,
         refreshStartedAtMonotonicMilliseconds: number,
     ): CollectorGroupRefreshResult {
+        // If a source read starts before system sleep and returns after wake,
+        // this elapsed duration can include suspended time. Treat unusually
+        // large values near processResumeDetected as diagnostic noise first.
         const durationMilliseconds = monotonicNowMilliseconds() - refreshStartedAtMonotonicMilliseconds;
         const logMessage = () => [
             "collectorGroupRefresh",
