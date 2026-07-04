@@ -321,8 +321,8 @@ test("global settings changes resubscribe even when the polling plan is unchange
             },
         })));
         pluginGlobalSettingsStore.update(writeStoredGlobalSettingsPatch(undefined, {
-            network: {
-                maximumDownloadSpeedMegabitsPerSecond: 1000,
+            system: {
+                experimentalVendorHidBatteryEnabled: true,
             },
         }));
 
@@ -794,8 +794,8 @@ test("global settings changes recreate background collection bindings", () => {
     try {
         action.onWillAppear(buildWillAppearEvent(streamDeckAction, buildNetworkWidgetSettings()));
         pluginGlobalSettingsStore.update(writeStoredGlobalSettingsPatch(undefined, {
-            network: {
-                maximumDownloadSpeedMegabitsPerSecond: 1000,
+            system: {
+                experimentalVendorHidBatteryEnabled: true,
             },
         }));
 

@@ -147,12 +147,10 @@ function resolveMetricSlot(
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedMetricSlot {
     const networkDisplay = resolveNetworkDisplaySettings(
-        globalSettings.defaults.network,
         storedSlot?.overrides?.network,
         runtime,
     );
     const diskThroughputDisplay = resolveDiskThroughputDisplaySettings(
-        globalSettings.defaults.diskThroughput,
         storedSlot?.overrides?.diskThroughput,
         runtime,
     );

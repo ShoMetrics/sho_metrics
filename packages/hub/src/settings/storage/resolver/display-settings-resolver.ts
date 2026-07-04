@@ -14,38 +14,16 @@ import {
     scaleModeByProto,
 } from "./stored-to-resolved-enum-maps";
 
-const DEFAULT_NETWORK_DISPLAY_SETTINGS: ResolvedNetworkDisplaySettings = {
-    scaleMode: "auto",
-    maximumDownloadSpeedMegabitsPerSecond: undefined,
-    maximumUploadSpeedMegabitsPerSecond: undefined,
-    unitBase: "byte",
-};
-
-const DEFAULT_DISK_THROUGHPUT_DISPLAY_SETTINGS: ResolvedDiskThroughputDisplaySettings = {
-    scaleMode: "auto",
-    maximumReadThroughputMebibytesPerSecond: undefined,
-    maximumWriteThroughputMebibytesPerSecond: undefined,
-};
-
-export function resolveNetworkDisplayDefaults(
-    storedSettings: StoredNetworkDisplaySettings | undefined,
-): ResolvedNetworkDisplaySettings {
-    return resolveNetworkDisplaySettings(DEFAULT_NETWORK_DISPLAY_SETTINGS, storedSettings, undefined);
-}
-
 export function resolveNetworkDisplaySettings(
-    defaults: ResolvedNetworkDisplaySettings,
     storedSettings: StoredNetworkDisplaySettings | undefined,
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedNetworkDisplaySettings {
-    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
+    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, "auto");
     const configuredSettings = {
         scaleMode,
-        maximumDownloadSpeedMegabitsPerSecond: storedSettings?.maximumDownloadSpeedMegabitsPerSecond
-            ?? defaults.maximumDownloadSpeedMegabitsPerSecond,
-        maximumUploadSpeedMegabitsPerSecond: storedSettings?.maximumUploadSpeedMegabitsPerSecond
-            ?? defaults.maximumUploadSpeedMegabitsPerSecond,
-        unitBase: resolveProtoEnum(storedSettings?.unitBase, networkUnitBaseByProto, defaults.unitBase),
+        maximumDownloadSpeedMegabitsPerSecond: storedSettings?.maximumDownloadSpeedMegabitsPerSecond,
+        maximumUploadSpeedMegabitsPerSecond: storedSettings?.maximumUploadSpeedMegabitsPerSecond,
+        unitBase: resolveProtoEnum(storedSettings?.unitBase, networkUnitBaseByProto, "byte"),
     };
 
     if (configuredSettings.scaleMode !== "auto") {
@@ -54,39 +32,22 @@ export function resolveNetworkDisplaySettings(
 
     return {
         ...configuredSettings,
-        maximumDownloadSpeedMegabitsPerSecond: largestConfiguredOrRuntimeMaximum(
-            configuredSettings.maximumDownloadSpeedMegabitsPerSecond,
-            runtime?.runtimeMaximumDownloadSpeedMegabitsPerSecond,
-        ),
-        maximumUploadSpeedMegabitsPerSecond: largestConfiguredOrRuntimeMaximum(
-            configuredSettings.maximumUploadSpeedMegabitsPerSecond,
-            runtime?.runtimeMaximumUploadSpeedMegabitsPerSecond,
-        ),
+        maximumDownloadSpeedMegabitsPerSecond:
+            readPositiveRuntimeMaximum(runtime?.runtimeMaximumDownloadSpeedMegabitsPerSecond),
+        maximumUploadSpeedMegabitsPerSecond:
+            readPositiveRuntimeMaximum(runtime?.runtimeMaximumUploadSpeedMegabitsPerSecond),
     };
-}
-
-export function resolveDiskThroughputDisplayDefaults(
-    storedSettings: StoredDiskThroughputDisplaySettings | undefined,
-): ResolvedDiskThroughputDisplaySettings {
-    return resolveDiskThroughputDisplaySettings(
-        DEFAULT_DISK_THROUGHPUT_DISPLAY_SETTINGS,
-        storedSettings,
-        undefined,
-    );
 }
 
 export function resolveDiskThroughputDisplaySettings(
-    defaults: ResolvedDiskThroughputDisplaySettings,
     storedSettings: StoredDiskThroughputDisplaySettings | undefined,
     runtime: ResolveStoredSettingsRuntimeContext | undefined,
 ): ResolvedDiskThroughputDisplaySettings {
-    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, defaults.scaleMode);
+    const scaleMode = resolveProtoEnum(storedSettings?.scaleMode, scaleModeByProto, "auto");
     const configuredSettings = {
         scaleMode,
-        maximumReadThroughputMebibytesPerSecond: storedSettings?.maximumReadThroughputMebibytesPerSecond
-            ?? defaults.maximumReadThroughputMebibytesPerSecond,
-        maximumWriteThroughputMebibytesPerSecond: storedSettings?.maximumWriteThroughputMebibytesPerSecond
-            ?? defaults.maximumWriteThroughputMebibytesPerSecond,
+        maximumReadThroughputMebibytesPerSecond: storedSettings?.maximumReadThroughputMebibytesPerSecond,
+        maximumWriteThroughputMebibytesPerSecond: storedSettings?.maximumWriteThroughputMebibytesPerSecond,
     };
 
     if (configuredSettings.scaleMode !== "auto") {
@@ -95,32 +56,11 @@ export function resolveDiskThroughputDisplaySettings(
 
     return {
         ...configuredSettings,
-        maximumReadThroughputMebibytesPerSecond: largestConfiguredOrRuntimeMaximum(
-            configuredSettings.maximumReadThroughputMebibytesPerSecond,
-            runtime?.runtimeMaximumDiskReadThroughputMebibytesPerSecond,
-        ),
-        maximumWriteThroughputMebibytesPerSecond: largestConfiguredOrRuntimeMaximum(
-            configuredSettings.maximumWriteThroughputMebibytesPerSecond,
-            runtime?.runtimeMaximumDiskWriteThroughputMebibytesPerSecond,
-        ),
+        maximumReadThroughputMebibytesPerSecond:
+            readPositiveRuntimeMaximum(runtime?.runtimeMaximumDiskReadThroughputMebibytesPerSecond),
+        maximumWriteThroughputMebibytesPerSecond:
+            readPositiveRuntimeMaximum(runtime?.runtimeMaximumDiskWriteThroughputMebibytesPerSecond),
     };
-}
-
-function largestConfiguredOrRuntimeMaximum(
-    configuredMaximum: number | undefined,
-    runtimeMaximum: number | undefined,
-): number | undefined {
-    const resolvedRuntimeMaximum = readPositiveRuntimeMaximum(runtimeMaximum);
-
-    if (configuredMaximum === undefined) {
-        return resolvedRuntimeMaximum;
-    }
-
-    if (resolvedRuntimeMaximum === undefined) {
-        return configuredMaximum;
-    }
-
-    return Math.max(configuredMaximum, resolvedRuntimeMaximum);
 }
 
 export function readPositiveRuntimeMaximum(value: number | undefined): number | undefined {

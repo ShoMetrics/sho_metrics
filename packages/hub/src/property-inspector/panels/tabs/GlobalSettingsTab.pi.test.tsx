@@ -77,26 +77,6 @@ test("global settings tab enables transparent surface with its subsection toggle
     }]);
 });
 
-test("global settings tab writes undefined when an optional network maximum is cleared", async () => {
-    const settingsPatches: StoredGlobalSettingsPatch[] = [];
-    const user = userEvent.setup();
-
-    renderGlobalSettingsTab(resolveGlobalSettings({
-        network: {
-            scaleMode: "custom",
-            maximumDownloadSpeedMegabitsPerSecond: 250,
-        },
-    }), settingsPatches);
-
-    await user.clear(screen.getByRole("spinbutton", { name: /download max/i }));
-
-    assert.deepEqual(settingsPatches, [{
-        network: {
-            maximumDownloadSpeedMegabitsPerSecond: undefined,
-        },
-    }]);
-});
-
 function renderGlobalSettingsTab(
     resolvedSettings: ResolvedGlobalSettings,
     settingsPatches: StoredGlobalSettingsPatch[],

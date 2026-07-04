@@ -109,14 +109,4 @@ export const globalSettingsMessages = {
         zh_CN: "覆盖透明表面",
         ja: "透明サーフェスを上書き",
     },
-    networkDefaultsSection: {
-        en: "Network Defaults",
-        zh_CN: "网络默认值",
-        ja: "ネットワーク既定値",
-    },
-    diskThroughputDefaultsSection: {
-        en: "Disk Throughput Defaults",
-        zh_CN: "磁盘吞吐量默认值",
-        ja: "ディスクスループット既定値",
-    },
 } as const satisfies LocalizedMessages;

@@ -579,13 +579,7 @@ export interface ResolvedCustomHttpCredentialSummary {
     readonly updatedAtMilliseconds: number | undefined;
 }
 
-export interface ResolvedGlobalDefaults {
-    // Current global defaults only cover cross-widget network and disk
-    // throughput display settings. Add GPU/temperature/power defaults here
-    // only after StoredGlobalSettings gains matching fields.
-    readonly network: ResolvedNetworkDisplaySettings;
-    readonly diskThroughput: ResolvedDiskThroughputDisplaySettings;
-}
+export type ResolvedGlobalDefaults = Record<never, never>;
 
 export interface ResolvedGlobalViewOverride {
     readonly view: ResolvedAppearanceViewSettings;

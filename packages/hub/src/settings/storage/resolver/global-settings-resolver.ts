@@ -25,10 +25,6 @@ import type {
 } from "../../resolved-settings";
 import { DEFAULT_APPEARANCE_SETTINGS, DEFAULT_GLOBAL_TRANSPARENT_SURFACE_SETTINGS } from "../../default-appearance-settings";
 import {
-    resolveDiskThroughputDisplayDefaults,
-    resolveNetworkDisplayDefaults,
-} from "./display-settings-resolver";
-import {
     resolveAppearanceThemeSettings,
     resolveAppearanceViewSettings,
     resolveColorFilledPaintSettings,
@@ -55,7 +51,7 @@ export function resolveStoredGlobalSettings(
         && (storedOverrides?.paint?.enabled ?? true);
 
     return {
-        defaults: resolveGlobalDefaults(storedGlobalSettings),
+        defaults: resolveGlobalDefaults(),
         globalOverrideEnabled,
         viewOverride: viewOverrideEnabled
             ? resolveGlobalViewOverride(storedOverrides?.view)
@@ -80,13 +76,8 @@ export function resolveStoredGlobalSettings(
     };
 }
 
-function resolveGlobalDefaults(
-    storedGlobalSettings: StoredGlobalSettings | undefined,
-): ResolvedGlobalDefaults {
-    return {
-        network: resolveNetworkDisplayDefaults(storedGlobalSettings?.defaults?.network),
-        diskThroughput: resolveDiskThroughputDisplayDefaults(storedGlobalSettings?.defaults?.diskThroughput),
-    };
+function resolveGlobalDefaults(): ResolvedGlobalDefaults {
+    return {};
 }
 
 function resolveGlobalViewOverride(

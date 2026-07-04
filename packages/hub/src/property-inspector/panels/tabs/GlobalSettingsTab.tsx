@@ -1,16 +1,12 @@
 import { CircleVariantSetting } from "../../controls/CircleVariantSetting";
 import { commonMessages } from "../../../i18n/message-groups/shell";
 import { globalSettingsMessages } from "../../../i18n/message-groups/settings";
-import { optionMessages } from "../../../i18n/message-groups/options";
-import { localizeOptionList } from "../../../i18n/options";
 import { useI18n } from "../../../i18n/react";
 import { MetricViewSetting } from "../../controls/MetricViewSetting";
-import { NumberSetting } from "../../controls/NumberSetting";
 import { TerminalVariantSetting } from "../../controls/TerminalVariantSetting";
 import { TextVariantSetting } from "../../controls/TextVariantSetting";
 import { ThemeSetting } from "../../controls/ThemeSetting";
 import { TransparentSurfaceRangeControls } from "../../controls/TransparentSurfaceSetting";
-import { SelectSetting } from "../../controls/SelectSetting";
 import { InspectorItem } from "../../components/InspectorItem";
 import {
     ColorFilledPaintControls,
@@ -19,20 +15,14 @@ import {
 } from "../controls/ColorSettings";
 import { buildDefaultAppearanceSettings } from "../../../settings/default-appearance-settings";
 import { SettingsSection } from "../controls/SettingsSection";
-import {
-    networkUnitBaseOptionList,
-    scaleModeOptionList,
-} from "../setting-options";
 import type {
     MetricTheme,
-    ResolvedDiskThroughputDisplaySettings,
     ResolvedGlobalPaintOverride,
     ResolvedGlobalSettings,
     ResolvedGlobalThemeOverride,
     ResolvedGlobalTransparentSurfaceOverride,
     ResolvedGlobalViewOverride,
     ResolvedMetricTarget,
-    ResolvedNetworkDisplaySettings,
 } from "../../../settings/resolved-settings";
 import type { StoredGlobalSettingsPatch } from "../../../settings/storage/global-settings-patch";
 import type { ColorCompensationProfile } from "../../../color-compensation/types";
@@ -45,7 +35,6 @@ interface GlobalSettingsTabProps {
     onSettingsPatch: (patch: StoredGlobalSettingsPatch) => void;
     onOpenColorCompensation: () => void;
 }
-
 const GLOBAL_OVERRIDE_PREVIEW_TARGET = {
     domain: "cpu",
     reading: { kind: "usage" },
@@ -103,14 +92,6 @@ export function GlobalSettingsTab({
                     />
                 </>
             )}
-            <NetworkDefaultsSection
-                network={resolvedSettings.defaults.network}
-                onNetworkPatch={(network) => onSettingsPatch({ network })}
-            />
-            <DiskThroughputDefaultsSection
-                diskThroughput={resolvedSettings.defaults.diskThroughput}
-                onDiskThroughputPatch={(diskThroughput) => onSettingsPatch({ diskThroughput })}
-            />
             <SettingsSection title={t(commonMessages.advancedSection)}>
                 <ColorCompensationControls
                     profile={colorCompensationProfile}
@@ -120,7 +101,6 @@ export function GlobalSettingsTab({
         </div>
     );
 }
-
 function GlobalOverrideSection({
     isGlobalOverrideEnabled,
     onOverrideChange,
@@ -392,98 +372,3 @@ function OverrideSubsectionToggle({
         </InspectorItem>
     );
 }
-
-function NetworkDefaultsSection({
-    network,
-    onNetworkPatch,
-}: {
-    network: ResolvedNetworkDisplaySettings;
-    onNetworkPatch: (patch: NonNullable<StoredGlobalSettingsPatch["network"]>) => void;
-}): React.JSX.Element {
-    const { t } = useI18n();
-    const isAutoScale = network.scaleMode === "auto";
-
-    return (
-        <SettingsSection title={t(globalSettingsMessages.networkDefaultsSection)}>
-            <SelectSetting
-                label={t(commonMessages.unitLabel)}
-                value={network.unitBase}
-                optionList={networkUnitBaseOptionList}
-                onValueChange={(unitBase) => onNetworkPatch({ unitBase })}
-            />
-            <SelectSetting
-                label={t(commonMessages.scaleLabel)}
-                value={network.scaleMode}
-                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
-                onValueChange={(scaleMode) => onNetworkPatch({ scaleMode })}
-            />
-            <NumberSetting
-                label="Download Max"
-                value={network.maximumDownloadSpeedMegabitsPerSecond}
-                minimum={1}
-                step={1}
-                optional
-                disabled={isAutoScale}
-                onValueChange={(maximumDownloadSpeedMegabitsPerSecond) =>
-                    onNetworkPatch({ maximumDownloadSpeedMegabitsPerSecond })}
-            />
-            <NumberSetting
-                label="Upload Max"
-                value={network.maximumUploadSpeedMegabitsPerSecond}
-                minimum={1}
-                step={1}
-                optional
-                disabled={isAutoScale}
-                onValueChange={(maximumUploadSpeedMegabitsPerSecond) =>
-                    onNetworkPatch({ maximumUploadSpeedMegabitsPerSecond })}
-            />
-        </SettingsSection>
-    );
-}
-
-function DiskThroughputDefaultsSection({
-    diskThroughput,
-    onDiskThroughputPatch,
-}: {
-    diskThroughput: ResolvedDiskThroughputDisplaySettings;
-    onDiskThroughputPatch: (patch: NonNullable<StoredGlobalSettingsPatch["diskThroughput"]>) => void;
-}): React.JSX.Element {
-    const { t } = useI18n();
-    const isAutoScale = diskThroughput.scaleMode === "auto";
-
-    return (
-        <SettingsSection title={t(globalSettingsMessages.diskThroughputDefaultsSection)}>
-            <SelectSetting
-                label={t(commonMessages.scaleLabel)}
-                value={diskThroughput.scaleMode}
-                optionList={localizeOptionList(t, scaleModeOptionList, scaleModeMessageByValue)}
-                onValueChange={(scaleMode) => onDiskThroughputPatch({ scaleMode })}
-            />
-            <NumberSetting
-                label="Read Max"
-                value={diskThroughput.maximumReadThroughputMebibytesPerSecond}
-                minimum={1}
-                step={1}
-                optional
-                disabled={isAutoScale}
-                onValueChange={(maximumReadThroughputMebibytesPerSecond) =>
-                    onDiskThroughputPatch({ maximumReadThroughputMebibytesPerSecond })}
-            />
-            <NumberSetting
-                label="Write Max"
-                value={diskThroughput.maximumWriteThroughputMebibytesPerSecond}
-                minimum={1}
-                step={1}
-                optional
-                disabled={isAutoScale}
-                onValueChange={(maximumWriteThroughputMebibytesPerSecond) =>
-                    onDiskThroughputPatch({ maximumWriteThroughputMebibytesPerSecond })}
-            />
-        </SettingsSection>
-    );
-}
-
-const scaleModeMessageByValue = {
-    auto: optionMessages.autoOption,
-    custom: optionMessages.customOption,
-} as const;

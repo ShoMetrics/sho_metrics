@@ -11,7 +11,6 @@ import {
     CustomHttpCredential_HeaderSchema,
     CustomHttpCredential_QuerySchema,
     CustomHttpCredentialSchema,
-    DiskThroughputDisplaySettingsSchema,
     GlobalDefaultsSchema,
     GlobalOverridesSchema,
     GlobalMultiColorPaintSettingsSchema,
@@ -22,7 +21,6 @@ import {
     GlobalTransparentSurfaceOverrideSchema,
     GlobalViewOverrideSchema,
     MultiColorSetSchema,
-    NetworkDisplaySettingsSchema,
     SystemFeatureSettingsSchema,
     TerminalPaintSettingsSchema,
     TerminalThemeSettingsSchema,
@@ -30,7 +28,6 @@ import {
     type AppearanceThemeSettings as StoredAppearanceThemeSettings,
     type ColorFilledPaintSettings as StoredColorFilledPaintSettings,
     type CustomHttpCredential as StoredCustomHttpCredential,
-    type GlobalDefaults as StoredGlobalDefaults,
     type GlobalMetricPaintSettings as StoredGlobalMetricPaintSettings,
     type GlobalOverrides as StoredGlobalOverrides,
     type MultiColorSet as StoredMultiColorSet,
@@ -38,11 +35,9 @@ import {
 import type {
     ColorMode,
     MetricTheme,
-    NetworkUnitBase,
     ResolvedAppearanceViewSettings,
     ResolvedGlobalMultiColorPaintSettings,
     ResolvedGlobalSolidPaintSettings,
-    ScaleMode,
     TerminalThemeVariant,
 } from "../resolved-settings";
 import type {
@@ -59,11 +54,9 @@ import {
 import {
     storedCircleViewVariantByResolved,
     storedColorModeByResolved,
-    storedNetworkUnitBaseByResolved,
     storedTerminalPalettePresetByResolved,
     storedTerminalThemeVariantByResolved,
     storedTextViewVariantByResolved,
-    storedScaleModeByResolved,
     storedMetricViewByResolved,
     storedThemeByResolved,
 } from "./resolved-to-stored-enum-maps";
@@ -79,22 +72,10 @@ export interface StoredGlobalSettingsPatch {
     readonly theme?: GlobalThemeSettingsPatch | undefined;
     readonly transparentSurface?: ResolvedTransparentSurfaceSettingsOverride | undefined;
     readonly paint?: GlobalPaintSettingsPatch | undefined;
-    readonly network?: Partial<{
-        readonly scaleMode: ScaleMode;
-        readonly maximumDownloadSpeedMegabitsPerSecond: number | undefined;
-        readonly maximumUploadSpeedMegabitsPerSecond: number | undefined;
-        readonly unitBase: NetworkUnitBase;
-    }> | undefined;
-    readonly diskThroughput?: Partial<{
-        readonly scaleMode: ScaleMode;
-        readonly maximumReadThroughputMebibytesPerSecond: number | undefined;
-        readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
-    }> | undefined;
     readonly system?: Partial<{
         readonly experimentalVendorHidBatteryEnabled: boolean;
     }> | undefined;
 }
-
 export type StoredCustomHttpCredentialInput =
     | StoredCustomHttpBasicCredentialInput
     | StoredCustomHttpBearerCredentialInput
@@ -181,8 +162,6 @@ export function writeStoredGlobalSettingsPatch(
     applyThemeOverridePatch(settings.overrides, patch);
     applyTransparentSurfaceOverridePatch(settings.overrides, patch);
     applyPaintOverridePatch(settings.overrides, patch);
-    applyNetworkDefaultsPatch(settings.defaults, patch.network);
-    applyDiskThroughputDefaultsPatch(settings.defaults, patch.diskThroughput);
     applySystemFeatureSettingsPatch(settings, patch.system);
 
     return writeStoredGlobalSettings(settings);
@@ -307,7 +286,6 @@ function readExistingCredentialSecret(
             return existingCredential.auth.value.token;
     }
 }
-
 function readOptionalTimestamp(timestampMilliseconds: number | undefined): Timestamp | undefined {
     return timestampMilliseconds === undefined
         ? undefined
@@ -504,48 +482,5 @@ function applyMultiColorSetPatch(
     }
     if (patch?.highColor !== undefined) {
         colors.highColor = patch.highColor;
-    }
-}
-
-function applyNetworkDefaultsPatch(
-    defaults: StoredGlobalDefaults,
-    patch: StoredGlobalSettingsPatch["network"],
-): void {
-    if (!patch) {
-        return;
-    }
-
-    const network = defaults.network ??= create(NetworkDisplaySettingsSchema);
-    if (patch.scaleMode !== undefined) {
-        network.scaleMode = storedScaleModeByResolved[patch.scaleMode];
-    }
-    if ("maximumDownloadSpeedMegabitsPerSecond" in patch) {
-        network.maximumDownloadSpeedMegabitsPerSecond = patch.maximumDownloadSpeedMegabitsPerSecond;
-    }
-    if ("maximumUploadSpeedMegabitsPerSecond" in patch) {
-        network.maximumUploadSpeedMegabitsPerSecond = patch.maximumUploadSpeedMegabitsPerSecond;
-    }
-    if (patch.unitBase !== undefined) {
-        network.unitBase = storedNetworkUnitBaseByResolved[patch.unitBase];
-    }
-}
-
-function applyDiskThroughputDefaultsPatch(
-    defaults: StoredGlobalDefaults,
-    patch: StoredGlobalSettingsPatch["diskThroughput"],
-): void {
-    if (!patch) {
-        return;
-    }
-
-    const diskThroughput = defaults.diskThroughput ??= create(DiskThroughputDisplaySettingsSchema);
-    if (patch.scaleMode !== undefined) {
-        diskThroughput.scaleMode = storedScaleModeByResolved[patch.scaleMode];
-    }
-    if ("maximumReadThroughputMebibytesPerSecond" in patch) {
-        diskThroughput.maximumReadThroughputMebibytesPerSecond = patch.maximumReadThroughputMebibytesPerSecond;
-    }
-    if ("maximumWriteThroughputMebibytesPerSecond" in patch) {
-        diskThroughput.maximumWriteThroughputMebibytesPerSecond = patch.maximumWriteThroughputMebibytesPerSecond;
     }
 }

@@ -852,10 +852,8 @@ message HttpMetricSourceConnection {
   // credential reference here and keep the secret in the OS credential store.
 }
 
-message GlobalDefaults {
-  NetworkDisplaySettings network = 1;
-  DiskThroughputDisplaySettings disk_throughput = 2;
-}
+// Defaults applied when the user creates a new widget.
+message GlobalDefaults {}
 
 message GlobalOverrides {
   // Main switch for global override. When enabled, omitted subsection enabled

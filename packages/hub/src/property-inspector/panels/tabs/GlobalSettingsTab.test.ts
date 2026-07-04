@@ -128,19 +128,7 @@ function previewOptionLabelPattern(text: string): RegExp {
 
 function buildGlobalSettings(selectedTheme: MetricTheme = "flat", selectedView: MetricView = "circle"): ResolvedGlobalSettings {
     return {
-        defaults: {
-            network: {
-                scaleMode: "auto",
-                maximumDownloadSpeedMegabitsPerSecond: undefined,
-                maximumUploadSpeedMegabitsPerSecond: undefined,
-                unitBase: "byte",
-            },
-            diskThroughput: {
-                scaleMode: "auto",
-                maximumReadThroughputMebibytesPerSecond: undefined,
-                maximumWriteThroughputMebibytesPerSecond: undefined,
-            },
-        },
+        defaults: {},
         globalOverrideEnabled: true,
         viewOverride: {
             view: {

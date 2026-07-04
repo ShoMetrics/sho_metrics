@@ -439,15 +439,8 @@ describe("stored settings proto resolver", () => {
         assert.equal(settings.widget.slot.appearance.theme.flat.paint.colorMode, "solid");
     });
 
-    it("cascades global defaults widget overrides and runtime maxima", () => {
-        const storedGlobalSettings = readStoredGlobalSettings({
-            defaults: {
-                network: {
-                    unitBase: "UNIT_BASE_BIT",
-                    maximumDownloadSpeedMegabitsPerSecond: 250,
-                },
-            },
-        }).settings;
+    it("cascades widget appearance overrides and runtime maxima", () => {
+        const storedGlobalSettings = readStoredGlobalSettings({}).settings;
         const storedWidgetSettings = readStoredWidgetSettings({
             singleMetric: {
                 slot: {
@@ -496,9 +489,45 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.kind, "traffic");
         assert.equal(target.reading.direction, "download");
         assert.equal(target.reading.trafficDisplayMode, "overlay");
-        assert.equal(target.reading.display.unitBase, "bit");
+        assert.equal(target.reading.display.unitBase, "byte");
         assert.equal(target.reading.display.maximumDownloadSpeedMegabitsPerSecond, 800);
-        assert.equal(target.reading.display.maximumUploadSpeedMegabitsPerSecond, 50);
+        assert.equal(target.reading.display.maximumUploadSpeedMegabitsPerSecond, undefined);
+    });
+
+    it("ignores stale custom network maxima after switching back to automatic scale", () => {
+        const storedWidgetSettings = readStoredWidgetSettings({
+            singleMetric: {
+                slot: {
+                    metric: {
+                        network: {
+                            kind: "KIND_TRAFFIC",
+                            traffic: {
+                                direction: "DIRECTION_DOWNLOAD",
+                            },
+                        },
+                    },
+                    overrides: {
+                        network: {
+                            scaleMode: "SCALE_MODE_AUTO",
+                            maximumDownloadSpeedMegabitsPerSecond: 1,
+                        },
+                    },
+                },
+            },
+        }).settings;
+
+        const settings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings,
+            runtime: {
+                runtimeMaximumDownloadSpeedMegabitsPerSecond: 800,
+            },
+        });
+        const target = settings.widget.slot.metric.target;
+
+        assert.equal(target.domain, "network");
+        assert.equal(target.reading.kind, "traffic");
+        assert.equal(target.reading.display.scaleMode, "auto");
+        assert.equal(target.reading.display.maximumDownloadSpeedMegabitsPerSecond, 800);
     });
 
     it("resolves ping network targets with normalized host input", () => {
@@ -1012,6 +1041,7 @@ describe("stored settings proto resolver", () => {
                     },
                     overrides: {
                         diskThroughput: {
+                            scaleMode: "SCALE_MODE_CUSTOM",
                             maximumReadThroughputMebibytesPerSecond: 400,
                         },
                     },
