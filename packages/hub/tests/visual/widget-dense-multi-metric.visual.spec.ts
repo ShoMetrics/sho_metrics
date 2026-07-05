@@ -34,6 +34,19 @@ const DENSE_TOUCH_STRIP_SIX_ROW_DATA = buildDenseMetricWidgetData([
     ["RAM", 49, 0.49],
 ]);
 
+// These rows deliberately put the value text near the middle of each bar so
+// digits sit across both the filled and unfilled regions. This protects the
+// dense-specific number-on-bar color logic from regressing into clipped,
+// two-tone, or same-color text/track combinations.
+const DENSE_CROSS_REGION_TEXT_DATA = buildDenseMetricWidgetData([
+    ["CPU", 20, 0.2],
+    ["GPU", 55, 0.55],
+    ["RAM", 60, 0.6],
+    ["VRAM", 67, 0.67],
+    ["PWR", 78, 0.78],
+    ["HOT", 89, 0.89],
+]);
+
 const PIXEL_WINDOW_DENSE_APPEARANCE: ResolvedAppearanceSettingsOverride = {
     view: {
         selectedView: "bar",
@@ -117,6 +130,35 @@ const DENSE_VISUAL_TEST_CASES: readonly DenseMetricVisualTestCase[] = [
         appearance: PIXEL_WINDOW_DENSE_APPEARANCE,
         data: DENSE_TOUCH_STRIP_SIX_ROW_DATA,
         renderTarget: "touch-strip",
+    },
+    {
+        snapshotName: "dense-multi-metric-cross-region-default",
+        appearance: buildDenseFlatAppearance("multi-color"),
+        data: DENSE_CROSS_REGION_TEXT_DATA,
+    },
+    {
+        snapshotName: "dense-multi-metric-cross-region-color-filled",
+        appearance: buildColorFilledAppearanceOverride({
+            selectedView: "bar",
+            colorMode: "multi-color",
+            isGradientEnabled: true,
+        }),
+        data: DENSE_CROSS_REGION_TEXT_DATA,
+    },
+    {
+        snapshotName: "dense-multi-metric-cross-region-pixel-window",
+        appearance: PIXEL_WINDOW_DENSE_APPEARANCE,
+        data: DENSE_CROSS_REGION_TEXT_DATA,
+    },
+    {
+        snapshotName: "dense-multi-metric-cross-region-terminal-clean",
+        appearance: buildTerminalDenseAppearance("clean"),
+        data: DENSE_CROSS_REGION_TEXT_DATA,
+    },
+    {
+        snapshotName: "dense-multi-metric-cross-region-terminal-vintage",
+        appearance: buildTerminalDenseAppearance("vintage"),
+        data: DENSE_CROSS_REGION_TEXT_DATA,
     },
 ];
 

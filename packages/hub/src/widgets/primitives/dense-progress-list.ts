@@ -1,5 +1,11 @@
 import type { DenseMetricWidgetData, DenseMetricRowWidgetData } from "../../actions/dense-multi-metric/row-data";
-import { resolveReadableTextColor } from "../../shared/color-utils";
+import {
+    adjustHexColorBrightness,
+    parseHexColor,
+    resolveReadableTextColor,
+    resolveRelativeLuminance,
+    type RgbColor,
+} from "../../shared/color-utils";
 import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
 import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import {
@@ -25,10 +31,17 @@ import type { WidgetBaseConfig } from "../widget-contract";
 interface DenseProgressListConfig extends WidgetBaseConfig {
     readonly paints: DenseProgressListPaints;
     readonly textStyles: RenderTextStyles;
+    readonly fillTintedTrack?: DenseProgressListFillTintedTrack;
     readonly labelLetterSpacingEm?: number;
     readonly themeEffects: RenderThemeEffectTokens;
     readonly textOutline?: RenderOutlineTokens;
     readonly shapeOutline?: RenderOutlineTokens;
+}
+
+/** Selects an unfilled track color derived from the row's filled progress color. */
+export interface DenseProgressListFillTintedTrack {
+    /** How much to lighten the fill color before using it as the unfilled track. */
+    readonly trackLightenPercent: number;
 }
 
 interface DenseProgressListPaints {
@@ -79,6 +92,21 @@ const LABEL_BAR_GAP = 8;
 const LABEL_TEXT_BASELINE_SHIFT_EM = 0.08;
 const LABEL_TEXT_TRAILING_BLEED = 4;
 const BAR_CORNER_RADIUS_RATIO = 0.25;
+
+// Progress-row numbers sit across both filled and unfilled regions. Most themes
+// use a small neutral material set; fixed-accent themes can opt into a
+// fill-tinted track so the unfilled side stays in the same color family as the fill.
+const TRACK_PALETTE_FOR_DARK_TEXT = [
+    "rgba(255,255,255,0.46)",
+    "rgba(255,255,255,0.54)",
+    "rgba(255,255,255,0.62)",
+] as const;
+const TRACK_PALETTE_FOR_LIGHT_TEXT = [
+    "rgba(17,24,39,0.50)",
+    "rgba(17,24,39,0.44)",
+    "rgba(17,24,39,0.36)",
+] as const;
+const FILL_TINTED_TRACK_OPACITY = 0.62;
 
 // Production dense rendering overrides these theme-owned tokens; the defaults keep the primitive standalone-testable.
 export const DEFAULT_DENSE_PROGRESS_LIST_CONFIG: DenseProgressListConfig = {
@@ -242,23 +270,26 @@ function renderDenseProgressListRow(options: {
     const valueBoxWidth = Math.max(1, valueBoxRightCoordinate - bar.xCoordinate);
     const unitXCoordinate = bar.xCoordinate + bar.width - options.layout.unitWidth - options.layout.valuePaddingX;
     const fillWidth = Math.max(0, bar.width * clamp(options.row.widgetData.progress, 0, 1));
-    const barColor = resolveColorForThresholdValue(
+    const filledColor = resolveColorForThresholdValue(
         clamp(options.row.widgetData.progress, 0, 1) * 100,
         options.config.colorConfig,
     );
+    const barTextColor = resolveDenseBarTextColor({
+        filledColor,
+        fallbackTextColor: options.config.paints.valueText,
+    });
+    const trackColor = resolveDenseTrackColor({
+        filledColor,
+        fallbackTrackColor: options.config.paints.track,
+        fillTintedTrack: options.config.fillTintedTrack,
+        textColor: barTextColor,
+    });
     const barCenterY = bar.yCoordinate + bar.height / 2;
     const valueTextFontSize = resolveRenderTextStyleFontSize(
         options.layout.valueFontSize,
         options.config.textStyles.value,
     );
     const barTextYCoordinate = resolveDenseBarTextYCoordinate(barCenterY, valueTextFontSize);
-    const valueTextColor = fillWidth >= valueBoxRightCoordinate - bar.xCoordinate
-        ? resolveReadableTextColor(barColor)
-        : options.config.paints.valueText;
-    const unitTextColor = fillWidth >= unitXCoordinate - bar.xCoordinate
-        ? resolveReadableTextColor(barColor)
-        : options.config.paints.unitText;
-
     return `
         <g class="dense-progress-list-row" data-slot-id="${escapeSvgText(options.row.slotId)}">
             ${renderStyledSvgText({
@@ -279,12 +310,12 @@ function renderDenseProgressListRow(options: {
                     widthGuardRatio: 1.02,
                 },
             })}
-            ${renderTrack(bar, options.config)}
+            ${renderTrack({ bar, color: trackColor, config: options.config })}
             ${renderFill({
                 id: `dense-progress-list-fill-${options.rowIndex}`,
                 bar,
                 width: fillWidth,
-                color: barColor,
+                color: filledColor,
                 config: options.config,
             })}
             ${renderStyledSvgText({
@@ -297,7 +328,7 @@ function renderDenseProgressListRow(options: {
                 textStyle: options.config.textStyles.value,
                 textAnchor: "end",
                 baselineShiftEm: 0,
-                fill: valueTextColor,
+                fill: barTextColor,
                 outline: options.config.textOutline,
                 extraAttributes: [
                     "font-variant-numeric=\"tabular-nums\"",
@@ -318,7 +349,7 @@ function renderDenseProgressListRow(options: {
                 textStyle: options.config.textStyles.unit,
                 textAnchor: "start",
                 baselineShiftEm: 0,
-                fill: unitTextColor,
+                fill: barTextColor,
                 outline: options.config.textOutline,
                 extraAttributes: buildSvgFilterAttributes(options.config.textStyles.unit.filter),
                 fitOptions: {
@@ -328,6 +359,78 @@ function renderDenseProgressListRow(options: {
             })}
         </g>
     `;
+}
+
+function resolveDenseBarTextColor(options: {
+    readonly filledColor: string;
+    readonly fallbackTextColor: string;
+}): string {
+    return parseHexColor(options.filledColor) === undefined
+        ? options.fallbackTextColor
+        : resolveReadableTextColor(options.filledColor);
+}
+
+function resolveDenseTrackColor(options: {
+    readonly filledColor: string;
+    readonly fallbackTrackColor: string;
+    readonly fillTintedTrack: DenseProgressListFillTintedTrack | undefined;
+    readonly textColor: string;
+}): string {
+    if (options.fillTintedTrack !== undefined) {
+        return resolveFillTintedTrackColor({
+            fallbackTrackColor: options.fallbackTrackColor,
+            filledColor: options.filledColor,
+            trackLightenPercent: options.fillTintedTrack.trackLightenPercent,
+        });
+    }
+
+    const filledColor = parseHexColor(options.filledColor);
+    if (filledColor === undefined || parseHexColor(options.textColor) === undefined) {
+        return options.fallbackTrackColor;
+    }
+
+    return resolveNeutralTrackColor(filledColor, options.textColor);
+}
+
+function resolveNeutralTrackColor(filledColor: RgbColor, textColor: string): string {
+    const filledLuminance = resolveRelativeLuminance(filledColor);
+
+    if (textColor === "#ffffff") {
+        if (filledLuminance <= 0.14) {
+            return TRACK_PALETTE_FOR_LIGHT_TEXT[0];
+        }
+        if (filledLuminance <= 0.28) {
+            return TRACK_PALETTE_FOR_LIGHT_TEXT[1];
+        }
+        return TRACK_PALETTE_FOR_LIGHT_TEXT[2];
+    }
+
+    if (filledLuminance >= 0.82) {
+        return TRACK_PALETTE_FOR_DARK_TEXT[2];
+    }
+    if (filledLuminance >= 0.55) {
+        return TRACK_PALETTE_FOR_DARK_TEXT[1];
+    }
+    return TRACK_PALETTE_FOR_DARK_TEXT[0];
+}
+
+function resolveFillTintedTrackColor(options: {
+    readonly fallbackTrackColor: string;
+    readonly filledColor: string;
+    readonly trackLightenPercent: number;
+}): string {
+    const adjustedTrackColor = parseHexColor(adjustHexColorBrightness(
+        options.filledColor,
+        options.trackLightenPercent,
+    ));
+
+    return adjustedTrackColor === undefined
+        ? options.fallbackTrackColor
+        : formatRgbaColor(adjustedTrackColor, FILL_TINTED_TRACK_OPACITY);
+}
+
+function formatRgbaColor(color: RgbColor, opacity: number): string {
+    return `rgba(${color.red},${color.green},${color.blue},${opacity})`;
 }
 
 function resolveDenseLabelTextMaxWidth(layout: DenseProgressListLayout): number {
@@ -359,19 +462,23 @@ function resolveDenseProgressListBar(options: {
     };
 }
 
-function renderTrack(bar: DenseProgressListBar, config: DenseProgressListConfig): string {
+function renderTrack(options: {
+    readonly bar: DenseProgressListBar;
+    readonly color: string;
+    readonly config: DenseProgressListConfig;
+}): string {
     return `
         ${renderFilledRectOutline({
             className: "dense-progress-list-track-outline",
-            bar,
-            width: bar.width,
-            outline: config.shapeOutline,
+            bar: options.bar,
+            width: options.bar.width,
+            outline: options.config.shapeOutline,
         })}
         <rect class="dense-progress-list-track"
-            x="${formatSvgNumber(bar.xCoordinate)}" y="${formatSvgNumber(bar.yCoordinate)}"
-            width="${formatSvgNumber(bar.width)}" height="${formatSvgNumber(bar.height)}"
-            rx="${formatSvgNumber(bar.radius)}" fill="${escapeSvgText(config.paints.track)}"
-            ${buildSvgFilterAttributes(config.themeEffects.subtleFilter).join(" ")} />
+            x="${formatSvgNumber(options.bar.xCoordinate)}" y="${formatSvgNumber(options.bar.yCoordinate)}"
+            width="${formatSvgNumber(options.bar.width)}" height="${formatSvgNumber(options.bar.height)}"
+            rx="${formatSvgNumber(options.bar.radius)}" fill="${escapeSvgText(options.color)}"
+            ${buildSvgFilterAttributes(options.config.themeEffects.subtleFilter).join(" ")} />
     `;
 }
 

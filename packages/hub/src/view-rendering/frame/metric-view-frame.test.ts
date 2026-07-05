@@ -845,6 +845,9 @@ test("dense pixel window frame uses the full client viewport", () => {
                 rows: ["CPU", "GPU", "RAM", "RAM", "RAM", "RAM"].map((label, index) => buildDenseMetricRow({
                     slotId: `dense-slot-${index}`,
                     label,
+                    current: 60,
+                    progress: 0.6,
+                    sampleTimestampMilliseconds: 1000,
                 })),
             },
             resolvedSettings: {
@@ -868,9 +871,35 @@ test("dense pixel window frame uses the full client viewport", () => {
         clipRadius: 0,
     });
     assert.match(frame.svg, /<g transform="translate\(5 19\)">/);
+    assert.match(frame.svg, /class="dense-progress-list-track"[\s\S]*fill="rgba\(107,70,220,0\.62\)"/);
+    assert.match(frame.svg, /id="dense-progress-list-value-0"[\s\S]*fill="#ffffff"[\s\S]*>60<\/text>/);
     assert.doesNotMatch(frame.svg, /scale\(0\.8333\)/);
     assert.ok(readDenseLabelTextElements(frame.svg).every(element => !/letter-spacing=/u.test(element)));
     assert.ok(readDenseLabelTextElements(frame.svg).every(element => !/textLength=/u.test(element)));
+});
+
+test("dense terminal frame derives the track paint from the bar color", () => {
+    const frame = composeMetricViewFrame({
+        viewOptions: buildDenseMetricRenderOptions({
+            widgetData: {
+                rows: [
+                    buildDenseMetricRow({
+                        slotId: "dense-terminal-slot",
+                        label: "CPU",
+                        current: 60,
+                        progress: 0.6,
+                        sampleTimestampMilliseconds: 1000,
+                    }),
+                ],
+            },
+            resolvedSettings: {
+                theme: { selectedTheme: "terminal" },
+            },
+        }),
+        renderTarget: "key",
+    });
+
+    assert.match(frame.svg, /class="dense-progress-list-track"[\s\S]*fill="rgba\(157,245,174,0\.62\)"/);
 });
 
 test("dense metric frame uses the wide touch strip layout", () => {

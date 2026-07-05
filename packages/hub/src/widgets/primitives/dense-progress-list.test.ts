@@ -134,7 +134,7 @@ test("dense progress list offsets labels onto the same visual-center side as bar
     assert.ok(firstLabelTextYCoordinate <= firstTrack.yCoordinate + firstTrack.height / 2 + 3);
 });
 
-test("dense progress list picks readable value text over filled bar color", () => {
+test("dense progress list uses one readable bar text color across fill coverage", () => {
     const svg = renderDenseProgressList(
         {
             rows: [
@@ -166,8 +166,102 @@ test("dense progress list picks readable value text over filled bar color", () =
 
     assert.equal(readValueTextFills(svg)[0], "#111827");
     assert.equal(readUnitTextFills(svg)[0], "#111827");
-    assert.equal(readValueTextFills(svg)[1], DEFAULT_DENSE_PROGRESS_LIST_CONFIG.paints.valueText);
-    assert.equal(readUnitTextFills(svg)[1], DEFAULT_DENSE_PROGRESS_LIST_CONFIG.paints.unitText);
+    assert.equal(readValueTextFills(svg)[1], "#111827");
+    assert.equal(readUnitTextFills(svg)[1], "#111827");
+    assert.equal(readValueTextElements(svg).length, 2);
+    assert.equal(readUnitTextElements(svg).length, 2);
+});
+
+test("dense progress list keeps bar text readable over dark fill colors", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: [
+                buildDenseMetricRow({
+                    slotId: "slot-purple",
+                    label: "GPU",
+                    current: 67,
+                    progress: 0.67,
+                }),
+            ],
+        },
+        {
+            ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+            colorConfig: {
+                mode: "solid",
+                solidColor: "#5b31d8",
+                thresholds: [],
+                isGradientEnabled: true,
+            },
+        },
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.equal(readValueTextFills(svg)[0], "#ffffff");
+    assert.equal(readUnitTextFills(svg)[0], "#ffffff");
+    assert.equal(readTrackFills(svg)[0], "rgba(17,24,39,0.50)");
+});
+
+test("dense progress list keeps bar text readable over white fill colors", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: [
+                buildDenseMetricRow({
+                    slotId: "slot-white",
+                    label: "GPU",
+                    current: 67,
+                    progress: 0.67,
+                }),
+            ],
+        },
+        {
+            ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+            colorConfig: {
+                mode: "solid",
+                solidColor: "#ffffff",
+                thresholds: [],
+                isGradientEnabled: true,
+            },
+        },
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.equal(readValueTextFills(svg)[0], "#111827");
+    assert.equal(readUnitTextFills(svg)[0], "#111827");
+    assert.equal(readTrackFills(svg)[0], "rgba(255,255,255,0.62)");
+});
+
+test("dense progress list can derive track color from the filled bar color", () => {
+    const svg = renderDenseProgressList(
+        {
+            rows: [
+                buildDenseMetricRow({
+                    slotId: "slot-terminal",
+                    label: "GPU",
+                    current: 67,
+                    progress: 0.67,
+                }),
+            ],
+        },
+        {
+            ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG,
+            fillTintedTrack: {
+                trackLightenPercent: 55,
+            },
+            paints: {
+                ...DEFAULT_DENSE_PROGRESS_LIST_CONFIG.paints,
+                track: "rgba(0,0,0,0.12)",
+            },
+            colorConfig: {
+                mode: "solid",
+                solidColor: "#ffb000",
+                thresholds: [],
+                isGradientEnabled: false,
+            },
+        },
+        WIDGET_LOGICAL_SIZE,
+    );
+
+    assert.equal(readTrackFills(svg)[0], "rgba(255,219,140,0.62)");
 });
 
 test("dense progress list shrinks bar height as row count increases", () => {
@@ -425,6 +519,11 @@ function readTrackRects(svg: string): ReadonlyArray<{ xCoordinate: number; yCoor
         }));
 }
 
+function readTrackFills(svg: string): readonly string[] {
+    return [...svg.matchAll(/class="dense-progress-list-track"[\s\S]*?fill="([^"]+)"/gu)]
+        .map(match => match[1] ?? "");
+}
+
 function readMinimumTrackGap(svg: string): number {
     const rects = readTrackRects(svg);
     const gaps = rects
@@ -485,6 +584,11 @@ function readUnitTextXCoordinates(svg: string): readonly number[] {
 function readUnitTextYCoordinates(svg: string): readonly number[] {
     return [...svg.matchAll(/<clipPath id="dense-progress-list-unit-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-unit-\d+\)">\s*<text x="[^"]+" y="([^"]+)"/gu)]
         .map(match => Number(match[1] ?? 0));
+}
+
+function readUnitTextElements(svg: string): readonly string[] {
+    return [...svg.matchAll(/<clipPath id="dense-progress-list-unit-\d+">[\s\S]*?<\/clipPath>\s*<\/defs>\s*<g clip-path="url\(#dense-progress-list-unit-\d+\)">\s*(<text[\s\S]*?<\/text>)/gu)]
+        .map(match => match[1] ?? "");
 }
 
 function readValueTextFills(svg: string): readonly string[] {
