@@ -2,7 +2,7 @@
 
 Sho Metrics is a Stream Deck plugin for displaying live system metrics on Stream Deck keys.
 
-It supports Windows and macOS, with built-in metrics for CPU, GPU, memory, disk, network, and custom HTTP JSON endpoints. On Windows, an optional helper unlocks deeper LibreHardwareMonitor-backed sensors such as AMD/Intel GPU metrics, temperatures, fan speeds, and voltages.
+It supports Windows and macOS, with built-in metrics for CPU, GPU, memory, disk, network, battery, and custom HTTP JSON endpoints. On Windows, an optional helper unlocks deeper LibreHardwareMonitor-backed sensors such as AMD/Intel GPU metrics, temperatures, fan speeds, and voltages.
 
 ![Sho Metrics widgets on Stream Deck keys](docs/assets/readme/stream-deck-dashboard.png)
 
@@ -10,7 +10,7 @@ It supports Windows and macOS, with built-in metrics for CPU, GPU, memory, disk,
 
 ## Features
 
-- Monitor CPU, GPU, memory, disk, network speed, network latency, and custom HTTP JSON metrics.
+- Monitor CPU, GPU, memory, disk, network speed, network latency, battery, and custom HTTP JSON metrics.
 - Choose from multiple views: circle, text, linear bar, and sparkline.
 - Style metrics with themes such as default, color filled, terminal, pixel window, and glass.
 - Combine any supported view with any supported theme.
@@ -30,6 +30,7 @@ Built-in sources include:
 - Disk usage and throughput
 - Network upload/download speed
 - Network latency
+- Battery (System, bluetooth device, selected Logitech and ROG devices)
 - Custom metrics from HTTP JSON endpoints
 
 On Windows, the optional helper can expose additional hardware-backed metrics through LibreHardwareMonitor. Install it only if you need deeper sensor coverage.
@@ -84,7 +85,7 @@ For Windows helper development, use the commands listed in the command playbook.
 
 ## Acknowledgements
 
-Sho Metrics is built on excellent open-source projects, including:
+Sho Metrics is built on excellent open-source projects, including but not limited to:
 
 - [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor), which powers the optional Windows helper's deeper hardware sensor support.
 - [Lucide](https://github.com/lucide-icons/lucide), used for icons in the plugin UI and rendered widgets.

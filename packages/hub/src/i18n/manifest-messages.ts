@@ -8,9 +8,9 @@ export const manifestMessages = {
             ja: "Sho Metrics",
         },
         description: {
-            en: "Display live System metrics such as CPU, GPU, memory, disk, network, sensor metrics, and HTTP metrics.",
-            zh_CN: "显示实时系统指标，例如 CPU、GPU、内存、磁盘、网络、传感器指标和 HTTP 指标。",
-            ja: "CPU、GPU、メモリ、ディスク、ネットワーク、センサーメトリクス、HTTP メトリクスなどのライブシステムメトリクスを表示します。",
+            en: "Display live System metrics such as CPU, GPU, memory, disk, network, battery, sensor metrics, and HTTP metrics.",
+            zh_CN: "显示实时系统指标，例如 CPU、GPU、内存、磁盘、网络、电池、传感器指标和 HTTP 指标。",
+            ja: "CPU、GPU、メモリ、ディスク、ネットワーク、バッテリー、センサーメトリクス、HTTP メトリクスなどのライブシステムメトリクスを表示します。",
         },
     },
     actions: {

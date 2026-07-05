@@ -12,7 +12,7 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: Describe what went wrong.
+      description: Required, describe what went wrong.
     validations:
       required: true
 
@@ -62,9 +62,8 @@ body:
         - Only if you installed the helper: `%LOCALAPPDATA%\ShoMetrics\ControlPanel\logs\shometrics-control-panel-startup.log`
 
         macOS:
-        - ShoMetrics plugin log, if present: `~/Library/Application Support/com.elgato.StreamDeck/Plugins/com.ez.sho-metrics.sdPlugin/logs/com.ez.sho-metrics.*.log`
-
-        Attach the relevant excerpt around the time of the issue instead of the full log when possible.
+        - ShoMetrics plugin log: `~/Library/Application Support/com.elgato.StreamDeck/Plugins/com.ez.sho-metrics.sdPlugin/logs/com.ez.sho-metrics.*.log`
+        - Stream Deck host log: `~/Library/Logs/ElgatoStreamDeck/`
 
   - type: textarea
     id: logs-screenshots

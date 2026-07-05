@@ -241,7 +241,7 @@ jobs:
             else
               echo "This release is for Windows helper version ${WINDOWS_VERSION}. There is no Stream Deck plugin release in this release. You can find the latest Stream Deck plugin package at https://shometrics.github.io/download/."
               echo
-              echo "Most users should download the self-contained Windows helper installer. It is larger, but it includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
+              echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
             fi
             echo
             awk -v heading="${TAG_NAME}" '
