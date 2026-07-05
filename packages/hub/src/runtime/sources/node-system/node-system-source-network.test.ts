@@ -203,6 +203,33 @@ test("node system source returns aggregate zero when cached interfaces have no s
     assert.equal(snapshot.metrics["net.down.eth0"], undefined);
 });
 
+test("managed Windows PowerShell session treats empty network stats as no-data", async () => {
+    const sessionEvents: string[] = [];
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: {
+            ...buildEmptyNodeSystemInformation(),
+            networkInterfaces: async () => [buildNetworkInterface({ iface: "eth0" })],
+            networkStats: (async () => []) as NodeSystemInformationClient["networkStats"],
+        } as NodeSystemInformationClient,
+        windowsPowerShellSession: {
+            start: () => sessionEvents.push("start"),
+            restart: () => sessionEvents.push("restart"),
+            release: () => sessionEvents.push("release"),
+        },
+        pollWindowsGpuTelemetry: buildNoGpuPoller,
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller,
+        monotonicNow: () => 1000,
+    });
+
+    const snapshot = await source.pollMetrics(["net.down"]);
+    source.dispose();
+
+    assert.equal(readScalarMetric(snapshot, "net.down"), undefined);
+    assert.equal(snapshot.metrics["net.down.eth0"], undefined);
+    assert.deepEqual(sessionEvents, ["start", "release"]);
+});
+
 test("node system source polls ping without traffic interface discovery", async () => {
     const inetLatencyCalls: string[] = [];
     let networkInterfacesPollCount = 0;

@@ -43,6 +43,7 @@ import {
     NodeSystemSource,
     resolveCollectorGroups,
 } from "./node-system-source";
+import { WindowsPowerShellSessionSupervisor } from "./node-system-windows-powershell-session";
 import { readBluetoothBatteryMetrics } from "./bluetooth-battery/bluetooth-battery";
 import { BluetoothBatteryRouteRegistry } from "./bluetooth-battery/route-registry";
 import {
@@ -144,6 +145,7 @@ test("node system source timestamps single polling group snapshots after the gro
     const callCounts = buildCallCounts();
     let currentTimestampMilliseconds = 1000;
     const source = new NodeSystemSource({
+        platform: "linux",
         wallClockNow: () => currentTimestampMilliseconds,
         systemInformation: buildCountingSystemInformation(callCounts, {
             mem: async () => {
@@ -697,38 +699,68 @@ test("node system source falls back to used memory when macOS reclaimable memory
     });
 });
 
-test("node system source uses available memory for non-macOS RAM used", async () => {
-    for (const platform of ["linux", "win32"] as const) {
-        const callCounts = buildCallCounts();
-        const source = new NodeSystemSource({
-            platform,
-            systemInformation: buildCountingSystemInformation(callCounts, {
-                mem: async () => {
-                    callCounts.mem += 1;
-                    return {
-                        used: 15_000,
-                        total: 16_000,
-                        available: 4_000,
-                        reclaimable: 2_000,
-                    } as Systeminformation.MemData;
-                },
-            }),
-            pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
-            pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
-        });
+test("node system source uses available memory for Linux RAM used", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        platform: "linux",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                return {
+                    used: 15_000,
+                    total: 16_000,
+                    available: 4_000,
+                    reclaimable: 2_000,
+                } as Systeminformation.MemData;
+            },
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
 
-        const snapshot = await source.pollMetrics(["ram.used"]);
-        const metrics = assertSnapshotMetrics(snapshot);
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
 
-        assert.deepEqual(metrics["ram.used"], {
-            scalar: 12_000,
-            unit: MetricUnit.BYTES,
-        }, platform);
-        assert.deepEqual(metrics["ram.total"], {
-            scalar: 16_000,
-            unit: MetricUnit.BYTES,
-        }, platform);
-    }
+    assert.deepEqual(metrics["ram.used"], {
+        scalar: 12_000,
+        unit: MetricUnit.BYTES,
+    });
+    assert.deepEqual(metrics["ram.total"], {
+        scalar: 16_000,
+        unit: MetricUnit.BYTES,
+    });
+});
+
+test("node system source uses Node memory APIs on Windows", async () => {
+    const callCounts = buildCallCounts();
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            mem: async () => {
+                callCounts.mem += 1;
+                throw new Error("systeminformation.mem should not be called on Windows");
+            },
+        }),
+        readWindowsPhysicalMemory: () => ({
+            totalBytes: 16_000,
+            freeBytes: 4_000,
+        }),
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["ram.used"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics["ram.used"], {
+        scalar: 12_000,
+        unit: MetricUnit.BYTES,
+    });
+    assert.deepEqual(metrics["ram.total"], {
+        scalar: 16_000,
+        unit: MetricUnit.BYTES,
+    });
+    assert.equal(callCounts.mem, 0);
 });
 
 test("node system source falls back to used memory when non-macOS available memory is unusable", async () => {
@@ -815,6 +847,77 @@ test("node system source maintains network counter state and updates injected in
     assert.equal(callCounts.networkInterfaces, 1);
     assert.equal(callCounts.networkStats, 2);
     assert.equal(callCounts.currentLoad, 0);
+});
+
+test("node system source starts and releases injected Windows PowerShell session", () => {
+    const events: string[] = [];
+    const source = new NodeSystemSource({
+        platform: "win32",
+        windowsPowerShellSession: {
+            start: () => events.push("start"),
+            restart: () => events.push("restart"),
+            release: () => events.push("release"),
+        },
+    });
+
+    source.dispose();
+
+    assert.deepEqual(events, ["start", "release"]);
+});
+
+test("Windows PowerShell session supervisor restarts after repeated empty query results", async () => {
+    const events: string[] = [];
+    const supervisor = new WindowsPowerShellSessionSupervisor({
+        now: () => 1000,
+        restartDelaysMilliseconds: [0],
+        session: {
+            start: () => events.push("start"),
+            restart: () => events.push("restart"),
+            release: () => events.push("release"),
+        },
+    });
+
+    supervisor.start();
+    supervisor.recordEmptyResult("networkStats");
+    supervisor.recordEmptyResult("networkStats");
+    supervisor.recordEmptyResult("networkStats");
+    await waitForQueuedSupervisorRestart();
+    supervisor.dispose();
+
+    assert.deepEqual(events, ["start", "restart", "release"]);
+});
+
+test("empty Windows interface discovery does not clear PowerShell empty-result evidence", async () => {
+    const callCounts = buildCallCounts();
+    const events: string[] = [];
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsSize: async () => {
+                callCounts.fsSize += 1;
+                return [];
+            },
+        }),
+        windowsPowerShellSession: {
+            start: () => events.push("start"),
+            restart: () => events.push("restart"),
+            release: () => events.push("release"),
+        },
+        windowsPowerShellRestartDelaysMilliseconds: [0],
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    await source.pollMetrics(["disk.usage.percent"]);
+    await source.pollMetrics(["net.down"]);
+    await source.pollMetrics(["disk.usage.percent"]);
+    await source.pollMetrics(["disk.usage.percent"]);
+    await waitForQueuedSupervisorRestart();
+    source.dispose();
+
+    assert.equal(callCounts.fsSize, 3);
+    assert.equal(callCounts.networkInterfaces, 1);
+    assert.deepEqual(events, ["start", "restart", "release"]);
 });
 
 test("node system source maps disk usage metrics and updates injected disk registry", async () => {
@@ -1684,6 +1787,12 @@ function buildNoDarwinGpuPoller(
 async function waitForQueuedCpuInformationPoll(): Promise<void> {
     await new Promise<void>(resolve => {
         setImmediate(resolve);
+    });
+}
+
+async function waitForQueuedSupervisorRestart(): Promise<void> {
+    await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
     });
 }
 

@@ -12,7 +12,10 @@ import {
 } from "./source-ids";
 
 test("default source registry registers the Windows helper before fallback on Windows", () => {
-    const sourceRegistry = createDefaultSourceRegistry({ platform: "win32" });
+    const sourceRegistry = createDefaultSourceRegistry({
+        platform: "win32",
+        windowsPowerShellSession: buildNoopPowerShellSession(),
+    });
 
     try {
         assert.equal(
@@ -51,7 +54,10 @@ test("default source registry excludes the Windows helper outside Windows", () =
 });
 
 test("default source registry registers vendor HID battery support on Windows", () => {
-    const sourceRegistry = createDefaultSourceRegistry({ platform: "win32" });
+    const sourceRegistry = createDefaultSourceRegistry({
+        platform: "win32",
+        windowsPowerShellSession: buildNoopPowerShellSession(),
+    });
 
     try {
         assert.equal(
@@ -132,4 +138,16 @@ class FakeSourceClient implements SourceClient {
             listener(invalidation);
         }
     }
+}
+
+function buildNoopPowerShellSession(): {
+    start(): void;
+    restart(): void;
+    release(): void;
+} {
+    return {
+        start: () => undefined,
+        restart: () => undefined,
+        release: () => undefined,
+    };
 }

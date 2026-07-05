@@ -5,11 +5,17 @@ import type { SourceMetadataInvalidationListener } from "./source-planning-metad
 import { WindowsHelperSourceClient } from "./windows-helper/windows-helper-source-client";
 import { VendorHidBatterySourceClient } from "./battery-hid/vendor-hid-battery-source-client";
 import { shouldEnableVendorHidBatterySupport } from "../source-capabilities/vendor-hid-battery-platform-capabilities";
+import {
+    createSystemInformationPowerShellSession,
+    type NodeSystemWindowsPowerShellSession,
+} from "./node-system/node-system-windows-powershell-session";
 
 /** Options for default source registry creation. */
 export interface DefaultSourceRegistryOptions {
     /** Platform used to choose local helper sources. */
     readonly platform?: NodeJS.Platform;
+    /** Test seam for systeminformation's process-wide persistent PowerShell session. */
+    readonly windowsPowerShellSession?: NodeSystemWindowsPowerShellSession;
 }
 
 /** Lookup boundary for runtime telemetry sources. */
@@ -83,7 +89,12 @@ export function createDefaultSourceRegistry(options: DefaultSourceRegistryOption
         sourceClients.push(new WindowsHelperSourceClient());
     }
 
-    sourceClients.push(createMetricSourceClient(new NodeSystemSource({ platform })));
+    sourceClients.push(createMetricSourceClient(new NodeSystemSource({
+        platform,
+        windowsPowerShellSession: platform === "win32"
+            ? options.windowsPowerShellSession ?? createSystemInformationPowerShellSession()
+            : undefined,
+    })));
     sourceClients.push(new CustomHttpSourceClient());
 
     if (shouldEnableVendorHidBatterySupport(platform)) {

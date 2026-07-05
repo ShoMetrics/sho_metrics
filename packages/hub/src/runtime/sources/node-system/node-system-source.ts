@@ -1,3 +1,4 @@
+import { freemem, totalmem } from "node:os";
 import si, { type Systeminformation } from "systeminformation";
 import {
     buildMetricSnapshot,
@@ -93,6 +94,10 @@ import {
     type BluetoothBatteryMetricReader,
     readBluetoothBatteryMetrics,
 } from "./bluetooth-battery/bluetooth-battery";
+import {
+    type NodeSystemWindowsPowerShellSession,
+    WindowsPowerShellSessionSupervisor,
+} from "./node-system-windows-powershell-session";
 
 const log = logger.for("Source:NodeSystem");
 const networkLog = logger.for("Source:NodeSystem:Network");
@@ -140,6 +145,9 @@ interface NodeSystemSourceDependencies {
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
     readBluetoothBatteryMetrics?: BluetoothBatteryMetricReader;
+    readWindowsPhysicalMemory?: () => WindowsPhysicalMemory;
+    windowsPowerShellSession?: NodeSystemWindowsPowerShellSession;
+    windowsPowerShellRestartDelaysMilliseconds?: readonly number[];
 }
 
 interface CachedNetworkInterfaces {
@@ -150,6 +158,11 @@ interface CachedNetworkInterfaces {
 interface CachedCpuInformation {
     readonly baseFrequencyGigahertz: number | null;
     readonly modelText: string | null;
+}
+
+interface WindowsPhysicalMemory {
+    readonly totalBytes: number;
+    readonly freeBytes: number;
 }
 
 /**
@@ -170,10 +183,12 @@ export class NodeSystemSource implements MetricSource {
         systemInformation: NodeSystemInformationClient,
     ) => Promise<NodeSystemGpuTelemetryData | null>;
     private readonly readBluetoothBatteryMetrics: BluetoothBatteryMetricReader;
+    private readonly readWindowsPhysicalMemory: () => WindowsPhysicalMemory;
     private readonly networkInterfaceCache: RefreshableCache<CachedNetworkInterfaces>;
     private readonly networkInterfaceRefreshBackoff: BackoffPolicy;
     private readonly cpuInformationCache: RefreshableCache<CachedCpuInformation>;
     private readonly cpuInformationRefreshBackoff: BackoffPolicy;
+    private readonly windowsPowerShellSupervisor: WindowsPowerShellSessionSupervisor | undefined;
     private lastNetworkStatsByInterface = new Map<string, NodeSystemNetworkCounterSample>();
     private lastNetworkPollDebugLogMonotonicMilliseconds = 0;
     private cachedGpuData: NodeSystemGpuTelemetryData | null = null;
@@ -209,6 +224,7 @@ export class NodeSystemSource implements MetricSource {
         this.pollSystemInformationGpuTelemetry = dependencies.pollSystemInformationGpuTelemetry
             ?? pollSystemInformationGpuTelemetry;
         this.readBluetoothBatteryMetrics = dependencies.readBluetoothBatteryMetrics ?? readBluetoothBatteryMetrics;
+        this.readWindowsPhysicalMemory = dependencies.readWindowsPhysicalMemory ?? readWindowsPhysicalMemory;
         this.networkInterfaceCache = new RefreshableCache({
             now: this.monotonicNow,
             ttlMilliseconds: NodeSystemSource.NETWORK_INTERFACE_CACHE_MS,
@@ -229,6 +245,18 @@ export class NodeSystemSource implements MetricSource {
             this.monotonicNow,
             NodeSystemSource.CPU_INFORMATION_RETRY_MS,
         );
+        this.windowsPowerShellSupervisor = this.platform === "win32" && dependencies.windowsPowerShellSession
+            ? new WindowsPowerShellSessionSupervisor({
+                session: dependencies.windowsPowerShellSession,
+                now: this.monotonicNow,
+                restartDelaysMilliseconds: dependencies.windowsPowerShellRestartDelaysMilliseconds,
+            })
+            : undefined;
+        this.windowsPowerShellSupervisor?.start();
+    }
+
+    dispose(): void {
+        this.windowsPowerShellSupervisor?.dispose();
     }
 
     async poll(): Promise<MetricSnapshot> {
@@ -355,6 +383,22 @@ export class NodeSystemSource implements MetricSource {
 
     private async pollMemory(): Promise<Record<string, MetricValue>> {
         try {
+            if (this.platform === "win32") {
+                // Avoid systeminformation.mem() on Windows: v5 spawns PowerShell
+                // only for swap fields that ShoMetrics does not consume.
+                const memoryData = this.readWindowsPhysicalMemory();
+
+                return {
+                    [RAM_USED_METRIC_KEY]: buildScalarMetricValue(
+                        Math.max(memoryData.totalBytes - memoryData.freeBytes, 0),
+                        { unit: MetricUnit.BYTES },
+                    ),
+                    [RAM_TOTAL_METRIC_KEY]: buildScalarMetricValue(memoryData.totalBytes, {
+                        unit: MetricUnit.BYTES,
+                    }),
+                };
+            }
+
             const memoryData = await this.systemInformation.mem();
             const usedBytes = resolveRamUsedBytes(memoryData, this.platform);
 
@@ -406,6 +450,15 @@ export class NodeSystemSource implements MetricSource {
                 return [] as Systeminformation.DiskLayoutData[];
             }),
         ]);
+
+        this.recordWindowsPowerShellQueryResult("fsSize", fileSystems.length > 0);
+        if (this.windowsPowerShellSupervisor !== undefined && fileSystems.length === 0) {
+            // A managed Windows empty result can be a dead persistent
+            // PowerShell session, not a real topology change. Keep the last
+            // registry snapshot instead of flickering PI volume options empty.
+            return metrics;
+        }
+
         const diskVolumes = filterUsableFileSystems(fileSystems, this.platform)
             .map(fileSystem => toDiskVolumeOption(fileSystem, blockDevices, diskLayout));
         const defaultDiskVolume = resolveDefaultDiskVolume(diskVolumes);
@@ -596,6 +649,7 @@ export class NodeSystemSource implements MetricSource {
             ? await this.systemInformation.networkStats([...usableInterfaceIds].join(","))
             : [];
         const currentMonotonicMilliseconds = this.monotonicNow();
+        const isSuspiciousEmptyNetworkStats = usableInterfaceIds.size > 0 && networkStats.length === 0;
         let aggregateDownloadBytesPerSecond = 0;
         let aggregateUploadBytesPerSecond = 0;
         let hasPublishableDownloadRate = false;
@@ -603,6 +657,17 @@ export class NodeSystemSource implements MetricSource {
         const rateCalculations: NodeSystemNetworkRateCalculation[] = [];
 
         this.networkRegistry.update(interfaceOptions);
+        // Empty interface discovery is ambiguous: it can mean no active adapters,
+        // or a dead persistent PowerShell session returning an empty string.
+        // Treat it as neutral so it does not clear fsSize empty-result evidence.
+        // A traffic-only widget may still need the next interface refresh to
+        // recover because empty discovery provides no safe signal by itself.
+        if (usableInterfaceIds.size > 0) {
+            this.recordWindowsPowerShellQueryResult("networkStats", networkStats.length > 0);
+        }
+        if (this.windowsPowerShellSupervisor !== undefined && isSuspiciousEmptyNetworkStats) {
+            return metrics;
+        }
 
         for (const networkStat of networkStats) {
             if (!usableInterfaceIds.has(networkStat.iface)) {
@@ -793,6 +858,22 @@ export class NodeSystemSource implements MetricSource {
         ].join(" "));
     }
 
+    private recordWindowsPowerShellQueryResult(
+        queryName: "fsSize" | "networkStats",
+        hasExpectedResult: boolean,
+    ): void {
+        if (this.platform !== "win32" || this.windowsPowerShellSupervisor === undefined) {
+            return;
+        }
+
+        if (hasExpectedResult) {
+            this.windowsPowerShellSupervisor.recordSuccessfulResult();
+            return;
+        }
+
+        this.windowsPowerShellSupervisor.recordEmptyResult(queryName);
+    }
+
     private async pollGpu(): Promise<NodeSystemGpuTelemetryData | null> {
         const pollSequence = reserveNodeSystemGpuPollDebugSequence();
         const pollStartedAtMonotonicMilliseconds = this.monotonicNow();
@@ -870,6 +951,13 @@ export class NodeSystemSource implements MetricSource {
 
         return await this.pollSystemInformationGpuTelemetry(this.systemInformation);
     }
+}
+
+function readWindowsPhysicalMemory(): WindowsPhysicalMemory {
+    return {
+        totalBytes: totalmem(),
+        freeBytes: freemem(),
+    };
 }
 
 function resolveNetworkPollDebugReason(options: {
