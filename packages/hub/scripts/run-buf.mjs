@@ -14,18 +14,20 @@ const bufExecutable = join(
 );
 
 const env = { ...process.env };
+const pathEnvironmentKey = resolvePathEnvironmentKey(env);
 
-if (isWindows && !pathHasExecutable("diff.exe", env.PATH ?? "")) {
+if (isWindows && !pathHasExecutable("diff.exe", env[pathEnvironmentKey] ?? "")) {
     const gitDiffDirectory = findFirstExistingDirectory([
         join(env.ProgramFiles ?? "C:\\Program Files", "Git", "usr", "bin"),
         join(env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git", "usr", "bin"),
         join(env.LOCALAPPDATA ?? "", "Programs", "Git", "usr", "bin"),
+        join(env.USERPROFILE ?? "", "scoop", "apps", "git", "current", "usr", "bin"),
         "C:\\ProgramData\\chocolatey\\bin",
         join(env.USERPROFILE ?? "", "scoop", "shims"),
     ]);
 
     if (gitDiffDirectory) {
-        env.PATH = [gitDiffDirectory, env.PATH].filter(Boolean).join(delimiter);
+        env[pathEnvironmentKey] = [gitDiffDirectory, env[pathEnvironmentKey]].filter(Boolean).join(delimiter);
     }
 }
 
@@ -35,7 +37,7 @@ if (isWindows && !args.includes("--disable-symlinks")) {
     args.push("--disable-symlinks");
 }
 
-const result = spawnSync(bufExecutable, args, {
+const result = spawnSync(isWindows ? quoteWindowsCommandPath(bufExecutable) : bufExecutable, args, {
     env,
     shell: isWindows,
     stdio: "inherit",
@@ -51,6 +53,14 @@ function pathHasExecutable(executableName, pathValue) {
     return pathValue
         .split(delimiter)
         .some((directory) => existsSync(join(directory, executableName)));
+}
+
+function resolvePathEnvironmentKey(env) {
+    return Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+}
+
+function quoteWindowsCommandPath(commandPath) {
+    return `"${commandPath}"`;
 }
 
 function findFirstExistingDirectory(directories) {
