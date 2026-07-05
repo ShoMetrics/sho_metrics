@@ -15,6 +15,10 @@ internal sealed partial class SourceRequestHandler(
     ILogger<SourceRequestHandler> logger,
     TimeProvider timeProvider) : ISourceRequestHandler
 {
+    private readonly record struct PawnIoDiagnosticResult(
+        PawnIoDiagnostic? Diagnostic,
+        HardwareSourceWarning? Warning);
+
     private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ReadSnapshotTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ListDescriptorsTimeout = TimeSpan.FromSeconds(8);
@@ -22,10 +26,14 @@ internal sealed partial class SourceRequestHandler(
     private static readonly TimeSpan SlowOperationDebugThreshold = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan OperationLogThrottleInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MinimumDemandApplyInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan PawnIoDiagnosticCacheDuration = TimeSpan.FromSeconds(2);
     private const string PawnIoDiagnosticFailureWarningCode = "pawnio_diagnostic_failed";
 
     private readonly MetricRefreshDemandChangeGate _demandChangeGate =
         new(timeProvider, MinimumDemandApplyInterval);
+    private readonly Lock _pawnIoDiagnosticGate = new();
+    private PawnIoDiagnosticResult? _cachedPawnIoDiagnostic;
+    private long _pawnIoDiagnosticCapturedTimestamp;
 
     public Task<GetSourceHealthResponse> GetSourceHealthAsync(
         GetSourceHealthRequest request,
@@ -73,23 +81,45 @@ internal sealed partial class SourceRequestHandler(
 
     private GetSourceHealthResponse GetSourceHealthCore()
     {
-        PawnIoDiagnostic? pawnIoDiagnostic = TryReadPawnIoDiagnostic(out HardwareSourceWarning? diagnosticWarning);
+        PawnIoDiagnosticResult diagnostic = ReadPawnIoDiagnosticCached();
 
-        if (diagnosticWarning is null)
+        if (diagnostic.Warning is null)
         {
-            return protocolMapper.BuildHealthResponse(monitorSession.InitializationWarnings, pawnIoDiagnostic);
+            return protocolMapper.BuildHealthResponse(monitorSession.InitializationWarnings, diagnostic.Diagnostic);
         }
 
-        List<HardwareSourceWarning> warnings = [.. monitorSession.InitializationWarnings, diagnosticWarning];
-        return protocolMapper.BuildHealthResponse(warnings, pawnIoDiagnostic);
+        List<HardwareSourceWarning> warnings = [.. monitorSession.InitializationWarnings, diagnostic.Warning];
+        return protocolMapper.BuildHealthResponse(warnings, diagnostic.Diagnostic);
     }
 
-    private PawnIoDiagnostic? TryReadPawnIoDiagnostic(out HardwareSourceWarning? warning)
+    // Reading the PawnIO diagnostic loads the ring0 MSR module and issues kernel
+    // MSR reads. GetSourceHealth is reachable by any local user through the
+    // data-plane pipe and is intentionally not rate limited, so cache the
+    // quasi-static diagnostic for a short window to keep a request loop from
+    // driving continuous ring0 work on the privileged service. Initialization
+    // warnings stay live because the caller reads them outside this cache.
+    private PawnIoDiagnosticResult ReadPawnIoDiagnosticCached()
+    {
+        lock (_pawnIoDiagnosticGate)
+        {
+            if (_cachedPawnIoDiagnostic is { } cachedDiagnostic
+                && timeProvider.GetElapsedTime(_pawnIoDiagnosticCapturedTimestamp) < PawnIoDiagnosticCacheDuration)
+            {
+                return cachedDiagnostic;
+            }
+
+            PawnIoDiagnosticResult diagnostic = ReadPawnIoDiagnostic();
+            _cachedPawnIoDiagnostic = diagnostic;
+            _pawnIoDiagnosticCapturedTimestamp = timeProvider.GetTimestamp();
+            return diagnostic;
+        }
+    }
+
+    private PawnIoDiagnosticResult ReadPawnIoDiagnostic()
     {
         try
         {
-            warning = null;
-            return PawnIoDiagnostics.Read();
+            return new PawnIoDiagnosticResult(PawnIoDiagnostics.Read(), Warning: null);
         }
         catch (Exception exception)
         {
@@ -100,13 +130,13 @@ internal sealed partial class SourceRequestHandler(
                     "PawnIO diagnostic failed while building source health. suppressedLogCount={SuppressedLogCount}",
                     context.SuppressedCount));
 
-            warning = new HardwareSourceWarning
-            {
-                Code = PawnIoDiagnosticFailureWarningCode,
-                Message = $"PawnIO diagnostic failed: {exception.GetType().Name}: {exception.Message}",
-            };
-
-            return null;
+            return new PawnIoDiagnosticResult(
+                Diagnostic: null,
+                Warning: new HardwareSourceWarning
+                {
+                    Code = PawnIoDiagnosticFailureWarningCode,
+                    Message = $"PawnIO diagnostic failed: {exception.GetType().Name}: {exception.Message}",
+                });
         }
     }
 
