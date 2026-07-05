@@ -43,7 +43,10 @@ import {
     NodeSystemSource,
     resolveCollectorGroups,
 } from "./node-system-source";
-import { WindowsPowerShellSessionSupervisor } from "./node-system-windows-powershell-session";
+import {
+    type NodeSystemWindowsPowerShellSession,
+    WindowsPowerShellSessionSupervisor,
+} from "./node-system-windows-powershell-session";
 import { readBluetoothBatteryMetrics } from "./bluetooth-battery/bluetooth-battery";
 import { BluetoothBatteryRouteRegistry } from "./bluetooth-battery/route-registry";
 import {
@@ -256,6 +259,39 @@ test("node system source keeps system battery when Bluetooth battery polling fai
     assert.deepEqual(metrics, {
         [SYSTEM_BATTERY_PERCENT_METRIC_KEY]: {
             scalar: 72,
+            unit: MetricUnit.PERCENT,
+        },
+    });
+    assert.equal(callCounts.battery, 1);
+});
+
+test("Windows system battery timeout does not block Bluetooth battery metrics", async () => {
+    const callCounts = buildCallCounts();
+    const bluetoothMetricKey = buildBluetoothBatteryPercentMetricKey(`device-${sha256Hex("aa:bb:cc:dd:ee:ff")}`);
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            battery: async () => {
+                callCounts.battery += 1;
+                return await neverResolvingPromise<Systeminformation.BatteryData>();
+            },
+        }),
+        readBluetoothBatteryMetrics: async () => ({
+            [bluetoothMetricKey]: buildScalarMetricValue(88, { unit: MetricUnit.PERCENT }),
+        }),
+        windowsPowerShellSession: buildNoopWindowsPowerShellSession(),
+        windowsPowerShellQueryTimeoutMilliseconds: 1,
+    });
+
+    const snapshot = await source.pollMetrics([
+        SYSTEM_BATTERY_PERCENT_METRIC_KEY,
+        bluetoothMetricKey,
+    ]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.deepEqual(metrics, {
+        [bluetoothMetricKey]: {
+            scalar: 88,
             unit: MetricUnit.PERCENT,
         },
     });
@@ -604,6 +640,41 @@ test("node system source retries static CPU information after a transient failur
     assert.equal(callCounts.currentLoad, 4);
 });
 
+test("Windows CPU information timeout does not leave the static CPU cache permanently pending", async () => {
+    const callCounts = buildCallCounts();
+    let currentTimestampMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            currentLoad: async () => {
+                callCounts.currentLoad += 1;
+                return { currentLoad: 42 } as Systeminformation.CurrentLoadData;
+            },
+            cpu: async () => {
+                callCounts.cpu += 1;
+                return await neverResolvingPromise<Systeminformation.CpuData>();
+            },
+        }),
+        windowsPowerShellSession: buildNoopWindowsPowerShellSession(),
+        windowsPowerShellQueryTimeoutMilliseconds: 1,
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+        monotonicNow: () => currentTimestampMilliseconds,
+    });
+
+    await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForWindowsPowerShellQueryTimeout();
+    currentTimestampMilliseconds = 60000;
+    await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForQueuedCpuInformationPoll();
+    currentTimestampMilliseconds = 61000;
+    await source.pollMetrics(["cpu.usage_percent"]);
+    await waitForWindowsPowerShellQueryTimeout();
+
+    assert.equal(callCounts.cpu, 2);
+    assert.equal(callCounts.currentLoad, 3);
+});
+
 test("node system source polls only memory when RAM metrics are requested", async () => {
     const callCounts = buildCallCounts();
     const source = new NodeSystemSource({
@@ -920,6 +991,43 @@ test("empty Windows interface discovery does not clear PowerShell empty-result e
     assert.deepEqual(events, ["start", "restart", "release"]);
 });
 
+test("Windows PowerShell query timeout restarts a hung interface discovery session", async () => {
+    const callCounts = buildCallCounts();
+    const events: string[] = [];
+    let currentMonotonicMilliseconds = 1000;
+    const source = new NodeSystemSource({
+        platform: "win32",
+        monotonicNow: () => currentMonotonicMilliseconds,
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            networkInterfaces: (async () => {
+                callCounts.networkInterfaces += 1;
+                return await neverResolvingPromise<Systeminformation.NetworkInterfacesData[]>();
+            }) as NodeSystemInformationClient["networkInterfaces"],
+        }),
+        windowsPowerShellSession: {
+            start: () => events.push("start"),
+            restart: () => events.push("restart"),
+            release: () => events.push("release"),
+        },
+        windowsPowerShellQueryTimeoutMilliseconds: 1,
+        windowsPowerShellRestartDelaysMilliseconds: [0],
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    await source.pollMetrics(["net.down"]);
+    currentMonotonicMilliseconds += 3000;
+    await source.pollMetrics(["net.down"]);
+    currentMonotonicMilliseconds += 3000;
+    await source.pollMetrics(["net.down"]);
+    await waitForQueuedSupervisorRestart();
+    source.dispose();
+
+    assert.equal(callCounts.networkInterfaces, 3);
+    assert.equal(callCounts.networkStats, 0);
+    assert.deepEqual(events, ["start", "restart", "release"]);
+});
+
 test("node system source maps disk usage metrics and updates injected disk registry", async () => {
     const callCounts = buildCallCounts();
     const diskRegistryUpdates: DiskVolumeOption[][] = [];
@@ -972,6 +1080,51 @@ test("node system source maps disk usage metrics and updates injected disk regis
     assert.equal(diskRegistryUpdates[0][0]?.volumeLabel, "System");
     assert.equal(callCounts.fsSize, 1);
     assert.equal(callCounts.fsStats, 0);
+});
+
+test("Windows disk usage timeout does not let topology queries freeze fsSize results", async () => {
+    const callCounts = buildCallCounts();
+    const diskRegistryUpdates: DiskVolumeOption[][] = [];
+    const source = new NodeSystemSource({
+        platform: "win32",
+        systemInformation: buildCountingSystemInformation(callCounts, {
+            fsSize: async () => {
+                callCounts.fsSize += 1;
+                return [buildFileSystem({
+                    fs: "C:",
+                    mount: "C:",
+                    size: 1000,
+                    used: 400,
+                    available: 600,
+                })];
+            },
+            blockDevices: async () => {
+                callCounts.blockDevices += 1;
+                return await neverResolvingPromise<Systeminformation.BlockDevicesData[]>();
+            },
+            diskLayout: async () => {
+                callCounts.diskLayout += 1;
+                return await neverResolvingPromise<Systeminformation.DiskLayoutData[]>();
+            },
+        }),
+        diskRegistry: {
+            update: options => diskRegistryUpdates.push([...options]),
+        },
+        windowsPowerShellSession: buildNoopWindowsPowerShellSession(),
+        windowsPowerShellQueryTimeoutMilliseconds: 1,
+        pollWindowsGpuTelemetry: buildNoGpuPoller(callCounts),
+        pollSystemInformationGpuTelemetry: buildNoSystemGpuPoller(callCounts),
+    });
+
+    const snapshot = await source.pollMetrics(["disk.usage.percent"]);
+    const metrics = assertSnapshotMetrics(snapshot);
+
+    assert.equal(metrics["disk.volume.C%3A.percent"]?.scalar, 40);
+    assert.equal(metrics["disk.usage.percent"]?.scalar, 40);
+    assert.equal(diskRegistryUpdates[0][0]?.id, "C:");
+    assert.equal(callCounts.fsSize, 1);
+    assert.equal(callCounts.blockDevices, 1);
+    assert.equal(callCounts.diskLayout, 1);
 });
 
 test("node system source uses macOS root data volume for default disk usage", async () => {
@@ -1766,6 +1919,14 @@ function buildCountingSystemInformation(
     } as NodeSystemInformationClient;
 }
 
+function buildNoopWindowsPowerShellSession(): NodeSystemWindowsPowerShellSession {
+    return {
+        start: () => undefined,
+        restart: () => undefined,
+        release: () => undefined,
+    };
+}
+
 function buildNoGpuPoller(
     callCounts: NodeSystemSourceCallCounts,
 ): () => Promise<NodeSystemGpuTelemetryData | null> {
@@ -1794,6 +1955,16 @@ async function waitForQueuedSupervisorRestart(): Promise<void> {
     await new Promise<void>(resolve => {
         setTimeout(resolve, 0);
     });
+}
+
+async function waitForWindowsPowerShellQueryTimeout(): Promise<void> {
+    await new Promise<void>(resolve => {
+        setTimeout(resolve, 5);
+    });
+}
+
+async function neverResolvingPromise<T>(): Promise<T> {
+    return await new Promise<T>(() => undefined);
 }
 
 function buildNoSystemGpuPoller(

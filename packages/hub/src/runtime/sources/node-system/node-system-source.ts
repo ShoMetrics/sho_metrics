@@ -96,6 +96,7 @@ import {
 } from "./bluetooth-battery/bluetooth-battery";
 import {
     type NodeSystemWindowsPowerShellSession,
+    type WindowsPowerShellQueryName,
     WindowsPowerShellSessionSupervisor,
 } from "./node-system-windows-powershell-session";
 
@@ -148,6 +149,7 @@ interface NodeSystemSourceDependencies {
     readWindowsPhysicalMemory?: () => WindowsPhysicalMemory;
     windowsPowerShellSession?: NodeSystemWindowsPowerShellSession;
     windowsPowerShellRestartDelaysMilliseconds?: readonly number[];
+    windowsPowerShellQueryTimeoutMilliseconds?: number;
 }
 
 interface CachedNetworkInterfaces {
@@ -184,6 +186,7 @@ export class NodeSystemSource implements MetricSource {
     ) => Promise<NodeSystemGpuTelemetryData | null>;
     private readonly readBluetoothBatteryMetrics: BluetoothBatteryMetricReader;
     private readonly readWindowsPhysicalMemory: () => WindowsPhysicalMemory;
+    private readonly windowsPowerShellQueryTimeoutMilliseconds: number;
     private readonly networkInterfaceCache: RefreshableCache<CachedNetworkInterfaces>;
     private readonly networkInterfaceRefreshBackoff: BackoffPolicy;
     private readonly cpuInformationCache: RefreshableCache<CachedCpuInformation>;
@@ -211,6 +214,7 @@ export class NodeSystemSource implements MetricSource {
     private static readonly NETWORK_INTERFACE_REFRESH_RETRY_MS = 2000;
     private static readonly NETWORK_INTERFACE_STALE_WARNING_INTERVAL_MS = 30000;
     private static readonly NETWORK_DEBUG_LOG_INTERVAL_MS = 5000;
+    private static readonly WINDOWS_POWERSHELL_QUERY_TIMEOUT_MS = 5000;
 
     constructor(dependencies: NodeSystemSourceDependencies = {}) {
         this.systemInformation = dependencies.systemInformation ?? defaultSystemInformation;
@@ -225,6 +229,8 @@ export class NodeSystemSource implements MetricSource {
             ?? pollSystemInformationGpuTelemetry;
         this.readBluetoothBatteryMetrics = dependencies.readBluetoothBatteryMetrics ?? readBluetoothBatteryMetrics;
         this.readWindowsPhysicalMemory = dependencies.readWindowsPhysicalMemory ?? readWindowsPhysicalMemory;
+        this.windowsPowerShellQueryTimeoutMilliseconds = dependencies.windowsPowerShellQueryTimeoutMilliseconds
+            ?? NodeSystemSource.WINDOWS_POWERSHELL_QUERY_TIMEOUT_MS;
         this.networkInterfaceCache = new RefreshableCache({
             now: this.monotonicNow,
             ttlMilliseconds: NodeSystemSource.NETWORK_INTERFACE_CACHE_MS,
@@ -440,12 +446,18 @@ export class NodeSystemSource implements MetricSource {
     private async pollDiskUsage(): Promise<Record<string, MetricValue>> {
         const metrics: Record<string, MetricValue> = {};
         const [fileSystems, blockDevices, diskLayout] = await Promise.all([
-            this.systemInformation.fsSize(),
-            this.systemInformation.blockDevices().catch(error => {
+            this.readWindowsPowerShellQuery("fsSize", () => this.systemInformation.fsSize(), {
+                timeoutFallback: () => [] as Systeminformation.FsSizeData[],
+            }),
+            this.readWindowsPowerShellQuery("blockDevices", () => this.systemInformation.blockDevices(), {
+                timeoutFallback: () => [] as Systeminformation.BlockDevicesData[],
+            }).catch(error => {
                 log.warn(() => `Block device poll error: ${String(error)}`);
                 return [] as Systeminformation.BlockDevicesData[];
             }),
-            this.systemInformation.diskLayout().catch(error => {
+            this.readWindowsPowerShellQuery("diskLayout", () => this.systemInformation.diskLayout(), {
+                timeoutFallback: () => [] as Systeminformation.DiskLayoutData[],
+            }).catch(error => {
                 log.warn(() => `Disk layout poll error: ${String(error)}`);
                 return [] as Systeminformation.DiskLayoutData[];
             }),
@@ -561,7 +573,7 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private async readCpuInformation(): Promise<CachedCpuInformation> {
-        const cpuData = await this.systemInformation.cpu();
+        const cpuData = await this.readWindowsPowerShellQuery("cpu", () => this.systemInformation.cpu());
         return {
             baseFrequencyGigahertz: isFinitePositiveNumber(cpuData.speed) ? cpuData.speed : null,
             modelText: formatCpuModelText(cpuData),
@@ -603,7 +615,7 @@ export class NodeSystemSource implements MetricSource {
 
     private async pollSystemBatterySafely(): Promise<Systeminformation.BatteryData | undefined> {
         try {
-            return await this.systemInformation.battery();
+            return await this.readWindowsPowerShellQuery("battery", () => this.systemInformation.battery());
         } catch (error) {
             log.error(() => `System battery poll error: ${String(error)}`);
             return undefined;
@@ -646,7 +658,11 @@ export class NodeSystemSource implements MetricSource {
         const interfaceOptions = cachedNetworkInterfaces.interfaceOptions;
         const usableInterfaceIds = new Set(interfaceOptions.map((networkInterface) => networkInterface.id));
         const networkStats = usableInterfaceIds.size > 0
-            ? await this.systemInformation.networkStats([...usableInterfaceIds].join(","))
+            ? await this.readWindowsPowerShellQuery(
+                "networkStats",
+                () => this.systemInformation.networkStats([...usableInterfaceIds].join(",")),
+                { timeoutFallback: () => [] as Systeminformation.NetworkStatsData[] },
+            )
             : [];
         const currentMonotonicMilliseconds = this.monotonicNow();
         const isSuspiciousEmptyNetworkStats = usableInterfaceIds.size > 0 && networkStats.length === 0;
@@ -766,7 +782,11 @@ export class NodeSystemSource implements MetricSource {
     }
 
     private async refreshUsableNetworkInterfaces(): Promise<CachedNetworkInterfaces> {
-        const networkInterfaces = await this.systemInformation.networkInterfaces();
+        const networkInterfaces = await this.readWindowsPowerShellQuery(
+            "networkInterfaces",
+            () => this.systemInformation.networkInterfaces(),
+            { shouldRecordTimeoutEvidence: true },
+        );
         const usableNetworkInterfaces = Array.isArray(networkInterfaces)
             ? networkInterfaces.filter(networkInterface => isUsableNetworkInterface(networkInterface, this.platform))
             : [];
@@ -858,8 +878,51 @@ export class NodeSystemSource implements MetricSource {
         ].join(" "));
     }
 
+    private async readWindowsPowerShellQuery<T>(
+        queryName: WindowsPowerShellQueryName,
+        operation: () => Promise<T>,
+        options: {
+            readonly timeoutFallback?: () => T;
+            readonly shouldRecordTimeoutEvidence?: boolean;
+        } = {},
+    ): Promise<T> {
+        if (this.platform !== "win32" || this.windowsPowerShellSupervisor === undefined) {
+            return operation();
+        }
+
+        let timeout: NodeJS.Timeout | undefined;
+        const timeoutPromise = new Promise<T>((resolve, reject) => {
+            timeout = setTimeout(() => {
+                log.atWarn()
+                    .everyMs(`windows-powershell-query-timeout:${queryName}`, 30000)
+                    .log(() => [
+                        "windowsPowerShellQueryTimeout",
+                        `query=${queryName}`,
+                        `timeoutMs=${this.windowsPowerShellQueryTimeoutMilliseconds}`,
+                    ].join(" "));
+                if (options.shouldRecordTimeoutEvidence === true) {
+                    this.windowsPowerShellSupervisor?.recordEmptyResult(queryName);
+                }
+                if (options.timeoutFallback !== undefined) {
+                    resolve(options.timeoutFallback());
+                    return;
+                }
+
+                reject(new Error(`Windows PowerShell query timed out: ${queryName}`));
+            }, this.windowsPowerShellQueryTimeoutMilliseconds);
+        });
+
+        try {
+            return await Promise.race([operation(), timeoutPromise]);
+        } finally {
+            if (timeout !== undefined) {
+                clearTimeout(timeout);
+            }
+        }
+    }
+
     private recordWindowsPowerShellQueryResult(
-        queryName: "fsSize" | "networkStats",
+        queryName: WindowsPowerShellQueryName,
         hasExpectedResult: boolean,
     ): void {
         if (this.platform !== "win32" || this.windowsPowerShellSupervisor === undefined) {
