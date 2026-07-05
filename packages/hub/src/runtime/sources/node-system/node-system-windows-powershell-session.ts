@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import si from "systeminformation";
 import { logger } from "../../../logging/node-logger";
+import { resolveWindowsPowerShellExecutablePath } from "./windows-powershell-executable";
 
 const log = logger.for("Source:NodeSystem:PowerShell");
 const execFileAsync = promisify(execFile);
@@ -260,7 +261,7 @@ function cleanupOrphanSystemInformationPowerShellProcesses(): void {
 }
 
 async function killOrphanSystemInformationPowerShellProcesses(): Promise<readonly string[]> {
-    const { stdout } = await execFileAsync("powershell.exe", [
+    const { stdout } = await execFileAsync(resolveWindowsPowerShellExecutablePath(), [
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",

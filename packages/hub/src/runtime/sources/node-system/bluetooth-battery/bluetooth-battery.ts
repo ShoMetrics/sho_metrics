@@ -33,6 +33,7 @@ import {
     type BluetoothBatteryRouteDefinition,
     type BluetoothBatteryRouteRegistry,
 } from "./route-registry";
+import { resolveWindowsPowerShellExecutablePath } from "../windows-powershell-executable";
 
 const log = logger.for("Source:NodeSystem:BluetoothBattery");
 const execFileAsync = promisify(execFile);
@@ -521,7 +522,7 @@ function logBluetoothBatteryFailure(operation: string, error: unknown): void {
 }
 
 async function listWindowsBluetoothDevicesFromPowerShell(): Promise<readonly WindowsBluetoothDeviceRouteData[]> {
-    const { stdout } = await execFileAsync("powershell.exe", [
+    const { stdout } = await execFileAsync(resolveWindowsPowerShellExecutablePath(), [
         "-NoProfile",
         "-NonInteractive",
         "-ExecutionPolicy",
@@ -544,7 +545,7 @@ async function readWindowsBluetoothBatteriesFromPowerShell(
         return [];
     }
 
-    const { stdout } = await execFileAsync("powershell.exe", [
+    const { stdout } = await execFileAsync(resolveWindowsPowerShellExecutablePath(), [
         "-NoProfile",
         "-NonInteractive",
         "-ExecutionPolicy",
