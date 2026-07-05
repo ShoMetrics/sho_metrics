@@ -96,7 +96,7 @@ message GpuHardwareSummaryTarget {
     max_items: 3
   }];
 
-  optional string gpu_id = 2 [(buf.validate.field).string.max_len = 256];
+  optional string gpu_id = 2 [(buf.validate.field).string.max_len = 1024];
 }
 
 message GpuHardwareSummaryReading {
@@ -305,7 +305,7 @@ message NetworkMetricTarget {
       defined_only: true
       not_in: [0]
     }];
-    optional string interface_id = 2 [(buf.validate.field).string.max_len = 256];
+    optional string interface_id = 2 [(buf.validate.field).string.max_len = 512];
     optional TrafficDisplayMode traffic_display_mode = 3 [(buf.validate.field).enum = {
       defined_only: true
       not_in: [0]
@@ -330,7 +330,7 @@ message DiskMetricTarget {
       DISPLAY_MODE_SPACE = 2;
     }
 
-    optional string volume_id = 1 [(buf.validate.field).string.max_len = 512];
+    optional string volume_id = 1 [(buf.validate.field).string.max_len = 1024];
     optional DisplayMode display_mode = 2 [(buf.validate.field).enum = {
       defined_only: true
       not_in: [0]
@@ -361,7 +361,7 @@ message GpuMetricTarget {
     Power power = 4;
   }
 
-  optional string gpu_id = 10 [(buf.validate.field).string.max_len = 256];
+  optional string gpu_id = 10 [(buf.validate.field).string.max_len = 1024];
 
   message Usage {}
 
@@ -437,7 +437,7 @@ message SystemPeripheralIdentity {
     optional uint32 product_id = 2 [(buf.validate.field).uint32.lte = 65535];
     optional string manufacturer = 3 [(buf.validate.field).string.max_len = 256];
     optional string product_name = 4 [(buf.validate.field).string.max_len = 256];
-    optional string serial_number = 5 [(buf.validate.field).string.max_len = 512];
+    optional string serial_number = 5 [(buf.validate.field).string.max_len = 1024];
 
     optional uint32 interface_number = 6 [(buf.validate.field).uint32.lte = 255];
     optional uint32 usage_page = 7 [(buf.validate.field).uint32.lte = 65535];
@@ -457,7 +457,7 @@ message SystemPeripheralIdentity {
 
     // Vendor-specific stable unit id from a known read-only protocol feature,
     // such as Logitech HID++ DeviceInformation. Treat as opaque.
-    optional string vendor_unit_id = 11 [(buf.validate.field).string.max_len = 512];
+    optional string vendor_unit_id = 11 [(buf.validate.field).string.max_len = 1024];
 
     // Stable model or family id owned by the vendor adapter. This is a fallback
     // signal, not a per-unit identity.
@@ -522,7 +522,7 @@ message CatalogMetricTarget {
   // paths, Linux hwmon chip/feature/subfeature names, macOS SMC keys, or
   // external hardware-monitor sensor paths. Each source adapter owns the
   // mapping from its native identifiers into this id.
-  optional string metric_id = 1 [(buf.validate.field).string.max_len = 1024];
+  optional string metric_id = 1 [(buf.validate.field).string.max_len = 4096];
 
   // Source-derived display hints captured when the user selected this metric.
   // These are not user overrides. They keep the widget useful when the source
