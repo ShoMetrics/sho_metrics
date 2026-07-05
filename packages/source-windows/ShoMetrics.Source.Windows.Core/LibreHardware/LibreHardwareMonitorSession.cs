@@ -143,6 +143,15 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     public IReadOnlyList<HardwareSourceWarning> InitializationWarnings { get; }
 
     /// <summary>
+    /// The immutable descriptor catalog built once at construction. Exposed so the
+    /// Service host can log a startup summary: the catalog drives the Property
+    /// Inspector picker, and because it is never rebuilt, a hardware category that
+    /// failed to enumerate at startup (for example motherboard SuperIO sensors when
+    /// the ring0 driver was not yet ready) stays missing for the whole process.
+    /// </summary>
+    public HardwareMetricDescriptorSnapshot DescriptorSnapshot => _cachedDescriptorSnapshot;
+
+    /// <summary>
     /// Reads the latest cached metric snapshot, filtered to requested metric ids.
     /// </summary>
     /// <remarks>

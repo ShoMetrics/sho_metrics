@@ -27,6 +27,58 @@ public sealed class WindowsMetricSnapshotWorkerLogTests
         Assert.Contains("/gpu/secret/0", summary, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DescriptorHardwareTypeSummaryCountsByHardwareTypeWithoutRawIdentity()
+    {
+        HardwareMetricDescriptorSnapshot descriptorSnapshot = new()
+        {
+            DescriptorFingerprint = "test",
+            Warnings = [],
+            Descriptors =
+            [
+                BuildDescriptor("SuperIO", "lhm.sensor:/superio/0/voltage/0"),
+                BuildDescriptor("SuperIO", "lhm.sensor:/superio/0/fan/0"),
+                BuildDescriptor("Cpu", "cpu.temp"),
+                BuildDescriptor(string.Empty, "disk.system.throughput.read"),
+            ],
+        };
+
+        string summary = WindowsMetricSnapshotWorker.BuildDescriptorHardwareTypeSummary(descriptorSnapshot);
+
+        Assert.Equal("(native):1,Cpu:1,SuperIO:2", summary);
+    }
+
+    [Fact]
+    public void DescriptorHardwareTypeSummaryReportsNoneForEmptyCatalog()
+    {
+        HardwareMetricDescriptorSnapshot descriptorSnapshot = new()
+        {
+            DescriptorFingerprint = "",
+            Warnings = [],
+            Descriptors = [],
+        };
+
+        Assert.Equal("none", WindowsMetricSnapshotWorker.BuildDescriptorHardwareTypeSummary(descriptorSnapshot));
+    }
+
+    private static HardwareMetricDescriptor BuildDescriptor(string hardwareType, string metricId)
+    {
+        return new HardwareMetricDescriptor
+        {
+            MetricId = metricId,
+            SourceSensorId = metricId,
+            PollingGroupId = "lhm:hardware:test",
+            HardwareId = "/test/0",
+            HardwareName = "Test Hardware",
+            HardwareType = hardwareType,
+            SensorName = "Test Sensor",
+            SourceSensorType = "Voltage",
+            ValueKind = MetricValueKind.Scalar,
+            Unit = MetricUnit.Volts,
+            MetricIdKind = MetricIdKind.SourceSensor,
+        };
+    }
+
     private static MetricSnapshotRefreshDiagnostics BuildDiagnostics()
     {
         return new MetricSnapshotRefreshDiagnostics

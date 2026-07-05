@@ -32,6 +32,7 @@ internal sealed class WindowsMetricSnapshotWorker(
             "Starting Windows metric snapshot refresh worker. mode=demand-driven maxDemandCheckDelayMs={MaxDemandCheckDelayMs} refreshSummaryIntervalMs={RefreshSummaryIntervalMs}",
             MaximumDemandCheckDelay.TotalMilliseconds,
             RefreshSummaryInterval.TotalMilliseconds);
+        LogDescriptorCatalogSummary();
         LogInitializationWarnings();
 
         try
@@ -259,6 +260,53 @@ internal sealed class WindowsMetricSnapshotWorker(
         logger.AtInformation()
             .Every(RefreshSummaryInterval)
             .Log(context => CreateRefreshSummaryEntry(context, result, duration));
+    }
+
+    private void LogDescriptorCatalogSummary()
+    {
+        HardwareMetricDescriptorSnapshot descriptorSnapshot = monitorSession.DescriptorSnapshot;
+
+        // The descriptor catalog is built once at startup and never rebuilt, so a
+        // hardware category that failed to enumerate then (for example motherboard
+        // SuperIO voltage/fan sensors when the ring0 driver was not ready) stays
+        // silently missing from the Property Inspector picker for the whole
+        // process. Logging the per-hardware-type counts at startup turns that
+        // otherwise invisible failure into a one-line diagnostic.
+        logger.LogInformation(
+            "Windows metric descriptor catalog built. descriptors={DescriptorCount} byHardwareType={DescriptorsByHardwareType} warnings={WarningCount}",
+            descriptorSnapshot.Descriptors.Count,
+            BuildDescriptorHardwareTypeSummary(descriptorSnapshot),
+            descriptorSnapshot.Warnings.Count);
+
+        // These preload warnings ("Hardware update failed for ...") are otherwise
+        // only sent to the hub over gRPC, never written locally, so a startup
+        // enumeration failure leaves no trace in the helper log. Surface them here.
+        if (descriptorSnapshot.Warnings.Count == 0)
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Windows metric descriptor catalog built with warnings. warningCount={WarningCount} warningSamples={WarningSamples}",
+            descriptorSnapshot.Warnings.Count,
+            BuildWarningSamples(descriptorSnapshot.Warnings));
+    }
+
+    internal static string BuildDescriptorHardwareTypeSummary(HardwareMetricDescriptorSnapshot descriptorSnapshot)
+    {
+        if (descriptorSnapshot.Descriptors.Count == 0)
+        {
+            return "none";
+        }
+
+        return string.Join(
+            ',',
+            descriptorSnapshot.Descriptors
+                .GroupBy(
+                    descriptor => descriptor.HardwareType.Length == 0 ? "(native)" : descriptor.HardwareType,
+                    StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key}:{group.Count()}"));
     }
 
     private void LogInitializationWarnings()
