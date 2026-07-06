@@ -46,6 +46,20 @@ export interface CollectorGroupSupervisorOptions {
  *
  * It does not plan groups, compose fallbacks, read MetricStore, or render
  * widgets. It only reconciles the latest planned groups with running loops.
+ *
+ * TODO(deferred, post-launch load-reduction) -- both belong here because this is
+ * where runner lifecycles and demanded refresh intervals are owned, and both are
+ * gated on NOT introducing a P0:
+ *   - No-device idle gating: when no Stream Deck device is connected
+ *     (streamDeck.devices + onDeviceDidConnect/DidDisconnect), suspend runner
+ *     polling so we stop calling node/helper/nvml. MUST pair with an action-event
+ *     force-resume failsafe: if an onDeviceDidConnect is ever missed, any key
+ *     interaction must resume polling, or a single missed event freezes every
+ *     widget with a device attached (that is the P0 this feature can create).
+ *   - AC minimum-refresh floor: when on wall power, clamp the demanded refresh
+ *     interval to a floor (~5s) to cut idle load. AC detection must not spawn
+ *     PowerShell, and a mis-detection must bias toward AC -- never floor a
+ *     battery user's fast poll.
  */
 export class CollectorGroupSupervisor {
     private readonly sourceRegistry: Pick<SourceRegistry, "resolveSourceClient">;

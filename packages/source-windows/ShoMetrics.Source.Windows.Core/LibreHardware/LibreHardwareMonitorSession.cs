@@ -149,6 +149,14 @@ public sealed class LibreHardwareMonitorSession : IDisposable
     /// failed to enumerate at startup (for example motherboard SuperIO sensors when
     /// the ring0 driver was not yet ready) stays missing for the whole process.
     /// </summary>
+    /// <remarks>
+    /// TODO(deferred, post-launch): make this catalog rebuildable. A parent update
+    /// failure during preload is now handled (child subtree is retained), but a
+    /// category that enumerates empty at startup (ring0 not ready) still needs a
+    /// service restart to reappear. A lazy/periodic re-preload that republishes a
+    /// new DescriptorFingerprint would let such machines self-heal. Deferred
+    /// because it touches cache invalidation and Hub re-planning; not launch-blocking.
+    /// </remarks>
     public HardwareMetricDescriptorSnapshot DescriptorSnapshot => _cachedDescriptorSnapshot;
 
     /// <summary>

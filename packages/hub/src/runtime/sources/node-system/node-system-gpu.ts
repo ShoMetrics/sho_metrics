@@ -48,6 +48,14 @@ export function getActiveNvidiaSmiQueryCount(): number {
     return activeNvidiaSmiQueryCount;
 }
 
+// TODO: resident nvidia-smi to remove the per-poll spawn. Each poll
+// spawns nvidia-smi fresh; the process itself is cheap but NVML/RTD3 dGPU wake
+// adds a 1-2s tail on some laptops. A resident `nvidia-smi --loop-ms=<interval>`
+// would amortize that, but must stay conservative:
+//   - pass the demanded interval through to -lms; never hardcode a 1s loop;
+//   - if the machine already has an nvidia-smi process at startup, do NOT start
+//     a second one -- stay spawn-per-poll;
+//   - if the resident process cannot start or dies, fall back to spawn-per-poll.
 export async function pollWindowsNvidiaGpuTelemetry(): Promise<NodeSystemGpuTelemetryData | null> {
     const output = await runNvidiaSmiTelemetryQuery();
 

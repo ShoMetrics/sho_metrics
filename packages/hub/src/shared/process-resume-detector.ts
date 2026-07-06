@@ -19,9 +19,14 @@ export type ProcessResumeListener = (event: ProcessResumeEvent) => void;
 /**
  * Detects large wall-clock gaps while the plugin is otherwise active.
  *
- * Stream Deck plugins do not receive a reliable cross-platform resume event.
- * Observing existing hot paths keeps the detector passive: it only fires after
- * the process starts doing useful work again.
+ * Stream Deck exposes a system wake event for normal host-delivered wake
+ * recovery. This detector is the passive fallback for missed wake events,
+ * process suspension, and other long gaps that only become observable when the
+ * plugin starts doing useful work again.
+ *
+ * TODO: Wire Stream Deck SDK onSystemDidWakeUp into the same recovery path so
+ * normal host-delivered wake events do not have to wait for the next hot-path
+ * activity gap.
  */
 export class ProcessResumeDetector {
     private readonly listeners = new Set<ProcessResumeListener>();
