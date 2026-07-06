@@ -235,7 +235,7 @@ jobs:
             if [[ -n "${STREAMDECK_PLUGIN_VERSION}" && -n "${WINDOWS_VERSION}" ]]; then
               echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION} and Windows helper version ${WINDOWS_VERSION}."
               echo
-              echo "Most users should download the self-contained Windows helper installer. It is larger, but it includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
+              echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
             elif [[ -n "${STREAMDECK_PLUGIN_VERSION}" ]]; then
               echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION}. There is no Windows helper release in this release. You can find the latest Windows helper installer at https://shometrics.github.io/download/."
             else
