@@ -133,7 +133,11 @@ export const DEFAULT_APPEARANCE_SETTINGS: ResolvedAppearanceSettings = {
         },
     },
     line: {
-        lineSmoothingPercent: 75,
+        // 100% maps to the full +-3 sample de-jitter window in
+        // sparkline-smoothing.ts; anything less leaves visible wrinkles at the
+        // default key size. The head sample always renders raw, so maximum
+        // smoothing does not add lag to the live edge.
+        lineSmoothingPercent: 100,
         gridLineVisibility: "none",
         gridLineType: "horizontal",
     },

@@ -1,83 +1,65 @@
 import { clamp } from "../../view-rendering/rasterize/svg-utils";
 
-const MAXIMUM_SMOOTHING_RADIUS = 18;
-const STRONG_SMOOTHING_THRESHOLD = 0.55;
-const VERY_STRONG_SMOOTHING_THRESHOLD = 0.84;
-const IMPULSE_SMOOTHING_THRESHOLD = 0.68;
+// A 60s history at 1s polling is ~60 samples, so a radius-3 window spans ~12% of
+// the line: enough to calm sample-to-sample jitter, small enough to keep real
+// movement. The window shrinks at both ends of the series (see the bounded
+// average below), so the newest sample -- the live "head" -- always renders its
+// exact value with zero lag.
+const MAXIMUM_SMOOTHING_RADIUS = 3;
 
 /**
- * Smooths visual sparkline samples without changing the metric data itself.
- * The slider uses a non-linear response so the default "pretty" value removes
- * high-frequency jitter while zero still shows the raw sampled history.
+ * Smooths the sparkline line shape without hiding real movement in the data.
+ *
+ * This is a zero-phase visual de-jitter, not a trend filter: a single symmetric
+ * triangular moving average whose window shrinks toward the series boundaries.
+ * Because the window collapses to the single newest sample at the right edge,
+ * the live head has no lag -- a jump to 100% shows on the current frame, and only
+ * its scrolled-back history is smoothed. Zero smoothing returns the raw samples.
+ *
+ * It deliberately does not blend the raw signal back on top of the smoothed one:
+ * that older trick left a sharp "needle" poking out of an otherwise smooth curve.
+ * curveMonotoneX already renders the smoothed points without overshoot.
  */
 export function smoothSparklineValues(
     values: readonly number[],
     lineSmoothingPercent: number,
 ): readonly number[] {
-    const smoothingStrength = resolveSmoothingStrength(lineSmoothingPercent);
+    const smoothingRadius = resolveSmoothingRadius(lineSmoothingPercent);
 
-    if (smoothingStrength <= 0 || values.length <= 2) {
+    if (smoothingRadius < 1 || values.length <= 2) {
         return values;
     }
 
-    const smoothingRatio = resolveSmoothingRatio(lineSmoothingPercent);
-    const smoothingRadius = Math.max(1, Math.round(1 + Math.pow(smoothingRatio, 1.35) * MAXIMUM_SMOOTHING_RADIUS));
-    const firstPassValues = applyWeightedMovingAverage(values, smoothingRadius);
-    const secondPassValues = smoothingStrength >= STRONG_SMOOTHING_THRESHOLD
-        ? applyWeightedMovingAverage(firstPassValues, Math.max(1, Math.round(smoothingRadius * 0.72)))
-        : firstPassValues;
-    const thirdPassValues = smoothingStrength >= VERY_STRONG_SMOOTHING_THRESHOLD
-        ? applyWeightedMovingAverage(secondPassValues, Math.max(1, Math.round(smoothingRadius * 0.46)))
-        : secondPassValues;
-    const filteredValues = smoothingRatio >= IMPULSE_SMOOTHING_THRESHOLD
-        ? applyWeightedMovingAverage(thirdPassValues, Math.max(1, Math.round(smoothingRadius * 0.34)))
-        : thirdPassValues;
-    const rawContribution = resolveRawContribution(smoothingRatio);
-
-    return values.map((value, valueIndex) =>
-        value * rawContribution + filteredValues[valueIndex] * (1 - rawContribution)
-    );
+    return applyBoundedTriangularAverage(values, smoothingRadius);
 }
 
-function resolveSmoothingStrength(lineSmoothingPercent: number): number {
-    const smoothingRatio = resolveSmoothingRatio(lineSmoothingPercent);
+function resolveSmoothingRadius(lineSmoothingPercent: number): number {
+    const smoothingRatio = clamp(lineSmoothingPercent, 0, 100) / 100;
 
-    return Math.pow(smoothingRatio, 0.62);
+    return Math.round(smoothingRatio * MAXIMUM_SMOOTHING_RADIUS);
 }
 
-function resolveSmoothingRatio(lineSmoothingPercent: number): number {
-    return clamp(lineSmoothingPercent, 0, 100) / 100;
-}
+function applyBoundedTriangularAverage(values: readonly number[], radius: number): readonly number[] {
+    const lastIndex = values.length - 1;
 
-function resolveRawContribution(smoothingRatio: number): number {
-    if (smoothingRatio >= IMPULSE_SMOOTHING_THRESHOLD) {
-        return 0;
-    }
+    return values.map((value, valueIndex) => {
+        // Shrink the window symmetrically so it never reads past either end. This
+        // keeps the average zero-phase (no lead or lag) and, crucially, leaves the
+        // newest sample (valueIndex === lastIndex, distance 0) exactly raw while
+        // smoothing ramps up over the older samples behind it.
+        const effectiveRadius = Math.min(radius, valueIndex, lastIndex - valueIndex);
+        if (effectiveRadius === 0) {
+            return value;
+        }
 
-    return Math.pow(1 - smoothingRatio / IMPULSE_SMOOTHING_THRESHOLD, 2.4);
-}
-
-function applyWeightedMovingAverage(values: readonly number[], radius: number): readonly number[] {
-    const averagedValues: number[] = [];
-
-    for (let valueIndex = 0; valueIndex < values.length; valueIndex++) {
         let weightedSum = 0;
         let totalWeight = 0;
-
-        for (let offset = -radius; offset <= radius; offset++) {
-            const sampleIndex = valueIndex + offset;
-
-            if (sampleIndex < 0 || sampleIndex >= values.length) {
-                continue;
-            }
-
-            const weight = radius + 1 - Math.abs(offset);
-            weightedSum += values[sampleIndex] * weight;
+        for (let offset = -effectiveRadius; offset <= effectiveRadius; offset++) {
+            const weight = effectiveRadius + 1 - Math.abs(offset);
+            weightedSum += values[valueIndex + offset] * weight;
             totalWeight += weight;
         }
 
-        averagedValues.push(totalWeight > 0 ? weightedSum / totalWeight : values[valueIndex]);
-    }
-
-    return averagedValues;
+        return weightedSum / totalWeight;
+    });
 }
