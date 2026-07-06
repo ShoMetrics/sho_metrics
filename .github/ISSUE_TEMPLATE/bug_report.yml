@@ -56,8 +56,9 @@ body:
         Useful logs:
 
         Windows:
-        - Stream Deck host/plugin lifecycle: `%APPDATA%\Elgato\StreamDeck\logs\StreamDeck*.log`
-        - ShoMetrics plugin log, if present: `%APPDATA%\Elgato\StreamDeck\logs\com.ez.sho-metrics*.log`
+        - ShoMetrics plugin log: `%APPDATA%\Elgato\StreamDeck\Plugins\com.ez.sho-metrics.sdPlugin\logs\com.ez.sho-metrics*.log`
+        - Stream Deck host log: `%APPDATA%\Elgato\StreamDeck\logs\StreamDeck*.log`
+        - Additional ShoMetrics plugin log, if present: `%APPDATA%\Elgato\StreamDeck\logs\com.ez.sho-metrics*.log`
         - Only if you installed the helper: `%ProgramData%\ShoMetrics\logs\shometrics-helper*.log`
         - Only if you installed the helper: `%LOCALAPPDATA%\ShoMetrics\ControlPanel\logs\shometrics-control-panel-startup.log`
 
