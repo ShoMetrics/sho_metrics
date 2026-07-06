@@ -1,5 +1,7 @@
 # Sho Metrics
 
+[![Join Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/tRSRAeHU35)
+
 Sho Metrics is a Stream Deck plugin for displaying live system metrics on Stream Deck keys.
 
 It supports Windows and macOS, with built-in metrics for CPU, GPU, memory, disk, network, battery, and custom HTTP JSON endpoints. On Windows, an optional helper unlocks deeper LibreHardwareMonitor-backed sensors such as AMD/Intel GPU metrics, temperatures, fan speeds, and voltages.
