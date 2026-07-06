@@ -49,6 +49,11 @@ internal sealed class FakeHardware : IHardware
         };
     }
 
+    public static FakeHardware SuperIo()
+    {
+        return new FakeHardware(HardwareType.SuperIO, "lpc/nct6799d/0");
+    }
+
     public static FakeHardware Memory()
     {
         return new FakeHardware(HardwareType.Memory, "ram");
@@ -161,6 +166,11 @@ internal sealed class FakeSensor : ISensor
     public static FakeSensor Load(string name, float? value)
     {
         return new FakeSensor(SensorType.Load, name, value);
+    }
+
+    public static FakeSensor Voltage(string name, float? value)
+    {
+        return new FakeSensor(SensorType.Voltage, name, value);
     }
 
     public IHardware Hardware => _hardware;

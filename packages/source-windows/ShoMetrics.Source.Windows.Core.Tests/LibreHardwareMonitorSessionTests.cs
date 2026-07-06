@@ -537,6 +537,33 @@ public sealed class LibreHardwareMonitorSessionTests
     }
 
     [Fact]
+    public async Task DescriptorCatalogKeepsSubHardwareWhenParentPreloadUpdateFails()
+    {
+        // Motherboard voltage/fan sensors live on the SuperIO subhardware. The
+        // descriptor catalog is built once at session construction, so a parent
+        // update failure during that preload must not drop the child subtree
+        // from the Property Inspector picker for the process lifetime.
+        FakeHardware superIoHardware = FakeHardware.SuperIo();
+        superIoHardware.Sensors = [FakeSensor.Voltage("Vcore", value: 1.25f)];
+        FakeHardware motherboardHardware = FakeHardware.Motherboard();
+        motherboardHardware.SubHardware = [superIoHardware];
+        motherboardHardware.OnUpdate = () => throw new InvalidOperationException("simulated preload update failure");
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([motherboardHardware], provider);
+
+        HardwareMetricDescriptorSnapshot descriptorSnapshot = await session.ListMetricDescriptorsAsync(
+            [],
+            CancellationToken.None);
+
+        Assert.Contains(descriptorSnapshot.Descriptors, descriptor =>
+            descriptor.HardwareType == "SuperIO"
+                && descriptor.MetricId == "lhm.sensor:/cpu/0/voltage/0");
+        Assert.Contains(descriptorSnapshot.Warnings, warning =>
+            warning.Contains("Hardware update failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RefreshPollingGroupExpiresRetainedCpuSensorAfterAgeLimit()
     {
         var timeProvider = new ManualTimeProvider();

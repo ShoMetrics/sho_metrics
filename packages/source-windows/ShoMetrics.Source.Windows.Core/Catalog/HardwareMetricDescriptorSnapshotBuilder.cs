@@ -141,17 +141,25 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        bool updateSucceeded = true;
+
         try
         {
             hardware.Update();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            // Do not return here: motherboard voltage/fan sensors live on the
+            // SuperIO subhardware, so bailing out on a transient parent update
+            // failure would silently drop that whole subtree from the catalog
+            // for the process lifetime (the catalog is built once and cached).
+            // Children update themselves in the recursion below; only this
+            // hardware's own sensors are skipped.
             warnings.Add($"Hardware update failed for {hardware.Name}: {exception.GetType().Name}: {exception.Message}");
-            return;
+            updateSucceeded = false;
         }
 
-        if (LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
+        if (updateSucceeded && LibreHardwareMetricCatalog.IsSupportedHardwareType(hardware.HardwareType))
         {
             // Descriptor preload also updates hardware, which can expose new
             // sensors. Keep the descriptor pass under the same no-history
