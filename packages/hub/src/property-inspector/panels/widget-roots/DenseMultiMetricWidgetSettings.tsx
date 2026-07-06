@@ -29,6 +29,7 @@ import { DenseMetricRowsSettings } from "./DenseMetricRowsSettings";
 import { PollingSettings } from "../controls/PollingSettings";
 import { SettingsSection } from "../controls/SettingsSection";
 import type { WidgetSettingsPanelProps } from "../panel-props";
+import type { OptionLabelFormatter } from "../setting-options";
 import {
     resolveBatteryPollingFrequencyOptionsForMinimum,
     resolveMinimumBatteryPollingFrequencySeconds,
@@ -69,6 +70,7 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
                         optionList={resolveDensePollingFrequencyOptions(
                             widget,
                             props.context.resolved.preferences.pollingFrequencySeconds,
+                            t,
                         )}
                         note={resolveDensePollingNote(widget, t)}
                     />
@@ -81,10 +83,12 @@ export function DenseMultiMetricWidgetSettings(props: WidgetSettingsPanelProps &
 function resolveDensePollingFrequencyOptions(
     widget: ResolvedDenseMultiMetricWidget,
     currentPollingFrequencySeconds: number,
+    t: OptionLabelFormatter,
 ): readonly { readonly value: number; readonly label: string }[] | undefined {
     return resolveBatteryPollingFrequencyOptionsForMinimum({
         minimumPollingFrequencySeconds: resolveDenseMinimumPollingFrequencySeconds(widget),
         currentPollingFrequencySeconds,
+        t,
     });
 }
 

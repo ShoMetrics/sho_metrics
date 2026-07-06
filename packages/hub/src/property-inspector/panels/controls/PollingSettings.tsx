@@ -5,25 +5,26 @@ import { SelectSetting } from "../../controls/SelectSetting";
 import type { SelectOption } from "../../inspector/types";
 import { SettingsSection } from "./SettingsSection";
 import type { WidgetSettingsPanelProps } from "../panel-props";
-import { pollingFrequencyOptionList } from "../setting-options";
+import { buildPollingFrequencyOptionList } from "../setting-options";
 
 export function PollingSettings({
     context,
     onSettingsPatch,
     note,
-    optionList = pollingFrequencyOptionList,
+    optionList,
 }: WidgetSettingsPanelProps & {
     readonly note?: string | undefined;
     readonly optionList?: readonly SelectOption<number>[] | undefined;
 }): React.JSX.Element {
     const { t } = useI18n();
+    const resolvedOptionList = optionList ?? buildPollingFrequencyOptionList(t);
 
     return (
         <SettingsSection title={t(commonMessages.updateSection)}>
             <SelectSetting
                 label={t(commonMessages.pollingFrequencyLabel)}
                 value={context.resolved.preferences.pollingFrequencySeconds}
-                optionList={optionList}
+                optionList={resolvedOptionList}
                 onValueChange={(pollingFrequencySeconds) => onSettingsPatch({
                     preferences: { pollingFrequencySeconds },
                 })}

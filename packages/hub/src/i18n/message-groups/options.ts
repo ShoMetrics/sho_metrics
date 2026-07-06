@@ -123,13 +123,13 @@ export const optionMessages = {
     },
     cupertinoGlassStyleOption: {
         en: "Cupertino Glass Style",
-        zh_CN: "Cupertino 玻璃风格",
-        ja: "Cupertino ガラススタイル",
+        zh_CN: "玻璃风格",
+        ja: "ガラススタイル",
     },
     colorFilledOption: {
         en: "Color Filled",
         zh_CN: "色彩填充",
-        ja: "カラー塗りつぶし",
+        ja: "カラーフィル",
     },
     terminalOption: {
         en: "Terminal",
@@ -385,6 +385,36 @@ export const optionMessages = {
         en: "{label} (Unavailable)",
         zh_CN: "{label}（不可用）",
         ja: "{label}（利用不可）",
+    },
+    pollingSecondOption: {
+        en: "{count} second",
+        zh_CN: "{count}秒",
+        ja: "{count}秒",
+    },
+    pollingSecondsOption: {
+        en: "{count} seconds",
+        zh_CN: "{count}秒",
+        ja: "{count}秒",
+    },
+    pollingMinuteOption: {
+        en: "{count} minute",
+        zh_CN: "{count}分钟",
+        ja: "{count}分",
+    },
+    pollingMinutesOption: {
+        en: "{count} minutes",
+        zh_CN: "{count}分钟",
+        ja: "{count}分",
+    },
+    pollingHourOption: {
+        en: "{count} hour",
+        zh_CN: "{count}小时",
+        ja: "{count}時間",
+    },
+    pollingHoursOption: {
+        en: "{count} hours",
+        zh_CN: "{count}小时",
+        ja: "{count}時間",
     },
     loadingVolumesOption: {
         en: "Loading volumes...",

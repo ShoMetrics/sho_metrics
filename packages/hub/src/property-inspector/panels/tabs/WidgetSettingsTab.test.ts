@@ -1330,7 +1330,7 @@ test("stacked metric settings use System polling options when any slot is System
     });
 
     assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
-    assert.match(markup, /60s/);
+    assert.match(markup, /1 minute/);
     assert.match(markup, /This polling frequency is shared by every metric in this key\./);
     assert.doesNotMatch(markup, /This device is checked infrequently since the support is experimental/);
 });
@@ -1359,7 +1359,7 @@ test("stacked metric settings use vendor HID polling options when any slot selec
     });
 
     assert.equal(countTextOccurrences(markup, "Polling Frequency:"), 1);
-    assert.match(markup, /10m/);
+    assert.match(markup, /10 minutes/);
     assert.match(markup, /This polling frequency is shared by every metric in this key\./);
     assert.match(markup, /This device is checked infrequently since the support is experimental/);
 });
@@ -1689,7 +1689,7 @@ test("system widget settings render battery selector and experimental vendor HID
     assert.match(markup, /Reads battery levels from Logitech\/ROG devices connected through USB receiver\/dongle/);
     assert.match(markup, /type="checkbox" checked=""/);
     assert.match(markup, /This device is checked infrequently since the support is experimental/);
-    assert.match(markup, /60m/);
+    assert.match(markup, /1 hour/);
 });
 
 test("system widget settings show touch strip label display cap", () => {
@@ -1961,7 +1961,7 @@ test("system widget settings use system polling options for Bluetooth battery de
     });
 
     assert.match(markup, /\[Bluetooth\] MX Master 3 Bluetooth/);
-    assert.match(markup, /60s/);
+    assert.match(markup, /1 minute/);
     assert.doesNotMatch(markup, /This device is checked infrequently since the support is experimental/);
 });
 

@@ -266,7 +266,7 @@
 	"Category": "Sho Metrics",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "Display live System metrics such as CPU, GPU, memory, disk, network, sensor metrics, and HTTP metrics.",
+	"Description": "Display live System metrics such as CPU, GPU, memory, disk, network, battery, sensor metrics, and HTTP metrics.",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 3,
 	"Software": {

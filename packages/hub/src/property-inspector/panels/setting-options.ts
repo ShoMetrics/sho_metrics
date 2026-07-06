@@ -1,4 +1,6 @@
 import type { SelectOption, SelectOptionValue } from "../inspector/types";
+import { optionMessages } from "../../i18n/message-groups/options";
+import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 import type {
     ResolvedCpuReading,
     ResolvedGpuReading,
@@ -24,22 +26,44 @@ import { isBuiltInMetricSupportedOnPlatform } from "../../runtime/source-routing
 import type { MetricSupportPlatform } from "../../runtime/source-capabilities/metric-support-platform";
 import { STANDARD_POLLING_FREQUENCY_SECONDS } from "../../settings/polling-frequency-options";
 
-export const pollingFrequencyOptionList = [
-    ...STANDARD_POLLING_FREQUENCY_SECONDS.map(value => ({ value, label: `${value}s` })),
-] as const satisfies readonly SelectOption<number>[];
+export type OptionLabelFormatter = (message: LocalizedMessage, values?: PlaceholderValues) => string;
 
-export const customHttpPollingFrequencyOptionList = [
-    ...pollingFrequencyOptionList,
-    { value: 300, label: "5m" },
-    { value: 900, label: "15m" },
-    { value: 1800, label: "30m" },
-    { value: 3600, label: "1h" },
-    { value: 7200, label: "2h" },
-    { value: 10800, label: "3h" },
-    { value: 21600, label: "6h" },
-    { value: 43200, label: "12h" },
-    { value: 86400, label: "24h" },
-] as const satisfies readonly SelectOption<number>[];
+export function buildPollingFrequencyOptionList(t: OptionLabelFormatter): readonly SelectOption<number>[] {
+    return STANDARD_POLLING_FREQUENCY_SECONDS.map(value => ({
+        value,
+        label: formatDurationOptionLabel(t, value),
+    }));
+}
+
+export function formatDurationOptionLabel(t: OptionLabelFormatter, seconds: number): string {
+    if (seconds < 60) {
+        return t(seconds === 1 ? optionMessages.pollingSecondOption : optionMessages.pollingSecondsOption, {
+            count: seconds,
+        });
+    }
+
+    if (seconds < 3600) {
+        const minutes = seconds / 60;
+        return t(minutes === 1 ? optionMessages.pollingMinuteOption : optionMessages.pollingMinutesOption, {
+            count: minutes,
+        });
+    }
+
+    const hours = seconds / 3600;
+    return t(hours === 1 ? optionMessages.pollingHourOption : optionMessages.pollingHoursOption, {
+        count: hours,
+    });
+}
+
+export function buildCustomHttpPollingFrequencyOptionList(t: OptionLabelFormatter): readonly SelectOption<number>[] {
+    return [
+        ...buildPollingFrequencyOptionList(t),
+        ...[300, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400].map(value => ({
+            value,
+            label: formatDurationOptionLabel(t, value),
+        })),
+    ];
+}
 
 export const customHttpTimeoutSecondOptionList = [
     ...CUSTOM_HTTP_TIMEOUT_SECOND_OPTIONS.map(value => ({ value, label: `${value}s` })),

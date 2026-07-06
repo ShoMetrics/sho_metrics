@@ -96,7 +96,7 @@ test("dense System battery row uses inline device selection and prefills the row
     await waitFor(() => {
         assert.equal((screen.getAllByRole("textbox", { name: /^Label:/ })[0] as HTMLInputElement).value, "MX M");
     });
-    assert.match(screen.getByRole("combobox", { name: /^Polling/ }).textContent ?? "", /60s/);
+    assert.match(screen.getByRole("combobox", { name: /^Polling/ }).textContent ?? "", /1 minute/);
 });
 
 function DenseSettingsHarness({

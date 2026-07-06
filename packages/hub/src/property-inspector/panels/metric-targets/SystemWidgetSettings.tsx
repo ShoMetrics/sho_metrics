@@ -86,7 +86,7 @@ export function SystemWidgetSettings(props: WidgetSettingsPanelProps & {
             {props.showPolling !== false && (
                 <PollingSettings
                     {...props}
-                    optionList={resolveBatteryPollingFrequencyOptions(props.target.reading.peripheralIdentity)}
+                    optionList={resolveBatteryPollingFrequencyOptions(props.target.reading.peripheralIdentity, t)}
                     note={isVendorHidPeripheralSelected ? t(systemMessages.infrequentPollingNote) : undefined}
                 />
             )}

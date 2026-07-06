@@ -38,8 +38,8 @@ test("stacked metric slot editor stays open after auto-save settings updates", a
     assert.notEqual(screen.queryByRole("button", { name: "Reset Widget Settings" }), null);
 
     await user.click(screen.getByRole("combobox", { name: /Interval/ }));
-    await user.click(screen.getByRole("option", { name: "5s" }));
-    assert.match(screen.getByRole("combobox", { name: /Interval/ }).textContent ?? "", /5s/);
+    await user.click(screen.getByRole("option", { name: "5 seconds" }));
+    assert.match(screen.getByRole("combobox", { name: /Interval/ }).textContent ?? "", /5 seconds/);
 
     await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
 
@@ -101,7 +101,7 @@ test("stacked metric slot editor can select System and bumps shared polling", as
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     await screen.findByRole("heading", { name: "Stack" });
-    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /60s/);
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /1 minute/);
 });
 
 test("stacked metric slot editor reuses System settings without child polling", async () => {
@@ -176,7 +176,7 @@ test("stacked metric System slot editor bumps shared polling when selecting vend
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     await screen.findByRole("heading", { name: "Stack" });
-    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10m/);
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10 minutes/);
 
     await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
     await screen.findByRole("heading", { name: "Battery" });
@@ -185,11 +185,11 @@ test("stacked metric System slot editor bumps shared polling when selecting vend
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     await screen.findByRole("heading", { name: "Stack" });
-    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10m/);
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /10 minutes/);
     await user.click(screen.getByRole("combobox", { name: /Polling Frequency/ }));
-    await user.click(screen.getByRole("option", { name: "1s" }));
+    await user.click(screen.getByRole("option", { name: "1 second" }));
 
-    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /1s/);
+    assert.match(screen.getByRole("combobox", { name: /Polling Frequency/ }).textContent ?? "", /1 second/);
 });
 
 test("stacked custom metric source editing hides the slot editor chrome", async () => {

@@ -23,6 +23,7 @@ import type { VisibilityContext } from "../../inspector/types";
 import { PollingSettings } from "../controls/PollingSettings";
 import { SettingsSection } from "../controls/SettingsSection";
 import { SingleMetricWidgetSettings } from "./SingleMetricWidgetSettings";
+import { formatDurationOptionLabel, type OptionLabelFormatter } from "../setting-options";
 import {
     resolveBatteryPollingFrequencyOptionsForMinimum,
     resolveMinimumBatteryPollingFrequencySeconds,
@@ -42,13 +43,7 @@ const stackedSlotMetricDomainOptionList = [
     { value: "customMetric", label: "Custom Metric" },
 ] as const satisfies readonly SelectOption<StackedSlotMetricDomain>[];
 
-const stackedRotationIntervalOptionList = [
-    { value: 1, label: "1s" },
-    { value: 2, label: "2s" },
-    { value: 3, label: "3s" },
-    { value: 4, label: "4s" },
-    { value: 5, label: "5s" },
-] as const satisfies readonly SelectOption<number>[];
+const STACKED_ROTATION_INTERVAL_SECONDS = [1, 2, 3, 4, 5] as const;
 
 export function StackedMetricWidgetSettings(props: WidgetSettingsPanelProps & {
     widget: ResolvedStackedMetricWidget;
@@ -110,6 +105,7 @@ export function StackedMetricWidgetSettings(props: WidgetSettingsPanelProps & {
                 optionList={resolveStackedPollingFrequencyOptions(
                     widget,
                     props.context.resolved.preferences.pollingFrequencySeconds,
+                    t,
                 )}
                 note={resolveStackedPollingNote(widget, t)}
             />
@@ -237,7 +233,7 @@ function StackedRotationSettings({
             <SelectSetting
                 label={t(stackedMessages.intervalSecondsLabel)}
                 value={widget.rotation.intervalSeconds}
-                optionList={stackedRotationIntervalOptionList}
+                optionList={buildStackedRotationIntervalOptionList(t)}
                 onValueChange={(intervalSeconds) => onSettingsPatch({
                     stacked: { rotation: { intervalSeconds } },
                 })}
@@ -370,11 +366,20 @@ function buildStackedSlotVisibilityContext(
 function resolveStackedPollingFrequencyOptions(
     widget: ResolvedStackedMetricWidget,
     currentPollingFrequencySeconds: number,
+    t: OptionLabelFormatter,
 ): readonly SelectOption<number>[] | undefined {
     return resolveBatteryPollingFrequencyOptionsForMinimum({
         minimumPollingFrequencySeconds: resolveStackedMinimumPollingFrequencySeconds(widget),
         currentPollingFrequencySeconds,
+        t,
     });
+}
+
+function buildStackedRotationIntervalOptionList(t: OptionLabelFormatter): readonly SelectOption<number>[] {
+    return STACKED_ROTATION_INTERVAL_SECONDS.map(value => ({
+        value,
+        label: formatDurationOptionLabel(t, value),
+    }));
 }
 
 function resolveStackedPollingNote(

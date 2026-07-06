@@ -16,7 +16,7 @@ import { AppearanceSettings } from "../controls/AppearanceSettings";
 import { PollingSettings } from "../controls/PollingSettings";
 import { LineSettings } from "../controls/LineSettings";
 import { SettingsSection } from "../controls/SettingsSection";
-import { customHttpPollingFrequencyOptionList } from "../setting-options";
+import { buildCustomHttpPollingFrequencyOptionList } from "../setting-options";
 import { MetricCustomizationSettings } from "../controls/MetricCustomizationSettings";
 import { CustomMetricSourceEditorPanel } from "./custom-metric/CustomMetricSourceEditorPanel";
 import type {
@@ -91,7 +91,7 @@ export function CustomMetricWidgetSettings(props: CustomMetricWidgetSettingsProp
             {props.showPolling !== false && (
                 <PollingSettings
                     {...props}
-                    optionList={customHttpPollingFrequencyOptionList}
+                    optionList={buildCustomHttpPollingFrequencyOptionList(t)}
                 />
             )}
         </>
