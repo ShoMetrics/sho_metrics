@@ -264,6 +264,18 @@ a {
   color: var(--background-color);
 }
 
+/* Download-page call-to-action wrapper; the button itself reuses the hero styles. */
+.download-cta {
+  margin: 1.25rem 0 1.75rem;
+}
+
+/* Official Elgato Marketplace badge; height matches the .action-button rows. */
+.marketplace-badge {
+  display: inline-block;
+  height: 3.25rem;
+  width: auto;
+}
+
 .deck-stage {
   width: min(595px, calc(100% - 2rem));
   margin: 3.5rem auto 4rem;

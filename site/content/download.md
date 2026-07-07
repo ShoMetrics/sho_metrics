@@ -1,32 +1,27 @@
 +++
 title = "Download"
-description = "Download the Sho Metrics helper and plugin files."
+description = "Download the Sho Metrics plugin and helper files."
 +++
-
-## Helper
-
-Download the latest Windows helper installer from GitHub Releases:
-
-- [(Recommended)Windows helper installer, self-contained](https://github.com/ShoMetrics/sho_metrics/releases/latest/download/ShoMetrics-Helper-Setup-win-x64.exe)
-- [Windows helper installer, framework-dependent](https://github.com/ShoMetrics/sho_metrics/releases/latest/download/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe)
-
-**Most users should download the self-contained installer.** It includes the required runtime dependencies. If you strongly care about installer
-size and already have the required .NET and WinUI runtime dependencies installed,
-you can use the framework-dependent installer instead.
 
 ## Plugin
 
-Download the latest Stream Deck plugin package from GitHub Releases:
+Get the Stream Deck plugin for Windows and macOS on Elgato Marketplace:
 
-- [ShoMetrics Stream Deck plugin](https://github.com/ShoMetrics/sho_metrics/releases/latest/download/ShoMetrics.streamDeckPlugin)
-- [SHA256 checksums](https://github.com/ShoMetrics/sho_metrics/releases/latest/download/checksums.txt)
+{{< marketplace-badge href="https://marketplace.elgato.com/product/sho-metrics-69957750-4b71-489f-a329-358d27ae67e6" >}}
 
-The Stream Deck plugin package can also be submitted manually to Elgato
-Marketplace when preparing a Marketplace release.
+Most users should start with the Stream Deck plugin. If you need the optional
+Windows helper that unlocks advanced sensors, read on.
 
-These links use GitHub's latest full release. Prerelease builds may be available
-from the GitHub Releases page before they appear here.
+## Helper
 
-Product-only releases may appear on GitHub before the next full release. The
-links above intentionally continue to point at the latest full release so each
-download link has a matching file.
+The optional Windows helper unlocks LibreHardwareMonitor-backed sensors such as
+AMD/Intel GPU metrics, temperatures, fan speeds, and voltages:
+
+{{< download-button
+    href="https://github.com/ShoMetrics/sho_metrics/releases/latest/download/ShoMetrics-Helper-Setup-win-x64.exe"
+    title="Download the Windows helper installer"
+    note="Self-contained, includes the required runtime dependencies" >}}
+
+If you strongly care about installer size and already have the required .NET and
+WinUI runtime dependencies installed, you can grab the framework-dependent
+installer from the [GitHub Releases page](https://github.com/ShoMetrics/sho_metrics/releases).

@@ -1,0 +1,10 @@
+{{- /* Prominent download call-to-action reusing the homepage action-button styles.
+Params: href (required), title (required), note (optional small line). */ -}}
+<p class="download-cta">
+  <a class="action-button action-button-primary" href="{{ .Get "href" }}"{{ if hasPrefix (.Get "href") "http" }} target="_blank" rel="noopener noreferrer"{{ end }}>
+    <span class="button-text">
+      <strong>{{ .Get "title" }}</strong>
+      {{- with .Get "note" }}<small>{{ . }}</small>{{ end }}
+    </span>
+  </a>
+</p>

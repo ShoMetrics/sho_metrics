@@ -1,14 +1,24 @@
 # Sho Metrics
 
-[![Join Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/tRSRAeHU35)
+[![Download plugin](https://img.shields.io/badge/Marketplace_Plugin-Download-204CFE?logo=elgato&logoColor=white)](https://marketplace.elgato.com/product/sho-metrics-69957750-4b71-489f-a329-358d27ae67e6) [![Join Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/tRSRAeHU35)
 
 Sho Metrics is a Stream Deck plugin for displaying live system metrics on Stream Deck keys.
 
 It supports Windows and macOS, with built-in metrics for CPU, GPU, memory, disk, network, battery, and custom HTTP JSON endpoints. On Windows, an optional helper unlocks deeper LibreHardwareMonitor-backed sensors such as AMD/Intel GPU metrics, temperatures, fan speeds, and voltages.
 
-![Sho Metrics widgets on Stream Deck keys](docs/assets/readme/stream-deck-dashboard.png)
+![Sho Metrics widgets on Stream Deck keys](docs/assets/readme/stream-deck-dashboard.webp)
 
 ![ShoMetrics Helper status window on Windows](docs/assets/readme/windows-helper-status.png)
+
+## Installation
+
+Most users should start with the Stream Deck plugin:
+
+[![Get it on Elgato Marketplace](site/static/images/badges/elgato-get-on-marketplace-dark.svg)](https://marketplace.elgato.com/product/sho-metrics-69957750-4b71-489f-a329-358d27ae67e6)
+
+If you need the optional Windows helper that unlocks advanced sensors, download it from:
+
+https://shometrics.github.io/download/
 
 ## Features
 
@@ -46,18 +56,6 @@ Examples include Home Assistant sensors, local weather data, homelab status endp
 See the custom HTTP metric guide:
 
 https://shometrics.github.io/faq/custom-http-metric/
-
-## Installation
-
-Install the Stream Deck plugin first. Most users should start there.
-
-If you need the optional Windows helper, download it from:
-
-https://shometrics.github.io/download/
-
-Helper details:
-
-https://shometrics.github.io/faq/helper/
 
 ## Documentation
 

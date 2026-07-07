@@ -1,0 +1,7 @@
+{{- /* Official Elgato Marketplace badge. The dark badge has a gray border, so
+it reads on both the light and dark page backgrounds. Params: href (required). */ -}}
+<p class="download-cta">
+  <a href="{{ .Get "href" }}" target="_blank" rel="noopener noreferrer">
+    <img class="marketplace-badge" src="{{ "images/badges/elgato-get-on-marketplace-dark.svg" | relURL }}" alt="Get it on Elgato Marketplace" width="146" height="40">
+  </a>
+</p>

@@ -15,9 +15,10 @@ installed and what the PawnIO driver does.
 2. Download the Windows helper installer from the
    [download page](../../download/), run it, and approve the Windows
    administrator prompt.
-3. If you want sensors that need driver access, install
-   [PawnIO](https://pawnio.eu/) yourself from pawnio.eu. The helper does not
-   install PawnIO for you. Skip this step if you do not want deeper sensors.
+3. The helper installer installs [PawnIO](https://pawnio.eu/) for you. If PawnIO is already
+   installed, the installer leaves your existing copy as is rather than
+   upgrading it. You can update PawnIO yourself from the official site whenever
+   you like.
 4. Restart Stream Deck if a ShoMetrics key does not pick up helper data right
    away.
 
