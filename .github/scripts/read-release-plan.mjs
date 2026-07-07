@@ -154,8 +154,8 @@ function validateRelease(release) {
         throw new Error(`Release tag may only contain letters, numbers, dot, underscore, slash, and hyphen: ${release.tag}`);
     }
 
-    if (!release.streamdeckPluginVersion && !release.windowsVersion) {
-        throw new Error(`Release ${release.tag} must include streamdeckPluginVersion or windowsVersion.`);
+    if (!release.streamdeckPluginVersion || !release.windowsVersion) {
+        throw new Error(`Release ${release.tag} must include both streamdeckPluginVersion and windowsVersion: every release builds and publishes every product.`);
     }
 
     if (release.streamdeckPluginVersion && !/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/u.test(release.streamdeckPluginVersion)) {

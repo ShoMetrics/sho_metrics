@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, for example v0.1.0 or streamdeck-v0.1.0.0. Note: this is NOT the product version, enter it in `.github/release-plan.yml` instead."
+        description: "Release tag, for example v0.1.0. Note: this is NOT the product version, enter it in `.github/release-plan.yml` instead."
         required: true
         type: string
       dry_run:
@@ -68,7 +68,6 @@ jobs:
     timeout-minutes: 20
     needs:
       - validate
-    if: ${{ needs.validate.outputs.streamdeck_plugin_version != '' }}
     defaults:
       run:
         shell: bash
@@ -112,7 +111,6 @@ jobs:
     timeout-minutes: 60
     needs:
       - validate
-    if: ${{ needs.validate.outputs.windows_version != '' }}
     defaults:
       run:
         shell: pwsh
@@ -172,7 +170,6 @@ jobs:
       - validate
       - build-plugin
       - build-windows-installers
-    if: ${{ always() && needs.validate.result == 'success' && (needs.build-plugin.result == 'success' || needs.build-plugin.result == 'skipped') && (needs.build-windows-installers.result == 'success' || needs.build-windows-installers.result == 'skipped') }}
     permissions:
       contents: write
     steps:
@@ -199,50 +196,38 @@ jobs:
           publish_dir="release-assets/publish"
           mkdir -p "${publish_dir}"
 
-          release_files=()
+          plugin_package="$(find release-artifacts -type f -name "com.ez.sho-metrics.streamDeckPlugin" -print -quit)"
+          if [[ ! -f "${plugin_package}" ]]; then
+            echo "Expected Stream Deck plugin package was not found." >&2
+            find release-artifacts -type f >&2
+            exit 1
+          fi
 
-          if [[ -n "${STREAMDECK_PLUGIN_VERSION}" ]]; then
-            plugin_package="$(find release-artifacts -type f -name "com.ez.sho-metrics.streamDeckPlugin" -print -quit)"
-            if [[ ! -f "${plugin_package}" ]]; then
-              echo "Expected Stream Deck plugin package was not found." >&2
+          standalone_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64.exe" -print -quit)"
+          framework_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64-framework-dependent.exe" -print -quit)"
+
+          for file in "${standalone_installer}" "${framework_installer}"; do
+            if [[ ! -f "${file}" ]]; then
+              echo "Expected Windows installer was not found: ${file}" >&2
               find release-artifacts -type f >&2
               exit 1
             fi
+          done
 
-            cp "${plugin_package}" "${publish_dir}/ShoMetrics.streamDeckPlugin"
-            release_files+=("${publish_dir}/ShoMetrics.streamDeckPlugin")
-          fi
+          cp "${plugin_package}" "${publish_dir}/ShoMetrics.streamDeckPlugin"
+          cp "${standalone_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe"
+          cp "${framework_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe"
 
-          if [[ -n "${WINDOWS_VERSION}" ]]; then
-            standalone_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64.exe" -print -quit)"
-            framework_installer="$(find release-artifacts -type f -name "ShoMetrics-Helper-Setup-${WINDOWS_VERSION}-win-x64-framework-dependent.exe" -print -quit)"
-
-            for file in "${standalone_installer}" "${framework_installer}"; do
-              if [[ ! -f "${file}" ]]; then
-                echo "Expected Windows installer was not found: ${file}" >&2
-                find release-artifacts -type f >&2
-                exit 1
-              fi
-            done
-
-            cp "${standalone_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe"
-            cp "${framework_installer}" "${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe"
-            release_files+=("${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe")
-            release_files+=("${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe")
-          fi
+          release_files=(
+            "${publish_dir}/ShoMetrics.streamDeckPlugin"
+            "${publish_dir}/ShoMetrics-Helper-Setup-win-x64.exe"
+            "${publish_dir}/ShoMetrics-Helper-Setup-win-x64-framework-dependent.exe"
+          )
 
           {
-            if [[ -n "${STREAMDECK_PLUGIN_VERSION}" && -n "${WINDOWS_VERSION}" ]]; then
-              echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION} and Windows helper version ${WINDOWS_VERSION}."
-              echo
-              echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
-            elif [[ -n "${STREAMDECK_PLUGIN_VERSION}" ]]; then
-              echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION}. There is no Windows helper release in this release. You can find the latest Windows helper installer at https://shometrics.github.io/download/."
-            else
-              echo "This release is for Windows helper version ${WINDOWS_VERSION}. There is no Stream Deck plugin release in this release. You can find the latest Stream Deck plugin package at https://shometrics.github.io/download/."
-              echo
-              echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
-            fi
+            echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION} and Windows helper version ${WINDOWS_VERSION}."
+            echo
+            echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
             echo
             awk -v heading="${TAG_NAME}" '
               $0 == "## " heading {
@@ -284,9 +269,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           INPUT_PRERELEASE: ${{ inputs.prerelease }}
-          STREAMDECK_PLUGIN_VERSION: ${{ needs.validate.outputs.streamdeck_plugin_version }}
           TAG_NAME: ${{ needs.validate.outputs.tag_name }}
-          WINDOWS_VERSION: ${{ needs.validate.outputs.windows_version }}
         run: |
           set -euo pipefail
 
@@ -295,16 +278,10 @@ jobs:
             prerelease_flag=(--prerelease)
           fi
 
-          latest_flag=()
-          if [[ -z "${STREAMDECK_PLUGIN_VERSION}" || -z "${WINDOWS_VERSION}" ]]; then
-            latest_flag=(--latest=false)
-          fi
-
           mapfile -t release_assets < <(find release-assets/publish -maxdepth 1 -type f ! -name "release-notes.md" -print | sort)
           gh release create "${TAG_NAME}" \
             "${release_assets[@]}" \
             --target "${GITHUB_SHA}" \
             --title "${TAG_NAME}" \
             --notes-file release-assets/publish/release-notes.md \
-            "${latest_flag[@]}" \
             "${prerelease_flag[@]}"

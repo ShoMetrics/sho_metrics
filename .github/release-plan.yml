@@ -16,12 +16,10 @@
 #   - tag: v0.1.0
 #     streamdeckPluginVersion: 0.1.0.0
 #     windowsVersion: 0.1.0
-#   - tag: streamdeck-v0.1.1.0
-#     streamdeckPluginVersion: 0.1.1.0
 #
-# Each release must define at least one product version. A release with neither
-# streamdeckPluginVersion nor windowsVersion is invalid because it would publish
-# an empty GitHub Release.
+# Each release must define both product versions: every release builds and
+# publishes every product, so the stable /releases/latest/download/ links on the
+# website always resolve. State in CHANGELOG.md when a product has no changes.
 releases:
   - tag: v0.0.1
     streamdeckPluginVersion: 0.0.1.0

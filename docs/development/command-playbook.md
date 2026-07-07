@@ -176,13 +176,13 @@ Release workflow.
 | Regenerate source-windows third-party notices | `node scripts/generate-third-party-notices.mjs --target source-windows` | `scripts/generate-third-party-notices.mjs` |
 
 The Release workflow creates the requested tag, creates a GitHub Release,
-uploads the selected product artifacts, and uploads `checksums.txt`.
-Releases that include only one product are created with `--latest=false` so the
-website's GitHub `latest` download links continue to point at the latest
-combined release.
+uploads all product artifacts, and uploads `checksums.txt`. Every release
+builds and publishes every product, so the website's GitHub `latest` download
+links always resolve. When a product has no changes, say so in its
+`CHANGELOG.md` section.
 
-`.github/release-plan.yml` must contain the requested tag and the product
-versions to publish. `CHANGELOG.md` must contain a non-empty `## <tag>` section
+`.github/release-plan.yml` must contain the requested tag and both product
+versions. `CHANGELOG.md` must contain a non-empty `## <tag>` section
 before the Release workflow runs. The workflow adds a short product/version
 summary before that section and publishes the combined text as the GitHub
 Release notes.
