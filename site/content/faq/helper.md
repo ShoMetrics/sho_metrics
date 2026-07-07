@@ -41,7 +41,7 @@ page explains what gets installed and what each part does.
 
 The helper sensor stack has two pieces:
 
-- the ShoMetrics Windows helper, a user-mode local service
+- the ShoMetrics Windows helper, a local Windows service that runs in the background
 - the third-party [PawnIO](https://pawnio.eu/) driver, used by
   [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
   inside the helper for low-level sensor access

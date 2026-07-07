@@ -220,6 +220,7 @@ a {
   gap: 0.875rem;
   flex-wrap: wrap;
   margin-top: 1.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .action-button {
