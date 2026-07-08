@@ -5,76 +5,66 @@ namespace ShoMetrics.Source.Windows.Core.Tests;
 public sealed class PawnIoDriverEvidenceTests
 {
     [Fact]
-    public void SuperIoDescriptorCountsAsEvidence()
+    public void SuperIoSensorCountsAsEvidenceRegardlessOfValue()
     {
-        HardwareMetricDescriptorSnapshot snapshot = BuildSnapshot(
-            Descriptor(hardwareType: "SuperIO", unit: MetricUnit.RevolutionsPerMinute));
-
-        Assert.True(PawnIoDriverEvidence.HasDriverBackedSensors(snapshot));
+        // A SuperIO node exists only after a successful ring0 LPC probe, so its
+        // presence is proof even when the individual sensor reads 0 (stopped fan).
+        Assert.True(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.SuperIo(),
+            FakeSensor.Voltage("Vcore", value: 0)));
     }
 
     [Fact]
-    public void CpuTemperatureDescriptorCountsAsEvidence()
+    public void CpuTemperatureWithPositiveValueCountsAsEvidence()
     {
-        HardwareMetricDescriptorSnapshot snapshot = BuildSnapshot(
-            Descriptor(hardwareType: "Cpu", unit: MetricUnit.Celsius));
-
-        Assert.True(PawnIoDriverEvidence.HasDriverBackedSensors(snapshot));
+        Assert.True(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.Cpu(),
+            FakeSensor.Temperature("Core (Tctl/Tdie)", value: 42)));
     }
 
     [Fact]
-    public void CpuLoadDescriptorIsNotEvidence()
+    public void CpuTemperatureAtZeroIsNotEvidence()
+    {
+        // 0 C is the sentinel LHM publishes when the ring0 read failed; a working
+        // driver never reports a powered CPU at 0 C.
+        Assert.False(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.Cpu(),
+            FakeSensor.Temperature("Core (Tctl/Tdie)", value: 0)));
+    }
+
+    [Fact]
+    public void CpuTemperatureWithoutValueIsNotEvidence()
+    {
+        // Intel writes null on a failed therm-status read.
+        Assert.False(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.Cpu(),
+            FakeSensor.Temperature("CPU Package", value: null)));
+    }
+
+    [Fact]
+    public void CpuLoadIsNotEvidence()
     {
         // CPU load comes from performance counters with no driver dependency.
-        HardwareMetricDescriptorSnapshot snapshot = BuildSnapshot(
-            Descriptor(hardwareType: "Cpu", unit: MetricUnit.Percent));
-
-        Assert.False(PawnIoDriverEvidence.HasDriverBackedSensors(snapshot));
+        Assert.False(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.Cpu(),
+            FakeSensor.Load("CPU Total", value: 37)));
     }
 
     [Fact]
-    public void GpuTemperatureDescriptorIsNotEvidence()
+    public void CpuPowerIsNotEvidence()
+    {
+        // Package power is activated unconditionally in the LHM CPU constructor.
+        Assert.False(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.Cpu(),
+            FakeSensor.Power("Package", value: 65)));
+    }
+
+    [Fact]
+    public void GpuTemperatureIsNotEvidence()
     {
         // GPU sensors come from NVML/ADL/DXGI and never use PawnIO.
-        HardwareMetricDescriptorSnapshot snapshot = BuildSnapshot(
-            Descriptor(hardwareType: "GpuNvidia", unit: MetricUnit.Celsius));
-
-        Assert.False(PawnIoDriverEvidence.HasDriverBackedSensors(snapshot));
-    }
-
-    [Fact]
-    public void EmptyCatalogIsNotEvidence()
-    {
-        HardwareMetricDescriptorSnapshot snapshot = BuildSnapshot();
-
-        Assert.False(PawnIoDriverEvidence.HasDriverBackedSensors(snapshot));
-    }
-
-    private static HardwareMetricDescriptorSnapshot BuildSnapshot(params HardwareMetricDescriptor[] descriptors)
-    {
-        return new HardwareMetricDescriptorSnapshot
-        {
-            DescriptorFingerprint = "test",
-            Descriptors = descriptors,
-            Warnings = [],
-        };
-    }
-
-    private static HardwareMetricDescriptor Descriptor(string hardwareType, MetricUnit unit)
-    {
-        return new HardwareMetricDescriptor
-        {
-            MetricId = $"{hardwareType}.metric",
-            SourceSensorId = "sensor",
-            PollingGroupId = "group",
-            HardwareId = "hardware",
-            HardwareName = hardwareType,
-            HardwareType = hardwareType,
-            SensorName = "sensor",
-            SourceSensorType = "Temperature",
-            ValueKind = MetricValueKind.Scalar,
-            Unit = unit,
-            MetricIdKind = MetricIdKind.SourceSensor,
-        };
+        Assert.False(PawnIoDriverEvidence.IsDriverBackedSensorReading(
+            FakeHardware.GpuNvidia(),
+            FakeSensor.Temperature("GPU Core", value: 60)));
     }
 }

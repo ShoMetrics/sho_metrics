@@ -297,7 +297,7 @@ internal sealed class WindowsMetricSnapshotWorker(
     {
         PawnIoEnvironment environment = new();
         bool hasDriverBackedEvidence =
-            PawnIoDriverEvidence.HasDriverBackedSensors(monitorSession.DescriptorSnapshot);
+            monitorSession.DescriptorSnapshot.HasDriverBackedSensorReading;
 
         // Log the raw inputs to the PawnIO health verdict at startup so CPU vendor
         // and architecture detection can be verified on real hardware from the

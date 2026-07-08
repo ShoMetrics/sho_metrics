@@ -451,10 +451,15 @@ internal static class LibreHardwareMetricCatalog
         return metricId switch
         {
             "cpu.usage_percent" or "gpu.usage_percent" => value is >= 0 and <= 100,
-            // Do not copy machine-specific prior-art temperature thresholds here.
-            // A finite value is enough for v1; impossible sensor names are
-            // filtered by ranked alias selection.
-            CpuTemperatureMetricId => double.IsFinite(value),
+            // Reject 0 C and below, not as a machine-specific range threshold, but
+            // because a powered CPU is never at 0 C: 0 is exactly the sentinel LHM
+            // publishes when the ring0 read failed (Amd17Cpu.UpdateSensors in
+            // LibreHardwareMonitorLib/Hardware/Cpu/Amd17Cpu.cs activates the sensor
+            // at 0 on an unloaded PawnIO module). This matches the dynamic-path gate
+            // (IsValidSensorValue) so both paths agree. DIVERGENCE: a genuine
+            // sub-zero reading (LN2) is dropped, an accepted trade to never publish
+            // a fake 0 C. No upper bound is imposed; extreme-but-real highs pass.
+            CpuTemperatureMetricId => value > 0,
             CpuPowerMetricId => value >= 0,
             "gpu.temp" => value > 0,
             "gpu.power" => value >= 0,

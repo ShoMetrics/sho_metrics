@@ -48,7 +48,7 @@ if (args is ["diagnose-pawnio"])
 
     using LibreHardwareMonitorSession diagnosticSession = new();
     bool hasDriverBackedEvidence =
-        PawnIoDriverEvidence.HasDriverBackedSensors(diagnosticSession.DescriptorSnapshot);
+        diagnosticSession.DescriptorSnapshot.HasDriverBackedSensorReading;
     PawnIoDiagnostic diagnostic = PawnIoDiagnostics.Read(new PawnIoEnvironment(), hasDriverBackedEvidence);
     Console.WriteLine(JsonSerializer.Serialize(diagnostic, diagnosticJsonOptions));
     return diagnostic.Verdict == PawnIoHealthVerdict.Ok ? 0 : 2;

@@ -708,6 +708,58 @@ public sealed class LibreHardwareMonitorSessionTests
         Assert.Equal(DateTimeOffset.UnixEpoch.AddSeconds(7), gpuSnapshot.CapturedAt);
     }
 
+    [Fact]
+    public void DescriptorSnapshotReportsDriverEvidenceForPositiveCpuTemperature()
+    {
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Load("CPU Total", value: 42),
+            FakeSensor.Temperature("Core (Tctl/Tdie)", value: 55),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware], provider);
+
+        Assert.True(session.DescriptorSnapshot.HasDriverBackedSensorReading);
+    }
+
+    [Fact]
+    public void DescriptorSnapshotReportsNoDriverEvidenceWhenCpuTemperatureReadsZero()
+    {
+        // Mirrors a broken/unloaded PawnIO driver: LHM still activates the CPU
+        // temperature sensor, but at the 0 C failed-read sentinel. CPU load stays
+        // available because it comes from performance counters.
+        FakeHardware cpuHardware = FakeHardware.Cpu();
+        cpuHardware.Sensors =
+        [
+            FakeSensor.Load("CPU Total", value: 42),
+            FakeSensor.Temperature("Core (Tctl/Tdie)", value: 0),
+        ];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([cpuHardware], provider);
+
+        Assert.False(session.DescriptorSnapshot.HasDriverBackedSensorReading);
+    }
+
+    [Fact]
+    public void DescriptorSnapshotReportsDriverEvidenceForSuperIoSubHardware()
+    {
+        FakeHardware motherboard = FakeHardware.Motherboard();
+        FakeHardware superIo = FakeHardware.SuperIo();
+        superIo.Sensors =
+        [
+            FakeSensor.Voltage("Vcore", value: 1.2f),
+        ];
+        motherboard.SubHardware = [superIo];
+        using var provider = new WindowsSystemTotalDiskThroughputProvider(
+            new FakeSystemTotalDiskCounterReader(new WindowsSystemTotalDiskThroughputCounterSample(120, 30)));
+        using var session = new LibreHardwareMonitorSession([motherboard], provider);
+
+        Assert.True(session.DescriptorSnapshot.HasDriverBackedSensorReading);
+    }
+
     private sealed class FakeSystemTotalDiskCounterReader : IWindowsSystemTotalDiskThroughputCounterReader
     {
         private readonly WindowsSystemTotalDiskThroughputCounterSample _sample;

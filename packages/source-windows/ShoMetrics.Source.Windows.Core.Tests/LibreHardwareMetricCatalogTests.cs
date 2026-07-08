@@ -234,16 +234,18 @@ public sealed class LibreHardwareMetricCatalogTests
     }
 
     [Fact]
-    public void CpuTemperatureReadingAllowsFiniteZeroValueSensors()
+    public void CpuTemperatureReadingRejectsZeroValueSensors()
     {
+        // 0 C is the sentinel LHM publishes when the ring0 read failed (Amd17Cpu
+        // activates its temperature sensor at 0 on an unloaded PawnIO module), so a
+        // 0 reading must not be surfaced as a real CPU temperature.
         bool classified = LibreHardwareMetricCatalog.TryCreateCpuStableAliasReadingCandidate(
             FakeHardware.Cpu(),
             FakeSensor.Temperature("CPU Package", value: 0),
             out RankedMetricReading? candidate);
 
-        Assert.True(classified);
-        Assert.NotNull(candidate);
-        Assert.Equal(0, candidate.Reading.Value);
+        Assert.False(classified);
+        Assert.Null(candidate);
     }
 
     [Fact]

@@ -124,7 +124,7 @@ internal sealed partial class SourceRequestHandler(
         try
         {
             bool hasDriverBackedEvidence =
-                PawnIoDriverEvidence.HasDriverBackedSensors(monitorSession.DescriptorSnapshot);
+                monitorSession.DescriptorSnapshot.HasDriverBackedSensorReading;
             return new PawnIoDiagnosticResult(
                 PawnIoDiagnostics.Read(PawnIoEnvironment, hasDriverBackedEvidence),
                 Warning: null);

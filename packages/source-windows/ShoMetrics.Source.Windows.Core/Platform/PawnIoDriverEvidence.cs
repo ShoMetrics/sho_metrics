@@ -1,47 +1,55 @@
+using LibreHardwareMonitor.Hardware;
+
 namespace ShoMetrics.Source.Windows.Core;
 
 /// <summary>
-/// Decides whether the descriptor catalog contains sensors that only appear when
-/// the PawnIO ring0 driver is delivering data. This is the vendor- and
+/// Decides whether a live LHM sensor is one that only carries data when the
+/// PawnIO ring0 driver is actually working. This is the vendor- and
 /// architecture-neutral health signal for the PawnIO component: if the driver is
-/// producing the deep sensors the user installed it for, it is healthy, whatever
+/// delivering the deep sensors the user installed it for, it is healthy, whatever
 /// a vendor-specific register probe would report.
 /// </summary>
 public static class PawnIoDriverEvidence
 {
-    // Verified against the LibreHardwareMonitor source. Only sensors that are
-    // gated on the ring0 driver count as evidence, and the catalog only contains
-    // activated sensors:
-    // - SuperIO hardware is enumerated only when the ring0 LPC probe succeeds.
-    // - CPU Temperature sensors are ActivateSensor'd only after a successful
-    //   driver/SMU read (Hardware/Cpu/Amd17Cpu.cs), so a CPU temperature
-    //   descriptor means the driver actually delivered a temperature.
-    // Do NOT widen this to any CPU descriptor (CPU load comes from performance
-    // counters), to CPU power/clock (activated unconditionally in the LHM CPU
-    // constructor), or to any GPU sensor (GPU data comes from NVML/ADL/DXGI and
-    // never uses PawnIO). Any of those would make a machine with a broken driver
-    // report as healthy.
-    private const string SuperIoHardwareType = "SuperIO";
-    private const string CpuHardwareType = "Cpu";
-
-    public static bool HasDriverBackedSensors(HardwareMetricDescriptorSnapshot snapshot)
+    // Verified against the LibreHardwareMonitor source. Paths below are relative to
+    // the LibreHardwareMonitorLib project root (/LibreHardwareMonitor).
+    //
+    // SuperIO: the SuperIO hardware node is enumerated only after a successful
+    // ring0 LPC probe. Every LpcIo port/register read goes through the PawnIO
+    // module (PawnIo/LpcIO.cs), and PawnIo.Execute returns all-zero on an unloaded
+    // module (PawnIo/PawnIo.cs), so without a working driver the chip id reads back
+    // as 0, matches no known SuperIO, and no node is created. Its mere presence
+    // therefore proves the driver works, whatever the value of any single SuperIO
+    // sensor (a stopped fan legitimately reads 0).
+    //
+    // CPU temperature: read through the ring0 driver (Intel MSR / AMD SMU), but
+    // presence alone is NOT proof. Amd17Cpu.UpdateSensors (Hardware/Cpu/Amd17Cpu.cs)
+    // calls ActivateSensor on the temperature sensor unconditionally, and
+    // PawnIo.Execute returns all-zero (never throws) on an unloaded module
+    // (PawnIo/PawnIo.cs), so a broken driver still surfaces a CPU temperature sensor
+    // reading 0 C. Require a physically valid value: a powered CPU is never at 0 C,
+    // and 0 is exactly the failed-read sentinel. IntelCpu.Update
+    // (Hardware/Cpu/IntelCpu.cs) instead writes null on a failed therm-status read,
+    // which also fails this check.
+    // DIVERGENCE: this drops a genuine sub-zero reading (LN2 overclocking); that is
+    // an accepted trade to stop every broken-driver machine from reading a fake 0 C.
+    //
+    // Do NOT count CPU load (performance counters, no driver), CPU power/clock
+    // (activated unconditionally in the LHM CPU constructor), or any GPU sensor
+    // (NVML/ADL/DXGI, never PawnIO): each would report a broken driver as healthy.
+    public static bool IsDriverBackedSensorReading(IHardware hardware, ISensor sensor)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(hardware);
+        ArgumentNullException.ThrowIfNull(sensor);
 
-        foreach (HardwareMetricDescriptor descriptor in snapshot.Descriptors)
+        if (hardware.HardwareType == HardwareType.SuperIO)
         {
-            if (descriptor.HardwareType.Equals(SuperIoHardwareType, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            if (descriptor.HardwareType.Equals(CpuHardwareType, StringComparison.Ordinal)
-                && descriptor.Unit == MetricUnit.Celsius)
-            {
-                return true;
-            }
+            return true;
         }
 
-        return false;
+        return hardware.HardwareType == HardwareType.Cpu
+            && sensor.SensorType == SensorType.Temperature
+            && sensor.Value is float value
+            && value > 0f;
     }
 }

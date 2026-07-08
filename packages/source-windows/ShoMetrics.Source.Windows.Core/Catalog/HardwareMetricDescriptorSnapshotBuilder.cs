@@ -26,10 +26,11 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId = new(StringComparer.Ordinal);
         Dictionary<string, List<RankedHardwareMetricDescriptor>> rankedCandidatesByMetricId = new(StringComparer.Ordinal);
         List<string> warnings = [];
+        bool hasDriverBackedSensorReading = false;
 
         foreach (IHardware hardware in rootHardware)
         {
-            ReadHardwareDescriptors(
+            hasDriverBackedSensorReading |= ReadHardwareDescriptors(
                 hardware,
                 descriptorsByMetricId,
                 rankedCandidatesByMetricId,
@@ -67,6 +68,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
             DescriptorFingerprint = BuildDescriptorFingerprint(descriptors),
             Descriptors = descriptors,
             Warnings = warnings,
+            HasDriverBackedSensorReading = hasDriverBackedSensorReading,
         };
     }
 
@@ -132,7 +134,11 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         };
     }
 
-    private static void ReadHardwareDescriptors(
+    /// <returns>
+    /// Whether this hardware subtree exposed a sensor that only carries data when
+    /// the PawnIO ring0 driver is working (see <see cref="PawnIoDriverEvidence" />).
+    /// </returns>
+    private static bool ReadHardwareDescriptors(
         IHardware hardware,
         Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId,
         Dictionary<string, List<RankedHardwareMetricDescriptor>> rankedCandidatesByMetricId,
@@ -142,6 +148,7 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
         cancellationToken.ThrowIfCancellationRequested();
 
         bool updateSucceeded = true;
+        bool hasDriverBackedSensorReading = false;
 
         try
         {
@@ -170,6 +177,9 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
             {
                 LibreHardwareMonitorSensorPolicy.AddUnsupportedSensorTypeWarning(sensor, warnings);
 
+                hasDriverBackedSensorReading |=
+                    PawnIoDriverEvidence.IsDriverBackedSensorReading(hardware, sensor);
+
                 foreach (HardwareMetricDescriptor descriptor in LibreHardwareMetricCatalog.CreateDescriptors(hardware, sensor))
                 {
                     descriptorsByMetricId.TryAdd(descriptor.MetricId, descriptor);
@@ -195,13 +205,15 @@ internal static class HardwareMetricDescriptorSnapshotBuilder
 
         foreach (IHardware childHardware in hardware.SubHardware)
         {
-            ReadHardwareDescriptors(
+            hasDriverBackedSensorReading |= ReadHardwareDescriptors(
                 childHardware,
                 descriptorsByMetricId,
                 rankedCandidatesByMetricId,
                 warnings,
                 cancellationToken);
         }
+
+        return hasDriverBackedSensorReading;
     }
 
     private static void AddDerivedDescriptors(Dictionary<string, HardwareMetricDescriptor> descriptorsByMetricId)
