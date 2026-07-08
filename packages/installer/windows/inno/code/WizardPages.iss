@@ -143,7 +143,7 @@ begin
 
   PawnIoDescriptionLabel := CreateBodyLinkLabel(
     PawnIoOptionPage,
-    'PawnIO is needed for temperature and power sensors. PawnIO is a popular, open source driver for accessing hardware. Read more <a href="https://shometrics.github.io/faq/why-helper">here</a>.'#13#10 +
+    'PawnIO is needed for temperature and power sensors. PawnIO is a popular, open source driver for accessing hardware. Read more <a href="https://shometrics.github.io/faq/helper/">here</a>.'#13#10 +
       'PawnIO is made by namazso. ShoMetrics is not affiliated with PawnIO.'#13#10#13#10 +
       'This installer bundles an unmodified, official version of PawnIO from <a href="' + PawnIoUrl + '">' + PawnIoUrl + '</a> for your convenience. You can also install PawnIO yourself from the official website.',
     not PawnIoInstalledBeforeSetup);

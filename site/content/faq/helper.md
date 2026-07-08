@@ -2,6 +2,7 @@
 title = "About the Windows helper"
 description = "When the optional Windows helper is needed and what its driver does."
 weight = 10
+aliases = ["/faq/why-helper/"]
 +++
 
 The helper is optional. Most users should start with just the Stream Deck
