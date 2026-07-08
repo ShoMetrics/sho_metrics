@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ShoMetrics.Contracts.V1;
 using ShoMetrics.Source.Windows.Contracts;
 using ShoMetrics.Source.Windows.Core;
@@ -13,7 +14,7 @@ public sealed class SourceProtocolMapperTests
 
         GetSourceHealthResponse response = mapper.BuildHealthResponse(
             [],
-            BuildPawnIoDiagnostic(isInstalled: true, isAdministrator: true, version: "1.2.3"));
+            BuildPawnIoDiagnostic(PawnIoHealthVerdict.Ok, version: "1.2.3"));
 
         SourceComponentStatus status = Assert.Single(response.ComponentStatuses);
         Assert.Equal(WindowsSourceServiceConstants.PawnIoDriverComponentId, status.Component);
@@ -23,22 +24,38 @@ public sealed class SourceProtocolMapperTests
     }
 
     [Fact]
-    public void BuildHealthResponseMapsPawnIoWarningsToUnusableComponent()
+    public void BuildHealthResponseMapsUnusableVerdictWithWarnings()
     {
         SourceProtocolMapper mapper = new();
 
         GetSourceHealthResponse response = mapper.BuildHealthResponse(
             [],
             BuildPawnIoDiagnostic(
-                isInstalled: true,
-                isAdministrator: true,
-                warnings: ["All MSR reads returned zero."]));
+                PawnIoHealthVerdict.Unusable,
+                warnings: ["PawnIO is installed but no driver-backed sensors were found."]));
 
         SourceComponentStatus status = Assert.Single(response.ComponentStatuses);
         SourceWarning warning = Assert.Single(response.Warnings);
         Assert.Equal(SourceComponentState.Unusable, status.State);
         Assert.Equal("pawnio_warning", warning.Code);
-        Assert.Equal("All MSR reads returned zero.", warning.Message);
+        Assert.Equal("PawnIO is installed but no driver-backed sensors were found.", warning.Message);
+    }
+
+    [Fact]
+    public void BuildHealthResponseMapsNotSupportedVerdict()
+    {
+        SourceProtocolMapper mapper = new();
+
+        GetSourceHealthResponse response = mapper.BuildHealthResponse(
+            [],
+            BuildPawnIoDiagnostic(
+                PawnIoHealthVerdict.NotSupported,
+                warnings: ["PawnIO deep sensors are not supported on this CPU architecture."]));
+
+        SourceComponentStatus status = Assert.Single(response.ComponentStatuses);
+        Assert.Equal(SourceComponentState.NotSupported, status.State);
+        SourceWarning warning = Assert.Single(response.Warnings);
+        Assert.Equal("pawnio_warning", warning.Code);
     }
 
     [Fact]
@@ -55,42 +72,46 @@ public sealed class SourceProtocolMapperTests
     }
 
     [Fact]
-    public void BuildHealthResponseMapsPawnIoNotInstalledBeforePrivileges()
+    public void BuildHealthResponseMapsNotInstalledVerdict()
     {
         SourceProtocolMapper mapper = new();
 
         GetSourceHealthResponse response = mapper.BuildHealthResponse(
             [],
-            BuildPawnIoDiagnostic(isInstalled: false, isAdministrator: false));
+            BuildPawnIoDiagnostic(PawnIoHealthVerdict.NotInstalled));
 
         SourceComponentStatus status = Assert.Single(response.ComponentStatuses);
         Assert.Equal(SourceComponentState.NotInstalled, status.State);
+        Assert.Empty(response.Warnings);
     }
 
     [Fact]
-    public void BuildHealthResponseMapsPawnIoNotElevated()
+    public void BuildHealthResponseMapsNotElevatedVerdict()
     {
         SourceProtocolMapper mapper = new();
 
         GetSourceHealthResponse response = mapper.BuildHealthResponse(
             [],
-            BuildPawnIoDiagnostic(isInstalled: true, isAdministrator: false));
+            BuildPawnIoDiagnostic(PawnIoHealthVerdict.NotElevated));
 
         SourceComponentStatus status = Assert.Single(response.ComponentStatuses);
         Assert.Equal(SourceComponentState.NotElevated, status.State);
     }
 
     private static PawnIoDiagnostic BuildPawnIoDiagnostic(
-        bool isInstalled,
-        bool isAdministrator,
+        PawnIoHealthVerdict verdict,
         string? version = null,
         IReadOnlyList<string>? warnings = null)
     {
         return new PawnIoDiagnostic
         {
-            IsInstalled = isInstalled,
-            IsAdministrator = isAdministrator,
+            IsInstalled = verdict is not PawnIoHealthVerdict.NotInstalled,
+            IsAdministrator = verdict is not PawnIoHealthVerdict.NotElevated,
             Version = version,
+            CpuVendor = PawnIoCpuVendor.Intel,
+            OsArchitecture = Architecture.X64,
+            HasDriverBackedEvidence = verdict is PawnIoHealthVerdict.Ok,
+            Verdict = verdict,
             MsrReads = [],
             Warnings = warnings ?? [],
         };

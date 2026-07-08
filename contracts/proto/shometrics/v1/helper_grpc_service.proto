@@ -195,4 +195,9 @@ enum SourceComponentState {
 
   // The component is present, but health checks indicate unusable output.
   SOURCE_COMPONENT_STATE_UNUSABLE = 5;
+
+  // The component cannot be supported on this platform, for example a ring0
+  // driver on a non-x86 CPU architecture. This is an informational terminal
+  // state, not an error the user can fix.
+  SOURCE_COMPONENT_STATE_NOT_SUPPORTED = 6;
 }

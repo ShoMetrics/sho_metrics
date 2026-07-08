@@ -438,19 +438,15 @@ internal sealed class SourceProtocolMapper
             return SourceComponentState.Unknown;
         }
 
-        if (!diagnostic.IsInstalled)
+        return diagnostic.Verdict switch
         {
-            return SourceComponentState.NotInstalled;
-        }
-
-        if (!diagnostic.IsAdministrator)
-        {
-            return SourceComponentState.NotElevated;
-        }
-
-        return diagnostic.Warnings.Count == 0
-            ? SourceComponentState.Ok
-            : SourceComponentState.Unusable;
+            PawnIoHealthVerdict.NotInstalled => SourceComponentState.NotInstalled,
+            PawnIoHealthVerdict.NotElevated => SourceComponentState.NotElevated,
+            PawnIoHealthVerdict.NotSupported => SourceComponentState.NotSupported,
+            PawnIoHealthVerdict.Ok => SourceComponentState.Ok,
+            PawnIoHealthVerdict.Unusable => SourceComponentState.Unusable,
+            _ => SourceComponentState.Unknown,
+        };
     }
 
     private static uint ToUInt32(double value)

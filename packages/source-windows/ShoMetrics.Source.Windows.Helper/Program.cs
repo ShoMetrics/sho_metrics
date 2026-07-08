@@ -39,9 +39,19 @@ if (args is ["dump"])
 
 if (args is ["diagnose-pawnio"])
 {
-    PawnIoDiagnostic diagnostic = PawnIoDiagnostics.Read();
-    Console.WriteLine(JsonSerializer.Serialize(diagnostic, jsonOptions));
-    return diagnostic.Warnings.Count == 0 ? 0 : 2;
+    // Render enums (cpuVendor, osArchitecture, verdict) as names so the
+    // diagnostic is readable at a glance for support and hardware verification.
+    JsonSerializerOptions diagnosticJsonOptions = new(jsonOptions)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    using LibreHardwareMonitorSession diagnosticSession = new();
+    bool hasDriverBackedEvidence =
+        PawnIoDriverEvidence.HasDriverBackedSensors(diagnosticSession.DescriptorSnapshot);
+    PawnIoDiagnostic diagnostic = PawnIoDiagnostics.Read(new PawnIoEnvironment(), hasDriverBackedEvidence);
+    Console.WriteLine(JsonSerializer.Serialize(diagnostic, diagnosticJsonOptions));
+    return diagnostic.Verdict == PawnIoHealthVerdict.Ok ? 0 : 2;
 }
 
 using LibreHardwareMonitorSession session = new();

@@ -81,7 +81,7 @@ public sealed class HelperControlPanelStatusReaderTests
         Assert.Equal("ShoMetrics Helper is running.", status.Service.DetailText);
         Assert.Equal("Connected", status.Service.ConnectionText);
         Assert.Equal("Needs attention (1.2.3)", status.PawnIoDriver.StatusText);
-        Assert.Equal("If you just installed PawnIO, restart your PC. If it keeps failing, reinstall PawnIO or open logs.", status.PawnIoDriver.DetailText);
+        Assert.Equal("PawnIO returned no sensor data. A restart may help, or your device may only be partially supported by ShoMetrics. Open logs for details.", status.PawnIoDriver.DetailText);
         Assert.Equal("test-helper", status.Diagnostics.HelperVersionText);
         Assert.Equal("1", status.Diagnostics.ProtocolVersionText);
         Assert.Equal("1", status.Diagnostics.DescriptorCountText);
@@ -153,6 +153,7 @@ public sealed class HelperControlPanelStatusReaderTests
     [InlineData(SourceComponentState.NotInstalled, "Not installed")]
     [InlineData(SourceComponentState.NotElevated, "Not elevated")]
     [InlineData(SourceComponentState.Unusable, "Needs attention")]
+    [InlineData(SourceComponentState.NotSupported, "Not supported")]
     [InlineData(SourceComponentState.Unknown, "Unknown")]
     [InlineData(SourceComponentState.Unspecified, "Unknown")]
     public async Task ReadAsyncFormatsPawnIoComponentState(

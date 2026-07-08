@@ -375,8 +375,13 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                 CanInstallPawnIoDriver: false),
             SourceComponentState.Unusable => new PawnIoDriverTileText(
                 StatusText: "Needs attention",
-                DetailText: "If you just installed PawnIO, restart your PC. If it keeps failing, reinstall PawnIO or open logs.",
+                DetailText: "PawnIO returned no sensor data. A restart may help, or your device may only be partially supported by ShoMetrics. Open logs for details.",
                 Tone: ControlPanelStatusTone.Caution,
+                CanInstallPawnIoDriver: false),
+            SourceComponentState.NotSupported => new PawnIoDriverTileText(
+                StatusText: "Not supported",
+                DetailText: "Deep sensors are not available on this CPU architecture.",
+                Tone: ControlPanelStatusTone.Unknown,
                 CanInstallPawnIoDriver: false),
             SourceComponentState.Unknown => new PawnIoDriverTileText(
                 StatusText: "Unknown",

@@ -33,6 +33,7 @@ internal sealed class WindowsMetricSnapshotWorker(
             MaximumDemandCheckDelay.TotalMilliseconds,
             RefreshSummaryInterval.TotalMilliseconds);
         LogDescriptorCatalogSummary();
+        LogPawnIoDriverSummary();
         LogInitializationWarnings();
 
         try
@@ -290,6 +291,25 @@ internal sealed class WindowsMetricSnapshotWorker(
             "Windows metric descriptor catalog built with warnings. warningCount={WarningCount} warningSamples={WarningSamples}",
             descriptorSnapshot.Warnings.Count,
             BuildWarningSamples(descriptorSnapshot.Warnings));
+    }
+
+    private void LogPawnIoDriverSummary()
+    {
+        PawnIoEnvironment environment = new();
+        bool hasDriverBackedEvidence =
+            PawnIoDriverEvidence.HasDriverBackedSensors(monitorSession.DescriptorSnapshot);
+
+        // Log the raw inputs to the PawnIO health verdict at startup so CPU vendor
+        // and architecture detection can be verified on real hardware from the
+        // helper log alone, without running the diagnostic CLI. This reads only
+        // ambient facts (registry, token, CPUID); it does not run an MSR probe.
+        logger.LogInformation(
+            "PawnIO driver diagnostic inputs. installed={PawnIoInstalled} elevated={PawnIoElevated} cpuVendor={PawnIoCpuVendor} osArchitecture={PawnIoOsArchitecture} hasDriverBackedEvidence={PawnIoHasDriverBackedEvidence}",
+            environment.IsInstalled,
+            environment.IsAdministrator,
+            environment.CpuVendor,
+            environment.OsArchitecture,
+            hasDriverBackedEvidence);
     }
 
     internal static string BuildDescriptorHardwareTypeSummary(HardwareMetricDescriptorSnapshot descriptorSnapshot)

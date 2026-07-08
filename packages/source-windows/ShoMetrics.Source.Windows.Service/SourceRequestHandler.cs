@@ -29,6 +29,10 @@ internal sealed partial class SourceRequestHandler(
     private static readonly TimeSpan PawnIoDiagnosticCacheDuration = TimeSpan.FromSeconds(2);
     private const string PawnIoDiagnosticFailureWarningCode = "pawnio_diagnostic_failed";
 
+    // The environment is stateless: installation, privilege, and CPU facts are
+    // read on each call and the MSR probe is created per read.
+    private static readonly IPawnIoEnvironment PawnIoEnvironment = new PawnIoEnvironment();
+
     private readonly MetricRefreshDemandChangeGate _demandChangeGate =
         new(timeProvider, MinimumDemandApplyInterval);
     private readonly Lock _pawnIoDiagnosticGate = new();
@@ -119,7 +123,11 @@ internal sealed partial class SourceRequestHandler(
     {
         try
         {
-            return new PawnIoDiagnosticResult(PawnIoDiagnostics.Read(), Warning: null);
+            bool hasDriverBackedEvidence =
+                PawnIoDriverEvidence.HasDriverBackedSensors(monitorSession.DescriptorSnapshot);
+            return new PawnIoDiagnosticResult(
+                PawnIoDiagnostics.Read(PawnIoEnvironment, hasDriverBackedEvidence),
+                Warning: null);
         }
         catch (Exception exception)
         {
