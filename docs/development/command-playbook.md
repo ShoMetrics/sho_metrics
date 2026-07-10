@@ -156,6 +156,7 @@ Use these from the repository root.
 | --- | --- | --- |
 | Command playbook lint | `npm.cmd --prefix .github/scripts run check-command-playbook` | `.github/scripts/test-command-playbook.ts` |
 | Release plan lint | `npm.cmd --prefix .github/scripts run check-release-plan` | `.github/scripts/read-release-plan.mjs` |
+| Node runtime version lint | `npm.cmd --prefix .github/scripts run check-node-runtime-version` | `.github/scripts/check-node-runtime-version.mjs` |
 
 The repository lint checks that this playbook still points at stable command entry
 points and package script names. It does not run the expensive build or release

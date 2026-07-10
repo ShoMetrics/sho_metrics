@@ -9,10 +9,11 @@ on:
       - ".github/release-plan.yml"
       - ".github/scripts/read-release-plan.mjs"
       - ".github/scripts/test-command-playbook.ts"
+      - ".github/scripts/check-node-runtime-version.mjs"
       - ".github/scripts/.npmrc"
       - ".github/scripts/package.json"
-      - ".github/workflows/release.yml"
-      - ".github/workflows/repo-lint.yml"
+      - ".github/workflows/**"
+      - "packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json"
       - "docs/development/command-playbook.md"
       - "docs/release/manual-verification-checklist.md"
       - "packages/assets/brand/package.json"
@@ -26,10 +27,11 @@ on:
       - ".github/release-plan.yml"
       - ".github/scripts/read-release-plan.mjs"
       - ".github/scripts/test-command-playbook.ts"
+      - ".github/scripts/check-node-runtime-version.mjs"
       - ".github/scripts/.npmrc"
       - ".github/scripts/package.json"
-      - ".github/workflows/release.yml"
-      - ".github/workflows/repo-lint.yml"
+      - ".github/workflows/**"
+      - "packages/hub/com.ez.sho-metrics.sdPlugin/manifest.json"
       - "docs/development/command-playbook.md"
       - "docs/release/manual-verification-checklist.md"
       - "packages/assets/brand/package.json"
@@ -61,3 +63,7 @@ jobs:
       - name: Check release plan
         working-directory: .github/scripts
         run: npm run check-release-plan
+
+      - name: Check Node runtime version
+        working-directory: .github/scripts
+        run: npm run check-node-runtime-version

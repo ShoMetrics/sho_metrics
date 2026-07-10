@@ -6,6 +6,7 @@
     },
     "scripts": {
         "check-command-playbook": "node test-command-playbook.ts",
+        "check-node-runtime-version": "node check-node-runtime-version.mjs",
         "check-release-plan": "node read-release-plan.mjs --check"
     }
 }
