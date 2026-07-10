@@ -84,11 +84,11 @@ public sealed class PawnIoDiagnosticsTests
     }
 
     [Fact]
-    public void NonX86IsNotSupportedAndNeverProbesMsr()
+    public void NonX86WithoutPawnIoIsNotSupportedAndNeverProbesMsr()
     {
         FakePawnIoEnvironment environment = new()
         {
-            IsInstalled = true,
+            IsInstalled = false,
             IsAdministrator = true,
             CpuVendor = PawnIoCpuVendor.Unknown,
             OsArchitecture = Architecture.Arm64,

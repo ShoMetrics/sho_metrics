@@ -70,6 +70,12 @@ public static class PawnIoDiagnostics
         List<string> warnings,
         List<MsrReadDiagnostic> msrReads)
     {
+        if (!IsX86Architecture(osArchitecture))
+        {
+            warnings.Add(NotSupportedWarning);
+            return PawnIoHealthVerdict.NotSupported;
+        }
+
         if (!isInstalled)
         {
             return PawnIoHealthVerdict.NotInstalled;
@@ -78,12 +84,6 @@ public static class PawnIoDiagnostics
         if (!isAdministrator)
         {
             return PawnIoHealthVerdict.NotElevated;
-        }
-
-        if (!IsX86Architecture(osArchitecture))
-        {
-            warnings.Add(NotSupportedWarning);
-            return PawnIoHealthVerdict.NotSupported;
         }
 
         if (hasDriverBackedEvidence)
