@@ -52,6 +52,10 @@ import {
     type PropertyInspectorDiagnosticLevel,
 } from "../property-inspector/diagnostic-messages";
 import {
+    buildPropertyInspectorPluginRuntimePongMessage,
+    readPropertyInspectorPluginRuntimePingMessage,
+} from "../property-inspector/plugin-runtime-connection-messages";
+import {
     BackgroundCollectionBinding,
     type BackgroundCollectionBindingRefreshOptions,
 } from "./shared/background-collection-binding";
@@ -214,6 +218,17 @@ export abstract class MetricAction extends SingletonAction {
     }
 
     override onSendToPlugin(event: SendToPluginEvent<never, Record<string, never>>): void {
+        // Answer connection pings before anything else: the reply must stay
+        // unconditional and side-effect free so the PI can distinguish "plugin
+        // runtime is down" from "a specific feature misbehaved".
+        const pluginRuntimePingMessage = readPropertyInspectorPluginRuntimePingMessage(event.payload);
+        if (pluginRuntimePingMessage !== null) {
+            void streamDeck.ui.sendToPropertyInspector(
+                buildPropertyInspectorPluginRuntimePongMessage(pluginRuntimePingMessage.requestId),
+            );
+            return;
+        }
+
         const diagnosticMessage = readPropertyInspectorDiagnosticMessage(event.payload);
         if (diagnosticMessage !== null) {
             writePropertyInspectorDiagnosticLog(diagnosticMessage.level, diagnosticMessage.message);

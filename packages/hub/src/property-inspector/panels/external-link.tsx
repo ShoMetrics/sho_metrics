@@ -47,4 +47,7 @@ const propertyInspectorExternalLinkStyle: React.CSSProperties = {
     font: "inherit",
     padding: 0,
     textDecoration: "underline",
+    // Wrap a literal URL inside the narrow Property Inspector layout.
+    overflowWrap: "anywhere",
+    textAlign: "left",
 };

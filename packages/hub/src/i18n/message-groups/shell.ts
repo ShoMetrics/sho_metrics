@@ -16,6 +16,11 @@ export const shellMessages = {
         zh_CN: "设置",
         ja: "設定",
     },
+    pluginRuntimeUnresponsive: {
+        en: "ShoMetrics plugin engine is not responding yet. Restart the Stream Deck app if it does not clear. For help, open this page:",
+        zh_CN: "ShoMetrics 插件引擎暂时没有响应。如果一直没有恢复，请重启 Stream Deck 应用。如需帮助，请打开此页面：",
+        ja: "ShoMetrics プラグインエンジンがまだ応答していません。解消しない場合は Stream Deck アプリを再起動してください。詳しくは次のページをご覧ください：",
+    },
 } as const satisfies LocalizedMessages;
 
 export const commonMessages = {

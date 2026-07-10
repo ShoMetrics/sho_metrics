@@ -3,6 +3,8 @@ import { shellMessages } from "../i18n/message-groups/shell";
 import { useI18n } from "../i18n/react";
 import { InspectorItem } from "./components/InspectorItem";
 import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
+import { propertyInspectorExternalUrls } from "./external-urls";
+import { PropertyInspectorExternalLink } from "./panels/external-link";
 import { GlobalSettingsTab } from "./panels/tabs/GlobalSettingsTab";
 import { WidgetSettingsTab } from "./panels/tabs/WidgetSettingsTab";
 import {
@@ -11,6 +13,10 @@ import {
 } from "./settings-sync/usePropertyInspectorSettings";
 import type { StreamDeckPropertyInspectorClient } from "./stream-deck/stream-deck-client";
 import { StreamDeckClientProvider } from "./stream-deck/stream-deck-client-context";
+import {
+    type PluginRuntimeConnectionStatus,
+    usePluginRuntimeConnectionStatus,
+} from "./usePluginRuntimeConnectionStatus";
 
 interface AppProps {
     client: StreamDeckPropertyInspectorClient;
@@ -27,6 +33,7 @@ export function App({ client }: AppProps): React.JSX.Element {
     const { t } = useI18n();
     const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
     const [isColorCompensationWizardOpen, setIsColorCompensationWizardOpen] = useState(false);
+    const pluginRuntimeConnectionStatus = usePluginRuntimeConnectionStatus(client);
     const {
         visibilityContext,
         resolvedGlobalSettings,
@@ -78,6 +85,8 @@ export function App({ client }: AppProps): React.JSX.Element {
                         ))}
                     </div>
 
+                    <PluginRuntimeConnectionNoticeSlot status={pluginRuntimeConnectionStatus} />
+
                     <SettingsNoticeSlot
                         notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
                     />
@@ -108,6 +117,39 @@ export function App({ client }: AppProps): React.JSX.Element {
                 </div>
             )}
         </StreamDeckClientProvider>
+    );
+}
+
+function PluginRuntimeConnectionNoticeSlot(options: {
+    status: PluginRuntimeConnectionStatus;
+}): React.JSX.Element | null {
+    const { t } = useI18n();
+
+    // "checking" and "connected" render nothing, and this is deliberately the
+    // only state that draws anything. Do not add a "checking..." note during the
+    // pre-timeout window: the tabs below already show "Loading widget settings..."
+    // / "Loading metrics..." in this same area while settings load, so a second
+    // in-progress note would overlap and read as redundant noise. Only the
+    // terminal "unresponsive" verdict carries information those loading notes do
+    // not, so only it surfaces a message.
+    if (options.status !== "unresponsive") {
+        return null;
+    }
+
+    // The link text is the literal URL, not hidden behind label words: in this
+    // exact failure the shared Node runtime may be missing and Stream Deck can
+    // drop the openUrl command, so the user must still be able to read and copy
+    // the address by hand. The link stays clickable for the common case where
+    // opening works.
+    return (
+        <InspectorItem className="settings-notice settings-notice-warning plugin-runtime-connection-notice">
+            <p className="section-note">{t(shellMessages.pluginRuntimeUnresponsive)}</p>
+            <p className="section-note">
+                <PropertyInspectorExternalLink url={propertyInspectorExternalUrls.pluginEngineNotRespondingFaq}>
+                    {propertyInspectorExternalUrls.pluginEngineNotRespondingFaq}
+                </PropertyInspectorExternalLink>
+            </p>
+        </InspectorItem>
     );
 }
 

@@ -181,6 +181,12 @@ body {
     color: #f8d66d;
 }
 
+/* This notice includes recovery text and a literal support URL. Both must be
+ * copyable when the plugin runtime cannot open the URL in the default browser. */
+.plugin-runtime-connection-notice .inspector-item-content {
+    user-select: text;
+}
+
 .settings-section {
     margin: 0 0 16px;
 }

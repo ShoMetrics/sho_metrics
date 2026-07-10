@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { test } from "vitest";
+import { afterEach, test, vi } from "vitest";
 import { act } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -32,6 +32,11 @@ import {
     readTestSettingsRecord,
     TestPropertyInspectorClient,
 } from "./testing/test-property-inspector-client";
+import { PLUGIN_RUNTIME_CONNECTION_TIMEOUT_MILLISECONDS } from "./usePluginRuntimeConnectionStatus";
+
+afterEach(() => {
+    vi.useRealTimers();
+});
 
 test("app loads widget settings and writes a sparse CPU metric patch through Stream Deck", async () => {
     const user = userEvent.setup();
@@ -169,6 +174,32 @@ test("app color compensation FAQ link opens in the default browser", async () =>
         event: "openUrl",
         payload: {
             url: "https://shometrics.github.io/faq/color-compensation/",
+        },
+    });
+});
+
+test("app runtime warning shows the troubleshooting URL as its own clickable, copyable link", async () => {
+    vi.useFakeTimers();
+    const troubleshootingUrl = "https://shometrics.github.io/faq/plugin-engine-not-responding/";
+    const client = new TestPropertyInspectorClient({
+        actionUuid: STREAM_DECK_ACTION_UUID_BY_KIND.cpu,
+        settings: buildQuickStartSettingsRecord("cpu"),
+    });
+
+    renderApp(client);
+
+    await act(async () => {
+        await vi.advanceTimersByTimeAsync(PLUGIN_RUNTIME_CONNECTION_TIMEOUT_MILLISECONDS);
+    });
+
+    // The link's visible text is the literal URL, so the accessible name is the
+    // URL itself: users can read and copy it even if opening it fails.
+    fireEvent.click(screen.getByRole("link", { name: troubleshootingUrl }));
+
+    assert.deepEqual(client.sentMessages.at(-1), {
+        event: "openUrl",
+        payload: {
+            url: troubleshootingUrl,
         },
     });
 });

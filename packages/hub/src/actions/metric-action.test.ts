@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { test, vi } from "vitest";
-import type {
-    DialDownEvent,
-    DidReceiveSettingsEvent,
-    KeyDownEvent,
-    PropertyInspectorDidAppearEvent,
-    SendToPluginEvent,
-    WillAppearEvent,
-    WillDisappearEvent,
+import streamDeck, {
+    type DialDownEvent,
+    type DidReceiveSettingsEvent,
+    type KeyDownEvent,
+    type PropertyInspectorDidAppearEvent,
+    type SendToPluginEvent,
+    type WillAppearEvent,
+    type WillDisappearEvent,
 } from "@elgato/streamdeck";
+import type {
+    JsonValue,
+} from "@elgato/utils";
 import { MetricAction, type MetricCollectionBinding } from "./metric-action";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 import type {
@@ -43,6 +46,10 @@ import {
     clearColorCompensationPreview,
     resolveHardwareColorCompensationProfile,
 } from "../color-compensation/runtime-store";
+import {
+    buildPropertyInspectorPluginRuntimePingMessage,
+    readPropertyInspectorPluginRuntimePongMessage,
+} from "../property-inspector/plugin-runtime-connection-messages";
 
 const TEST_CURRENT_TIMESTAMP_MILLISECONDS = 10_000;
 
@@ -857,6 +864,31 @@ test("color compensation messages update delegated preview state and disappear c
     } finally {
         action.onWillDisappear(buildWillDisappearEvent(streamDeckAction));
         clearColorCompensationPreview(streamDeckAction.id);
+    }
+});
+
+test("plugin runtime connection pings reply to the Property Inspector", () => {
+    const action = new TestMetricAction();
+    const streamDeckAction = new FakeStreamDeckAction("plugin-runtime-ping-action");
+    const sendToPropertyInspector = vi.spyOn(streamDeck.ui, "sendToPropertyInspector")
+        .mockResolvedValue(undefined);
+
+    try {
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildPropertyInspectorPluginRuntimePingMessage("request-1"),
+        ));
+
+        assert.equal(sendToPropertyInspector.mock.calls.length, 1);
+        const message = sendToPropertyInspector.mock.calls[0][0] as JsonValue;
+        assert.deepEqual(readPropertyInspectorPluginRuntimePongMessage(message), {
+            type: "shoMetrics.propertyInspectorPluginRuntimeConnection",
+            command: "pong",
+            requestId: "request-1",
+        });
+        assert.equal(action.metricsUpdateSnapshots.length, 0);
+    } finally {
+        sendToPropertyInspector.mockRestore();
     }
 });
 
