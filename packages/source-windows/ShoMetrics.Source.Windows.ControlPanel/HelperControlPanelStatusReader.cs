@@ -9,6 +9,17 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(800);
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(3);
 
+    // The gRPC surface deliberately does not expose refresh demand state to
+    // the panel. That is a KISS decision, not a technical limit: a field on
+    // ReadMetricSnapshotResponse could carry it if this tile ever justifies
+    // widening the wire contract. Until then the panel cannot distinguish an
+    // idle deck from actively sampling widgets (both produce an empty
+    // diagnostic read), so this text states what this view does not include
+    // and must not condition on widget state; real diagnosis lives in the
+    // helper log.
+    private const string EmptySnapshotSampleText =
+        "No sample data in this diagnostic snapshot. This view does not track live widget sampling.";
+
     private readonly IWindowsServiceStatusReader _serviceStatusReader;
     private readonly IHelperControlPanelSourceClient _sourceClient;
 
@@ -76,12 +87,27 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                 health.ComponentStatuses,
                 serviceStatus,
                 helperRequestException: null);
+
+            // The panel's unfiltered snapshot read returns the service's global
+            // snapshot, which per-group demand refresh currently does not
+            // republish (see the MetricSnapshotCache empty-request read path):
+            // it can be empty with an old CapturedAt even while widgets are
+            // actively sampling. So today an empty snapshot proves nothing
+            // about demand, and its age is not a sample age. Show a neutral
+            // note instead of the aging timestamp, which reads as a failure
+            // while the helper is simply idle. If the global snapshot ever
+            // starts tracking per-group refreshes, the age becomes real and
+            // this special case can be revisited.
+            bool snapshotHasNoSampleData =
+                snapshot.Response is not null && (snapshot.Response.Snapshot?.Metrics.Count ?? 0) == 0;
             string lastSampleText = snapshot.Response is null
                 ? "Unknown"
-                : HelperControlPanelStatus.FormatSampleAge(sampleCapturedAt, checkedAt);
+                : snapshotHasNoSampleData
+                    ? EmptySnapshotSampleText
+                    : HelperControlPanelStatus.FormatSampleAge(sampleCapturedAt, checkedAt);
             string descriptorCountText = descriptors.Response is null
                 ? "Unknown"
-                : descriptors.Response.DescriptorSnapshot?.Descriptors.Count.ToString() ?? "0";
+                : FormatDescriptorCount(descriptors.Response.DescriptorSnapshot);
 
             return new HelperControlPanelStatus
             {
@@ -97,7 +123,10 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                     ProtocolVersionText = string.IsNullOrWhiteSpace(health.ProtocolVersion) ? "Unknown" : health.ProtocolVersion,
                     LastSampleText = lastSampleText,
                     DescriptorCountText = descriptorCountText,
-                    SensorDiagnosticsText = FormatSensorDiagnosticsText(lastSampleText, descriptorCountText),
+                    SensorDiagnosticsText = FormatSensorDiagnosticsText(
+                        lastSampleText,
+                        descriptorCountText,
+                        isSampleAge: !snapshotHasNoSampleData),
                     WarningCountText = FormatWarningCount(warningMessages.Count),
                     DetailText = FormatDiagnosticsDetail(warningMessages.Count, errorMessages.Count),
                     Tone = ResolveDiagnosticsStatusTone(warningMessages.Count, errorMessages.Count),
@@ -131,7 +160,7 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
                     ProtocolVersionText = "Unknown",
                     LastSampleText = "No sample",
                     DescriptorCountText = "Unknown",
-                    SensorDiagnosticsText = FormatSensorDiagnosticsText("No sample", "Unknown"),
+                    SensorDiagnosticsText = FormatSensorDiagnosticsText("No sample", "Unknown", isSampleAge: true),
                     WarningCountText = "Unknown",
                     DetailText = "Could not read diagnostics.",
                     Tone = ControlPanelStatusTone.Unknown,
@@ -424,9 +453,48 @@ internal sealed class HelperControlPanelStatusReader : IDisposable
         };
     }
 
-    private static string FormatSensorDiagnosticsText(string lastSampleText, string descriptorCountText)
+    private static string FormatDescriptorCount(HelperMetricDescriptorSnapshot? descriptorSnapshot)
     {
-        return $"Last sample when checked: {lastSampleText}. Metrics discovered: {descriptorCountText}.";
+        if (descriptorSnapshot is null || descriptorSnapshot.Descriptors.Count == 0)
+        {
+            return "0";
+        }
+
+        // Same bucket vocabulary and format as the helper's startup
+        // "descriptor catalog built" log line, so support can diff this
+        // panel text against the helper log directly. A hardware category
+        // that failed to enumerate at startup is absent from the list, not
+        // zero: the panel cannot know which categories this machine should
+        // have. Absence of an expected category (for example no Motherboard
+        // or SuperIO bucket on a desktop board) is the fingerprint that
+        // previously required asking the user to install LibreHardwareMonitor.
+        string breakdown = string.Join(
+            ',',
+            descriptorSnapshot.Descriptors
+                .GroupBy(
+                    descriptor => string.IsNullOrEmpty(descriptor.RawSensorIdentity?.HardwareType)
+                        ? "(native)"
+                        : descriptor.RawSensorIdentity.HardwareType,
+                    StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key}:{group.Count()}"));
+
+        return $"{descriptorSnapshot.Descriptors.Count} ({breakdown})";
+    }
+
+    private static string FormatSensorDiagnosticsText(
+        string sampleStatusText,
+        string descriptorCountText,
+        bool isSampleAge)
+    {
+        // The empty-snapshot status text is already full sentences, so it must
+        // not be prefixed with "Last sample when checked:" the way an age
+        // string is.
+        string sampleClause = isSampleAge
+            ? $"Last sample when checked: {sampleStatusText}."
+            : sampleStatusText;
+
+        return $"{sampleClause} Metrics discovered: {descriptorCountText}.";
     }
 
     private static string FormatWarningCount(int warningCount)

@@ -19,4 +19,12 @@ internal interface ISourceRequestHandler
     Task<SetMetricRefreshDemandResponse> SetMetricRefreshDemandAsync(
         SetMetricRefreshDemandRequest request,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reports whether any metric refresh demand is currently active. Snapshot
+    /// staleness logging uses this to separate a snapshot that aged because
+    /// nothing asks for metrics (demand-driven refresh idles on purpose) from
+    /// one that aged despite active demand.
+    /// </summary>
+    bool HasActiveMetricRefreshDemand();
 }

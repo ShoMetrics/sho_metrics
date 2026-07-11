@@ -83,6 +83,11 @@ internal sealed partial class SourceRequestHandler(
             cancellationToken);
     }
 
+    public bool HasActiveMetricRefreshDemand()
+    {
+        return monitorSession.ReadMetricRefreshDemands().Count > 0;
+    }
+
     private GetSourceHealthResponse GetSourceHealthCore()
     {
         PawnIoDiagnosticResult diagnostic = ReadPawnIoDiagnosticCached();

@@ -68,6 +68,7 @@ public sealed class HelperControlPanelStatusReaderTests
                 Snapshot = new MetricSnapshot
                 {
                     CapturedAt = Timestamp.FromDateTimeOffset(capturedAt),
+                    Metrics = { { "cpu.temp", new MetricValue { Scalar = 42 } } },
                 },
             },
         };
@@ -84,12 +85,117 @@ public sealed class HelperControlPanelStatusReaderTests
         Assert.Equal("PawnIO returned no sensor data. A restart may help, or your device may only be partially supported by ShoMetrics. Open logs for details.", status.PawnIoDriver.DetailText);
         Assert.Equal("test-helper", status.Diagnostics.HelperVersionText);
         Assert.Equal("1", status.Diagnostics.ProtocolVersionText);
-        Assert.Equal("1", status.Diagnostics.DescriptorCountText);
+        Assert.Equal("1 (Cpu:1)", status.Diagnostics.DescriptorCountText);
         Assert.Equal("1 warning", status.Diagnostics.WarningCountText);
         Assert.Contains("Last sample when checked:", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
-        Assert.Contains("Metrics discovered: 1.", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+        Assert.Contains("Metrics discovered: 1 (Cpu:1).", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
         Assert.Contains("driver: PawnIO driver warning.", status.Diagnostics.WarningDetailsText, StringComparison.Ordinal);
         Assert.NotEqual("No sample", status.Diagnostics.LastSampleText);
+    }
+
+    [Fact]
+    public async Task ReadAsyncReportsEmptySnapshotWithoutClaimingDemandState()
+    {
+        // The panel reads the service's global snapshot, which today stays
+        // empty with an aging CapturedAt even while widgets actively sample
+        // (per-group demand refresh does not currently republish it), and
+        // demand state is deliberately kept off the wire. The replacement text
+        // must therefore stay true in both the idle and the active case: no
+        // aging timestamp, and no claim about whether widgets are requesting
+        // metrics.
+        DateTimeOffset capturedAt = DateTimeOffset.UtcNow.AddMinutes(-8);
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Health = new GetSourceHealthResponse
+            {
+                SourceId = "windows-helper",
+                ProtocolVersion = "1",
+                HelperVersion = "test-helper",
+            },
+            Descriptors = new ListMetricDescriptorsResponse
+            {
+                DescriptorSnapshot = new HelperMetricDescriptorSnapshot
+                {
+                    DescriptorFingerprint = "test-fingerprint",
+                },
+            },
+            Snapshot = new ReadMetricSnapshotResponse
+            {
+                Snapshot = new MetricSnapshot
+                {
+                    CapturedAt = Timestamp.FromDateTimeOffset(capturedAt),
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(
+            "No sample data in this diagnostic snapshot. This view does not track live widget sampling.",
+            status.Diagnostics.LastSampleText);
+        Assert.StartsWith(
+            "No sample data in this diagnostic snapshot.",
+            status.Diagnostics.SensorDiagnosticsText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ago", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Last sample when checked:", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+        // Demand state is deliberately not exposed over the wire (KISS), so any
+        // wording that asserts it would be a guess that is wrong in the active
+        // case. This pins the earlier regression from coming back.
+        Assert.DoesNotContain("No active widgets", status.Diagnostics.SensorDiagnosticsText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReadAsyncBucketsDescriptorCountByHardwareType()
+    {
+        // The breakdown uses the same vocabulary and format as the helper's
+        // startup "descriptor catalog built" log line so support can diff the
+        // two. An expected-but-missing bucket (SuperIO enumeration failure) is
+        // visible as absence from this list.
+        var sourceClient = new FakeHelperControlPanelSourceClient
+        {
+            Descriptors = new ListMetricDescriptorsResponse
+            {
+                DescriptorSnapshot = new HelperMetricDescriptorSnapshot
+                {
+                    DescriptorFingerprint = "test-fingerprint",
+                    Descriptors =
+                    {
+                        BuildDescriptor("cpu.temp", "Cpu"),
+                        BuildDescriptor("cpu.load", "Cpu"),
+                        BuildDescriptor("gpu.temp", "GpuNvidia"),
+                        BuildDescriptor("disk.total.read", hardwareType: ""),
+                    },
+                },
+            },
+        };
+        var reader = new HelperControlPanelStatusReader(
+            new FakeWindowsServiceStatusReader(WindowsServiceStatusKind.Running),
+            sourceClient);
+
+        HelperControlPanelStatus status = await reader.ReadAsync(CancellationToken.None);
+
+        Assert.Equal("4 ((native):1,Cpu:2,GpuNvidia:1)", status.Diagnostics.DescriptorCountText);
+    }
+
+    private static HelperMetricDescriptor BuildDescriptor(string metricId, string hardwareType)
+    {
+        return new HelperMetricDescriptor
+        {
+            Descriptor_ = new MetricDescriptor
+            {
+                MetricId = metricId,
+                PollingGroupId = "test-group",
+            },
+            RawSensorIdentity = new RawSensorIdentity
+            {
+                SourceSensorId = $"test:{metricId}",
+                HardwareType = hardwareType,
+            },
+        };
     }
 
     [Fact]
@@ -343,7 +449,7 @@ public sealed class HelperControlPanelStatusReaderTests
         Assert.Equal("Connected with errors", status.Service.ConnectionText);
         Assert.Equal("test-helper", status.Diagnostics.HelperVersionText);
         Assert.Equal("1", status.Diagnostics.ProtocolVersionText);
-        Assert.Equal("1", status.Diagnostics.DescriptorCountText);
+        Assert.Equal("1 (Cpu:1)", status.Diagnostics.DescriptorCountText);
         Assert.Equal("Unknown", status.Diagnostics.LastSampleText);
         Assert.Contains(
             "Snapshot read failed: ShoMetrics Helper did not respond in time: Snapshot timed out.",

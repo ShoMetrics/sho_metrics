@@ -202,6 +202,33 @@ public sealed class WindowsGrpcMetricSourceServiceTests
         Assert.Equal(StatusCode.Internal, exception.StatusCode);
     }
 
+    [Theory]
+    [InlineData(true, false, 0, 0, false, true)]   // A slow read always warns, even when empty.
+    [InlineData(true, true, 0, 0, false, true)]    // Slow wins over every quiet exception.
+    [InlineData(false, true, 5, 0, false, true)]   // Stale data that has readings is a real fault.
+    [InlineData(false, true, 0, 3, true, true)]    // Requested metrics missing while demanded: a fault.
+    [InlineData(false, true, 0, 3, false, false)]  // Requested metrics missing, nothing demands: idle, quiet.
+    [InlineData(false, true, 0, 0, true, false)]   // Unfiltered diagnostic read: global snapshot age is not a freshness signal, quiet even with demand.
+    [InlineData(false, true, 0, 0, false, false)]  // Unfiltered diagnostic read while idle: quiet.
+    [InlineData(false, false, 0, 0, false, false)] // Fresh read never warns.
+    public void ShouldWarnSnapshotSlowOrStaleKeepsIdleSnapshotsQuiet(
+        bool isSlow,
+        bool isStale,
+        int metricCount,
+        int unavailableMetricCount,
+        bool hasActiveDemand,
+        bool expectedWarn)
+    {
+        Assert.Equal(
+            expectedWarn,
+            WindowsGrpcMetricSourceService.ShouldWarnSnapshotSlowOrStale(
+                isSlow,
+                isStale,
+                metricCount,
+                unavailableMetricCount,
+                hasActiveDemand));
+    }
+
     private sealed class FakeSourceRequestHandler : ISourceRequestHandler
     {
         public Func<CancellationToken, Task<GetSourceHealthResponse>> GetSourceHealth { get; init; } =
@@ -215,6 +242,8 @@ public sealed class WindowsGrpcMetricSourceServiceTests
 
         public Func<CancellationToken, Task<SetMetricRefreshDemandResponse>> SetMetricRefreshDemand { get; init; } =
             _ => Task.FromResult(new SetMetricRefreshDemandResponse());
+
+        public Func<bool> HasActiveMetricRefreshDemandResult { get; init; } = () => false;
 
         public Task<GetSourceHealthResponse> GetSourceHealthAsync(
             GetSourceHealthRequest request,
@@ -242,6 +271,11 @@ public sealed class WindowsGrpcMetricSourceServiceTests
             CancellationToken cancellationToken)
         {
             return SetMetricRefreshDemand(cancellationToken);
+        }
+
+        public bool HasActiveMetricRefreshDemand()
+        {
+            return HasActiveMetricRefreshDemandResult();
         }
     }
 

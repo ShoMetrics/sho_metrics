@@ -155,16 +155,93 @@ internal sealed class WindowsGrpcMetricSourceService(
             return;
         }
 
+        int metricCount = readResponse.Snapshot?.Metrics.Count ?? 0;
+        int unavailableMetricCount = readResponse.UnavailableMetrics.Count;
+        bool hasActiveDemand = requestHandler.HasActiveMetricRefreshDemand();
+
+        if (!ShouldWarnSnapshotSlowOrStale(isSlow, isStale, metricCount, unavailableMetricCount, hasActiveDemand))
+        {
+            // Two quiet shapes land here. (1) An unfiltered diagnostic read
+            // (empty request, used by the Control Panel): it returns the
+            // global snapshot, which per-group demand refresh currently does
+            // not republish, so its age says nothing about sampling health
+            // even while widgets are active. (2) A concrete metric request
+            // while nothing demands metrics: demand-driven refresh lets data
+            // age on purpose when idle. Warning on either shape misled issue
+            // #2 triage. The log line records the observed facts, not this
+            // interpretation, so triage can still question it. Information
+            // level on purpose: the production service logs at Information
+            // minimum, and this line is the positive evidence ("helper alive,
+            // read served") that triage needs from a user log. It cannot spam
+            // an idle machine because it only runs when a read request
+            // arrives, throttled to one line per interval.
+            logger.AtInformation()
+                .EveryBucket("grpc-read-snapshot-idle", UnaryLogThrottleInterval)
+                .Log(context => ThrottledLogEntry.Create(
+                    "gRPC ReadMetricSnapshot returned a stale snapshot with no metric readings. snapshotAgeMs={SnapshotAgeMs} unavailableMetricCount={UnavailableMetricCount} hasActiveDemand={HasActiveDemand} suppressedLogCount={SuppressedLogCount}",
+                    snapshotAge?.TotalMilliseconds,
+                    unavailableMetricCount,
+                    hasActiveDemand,
+                    context.SuppressedCount));
+            return;
+        }
+
         logger.AtWarning()
             .EveryBucket("grpc-read-snapshot-slow-or-stale", UnaryLogThrottleInterval)
             .Log(context => ThrottledLogEntry.Create(
                 "gRPC ReadMetricSnapshot returned slow or stale data. durationMs={DurationMs} snapshotAgeMs={SnapshotAgeMs} metricCount={MetricCount} unavailableMetricCount={UnavailableMetricCount} warningCount={WarningCount} suppressedLogCount={SuppressedLogCount}",
                 duration.TotalMilliseconds,
                 snapshotAge?.TotalMilliseconds,
-                readResponse.Snapshot?.Metrics.Count ?? 0,
-                readResponse.UnavailableMetrics.Count,
+                metricCount,
+                unavailableMetricCount,
                 readResponse.Warnings.Count,
                 context.SuppressedCount));
+    }
+
+    // Slowness is a real performance signal even on an empty snapshot, so a slow
+    // read always warns. For staleness the response shape tells the story:
+    //
+    // - metricCount > 0: a consumer received stale readings; always a fault.
+    // - metricCount == 0 with unavailable entries: only a non-empty request can
+    //   produce this shape (MetricSnapshotCache fills every requested id into
+    //   readings or unavailable reports), so a real metric request got nothing.
+    //   Warn only while something actively demands metrics; without demand,
+    //   demand-driven refresh lets data age on purpose (idle).
+    // - metricCount == 0 with no unavailable entries: only the unfiltered
+    //   diagnostic read (empty request) produces this shape, and it returns the
+    //   global snapshot that per-group demand refresh currently does not
+    //   republish. Its age says nothing about sampling health, with or without
+    //   demand, so it stays quiet; warning on it produced false alarms whenever
+    //   the Control Panel was opened while widgets were active.
+    //
+    // hasActiveDemand is deliberately "any demand", not matched to the requested
+    // polling groups: the mapping lives in Core and the Hub only reads metrics
+    // it also demands, so group matching would add cross-layer plumbing for no
+    // observed case. Revisit if the global snapshot ever starts tracking
+    // per-group refreshes or a reader starts requesting undemanded metrics.
+    internal static bool ShouldWarnSnapshotSlowOrStale(
+        bool isSlow,
+        bool isStale,
+        int metricCount,
+        int unavailableMetricCount,
+        bool hasActiveDemand)
+    {
+        if (isSlow)
+        {
+            return true;
+        }
+
+        if (!isStale)
+        {
+            return false;
+        }
+
+        if (metricCount > 0)
+        {
+            return true;
+        }
+
+        return unavailableMetricCount > 0 && hasActiveDemand;
     }
 
     private static StatusCode MapStatusCode(SourceRequestFailureKind failureKind)

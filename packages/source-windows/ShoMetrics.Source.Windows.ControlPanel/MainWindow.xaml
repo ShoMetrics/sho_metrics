@@ -323,7 +323,7 @@
                                 <toolkit:SettingsExpander.Items>
                                     <toolkit:SettingsCard Header="Sensor Reads">
                                         <toolkit:SettingsCard.Description>
-                                            <TextBlock Text="Last sample age and discovered metric count from the last check."
+                                            <TextBlock Text="Sample data and discovered metric count from the last check."
                                                        MaxWidth="320"
                                                        TextWrapping="Wrap" />
                                         </toolkit:SettingsCard.Description>
