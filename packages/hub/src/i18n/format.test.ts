@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
+    extractRichTagNames,
     extractPlaceholderNames,
     formatMessage,
+    parseRichMessageSegments,
+    validateLocalizedMessageTags,
     validateLocalizedMessagePlaceholders,
 } from "./format";
 
@@ -55,4 +58,46 @@ test("extracts and validates placeholder names across locales", () => {
         zh_CN: "打开设置",
         ja: "{scope}設定を開く",
     }), ["zh_CN"]);
+});
+
+test("parses non-nested rich-text tags without interpreting surrounding text", () => {
+    assert.deepEqual(parseRichMessageSegments("If <helper>ShoMetrics Helper</helper> is installed."), [
+        { kind: "text", text: "If " },
+        { kind: "tag", name: "helper", text: "ShoMetrics Helper" },
+        { kind: "text", text: " is installed." },
+    ]);
+});
+
+test("validates rich-text tag names and syntax across locales", () => {
+    assert.deepEqual(extractRichTagNames("<helper>ShoMetrics Helper</helper>"), ["helper"]);
+
+    assert.deepEqual(validateLocalizedMessageTags({
+        en: "If <helper>Helper</helper> is installed.",
+        zh_CN: "如果已安装<helper>Helper</helper>。",
+        ja: "<helper>Helper</helper> がインストールされています。",
+    }), []);
+
+    assert.deepEqual(validateLocalizedMessageTags({
+        en: "If <helper>Helper</helper> is installed.",
+        zh_CN: "如果已安装<download>Helper</download>。",
+        ja: "<helper>Helper</helper> がインストールされています。",
+    }), ["zh_CN rich tag mismatch"]);
+
+    assert.deepEqual(validateLocalizedMessageTags({
+        en: "If <helper>Helper</helper> is installed.",
+        zh_CN: "如果已安装<helper>Helper</download>。",
+        ja: "<helper>Helper</helper> がインストールされています。",
+    }), ["zh_CN invalid rich tag syntax"]);
+
+    assert.deepEqual(validateLocalizedMessageTags({
+        en: "If <helper></helper> is installed.",
+        zh_CN: "如果已安装<helper>Helper</helper>。",
+        ja: "<helper>Helper</helper> がインストールされています。",
+    }), ["en invalid rich tag syntax"]);
+
+    assert.deepEqual(validateLocalizedMessageTags({
+        en: "If <helper><em>Helper</em></helper> is installed.",
+        zh_CN: "如果已安装<helper>Helper</helper>。",
+        ja: "<helper>Helper</helper> がインストールされています。",
+    }), ["en invalid rich tag syntax"]);
 });

@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { validateLocalizedMessagePlaceholders } from "../src/i18n/format.ts";
+import {
+    validateLocalizedMessagePlaceholders,
+    validateLocalizedMessageTags,
+} from "../src/i18n/format.ts";
 // Node can type-strip explicit leaf .ts imports, but it does not resolve the
 // extensionless imports inside src/i18n/messages.ts the way Rollup does.
 import { colorCompensationMessages } from "../src/i18n/message-groups/color-compensation.ts";
@@ -93,7 +96,10 @@ function validateCatalogPlaceholders(label, value) {
 
     if (isLocalizedMessage(value)) {
         const mismatchedLocales = validateLocalizedMessagePlaceholders(value);
-        return mismatchedLocales.map((locale) => `${label} placeholder mismatch: ${locale}`);
+        return [
+            ...mismatchedLocales.map((locale) => `${label} placeholder mismatch: ${locale}`),
+            ...validateLocalizedMessageTags(value).map((problem) => `${label} ${problem}`),
+        ];
     }
 
     return Object.entries(value).flatMap(([key, childValue]) => (
