@@ -74,7 +74,9 @@ Good: `Add Stream Deck action UUID constants`, `Rename Property Inspector settin
 Bad: `refactor(pi): action uuid`, `property inspector cleanup`, `updated files`.
 Bad: Move archived documents to archived folder<newline>Archived documents are no longer in use. <- Unnecessary second line
 
-* **PREFER: No fear of backwards compatibility**: Code is not in prod yet, while making code changes, you do not need to consider backwards compatibility. Instead, focus on updating to/writing readable, testable code.
+* **DO: Guarantee backwards compatibility**: Code has launched in production, code must remain backward compatible unless compatibility would distort the design. Breaking changes are allowed only with a safe user-data migration. This applies to, but is not limited to:
+  - Proto changes.
+  - Plugin and helper changes: version skew is expected, user may update plugin without updating helper, and vice versa. Newer components must handle supported older counterparts safely.
 
 * **PREFER: Simplicity First**
 - No features beyond what was asked.
