@@ -4,6 +4,7 @@ import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_COLOR_COMPENSATION_PROFILE } from "../../../color-compensation/types";
+import { customMetricMessages } from "../../../i18n/message-groups/widgets";
 import {
     CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
     type CustomHttpSourceEditorResponse,
@@ -147,9 +148,7 @@ test("custom metric panel sends fetch and transform test commands through the pl
         },
     });
 
-    await screen.findByText(
-        "No maximum was returned. When jq declares the built-in percent unit, ShoMetrics uses 100 as the maximum; otherwise line charts fit their scale to observed data.",
-    );
+    await screen.findByText(customMetricMessages.transformPreviewMissingMaximumNote.en);
 });
 
 test("custom metric source editor visibly normalizes scheme-less URLs on blur", async () => {
