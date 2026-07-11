@@ -22,11 +22,15 @@ export interface WidgetData {
 }
 
 export type SparklineScale =
-    | AdaptiveSparklineScale
+    | FitToDataSparklineScale
     | FixedSparklineScale;
 
-interface AdaptiveSparklineScale {
-    mode: "adaptive";
+/**
+ * Explicit fit-to-data mode for metrics whose value domain is genuinely
+ * unknown. Do not use it as a fallback for a missing metric maximum.
+ */
+interface FitToDataSparklineScale {
+    mode: "fitToData";
     minimumValue?: number;
 }
 

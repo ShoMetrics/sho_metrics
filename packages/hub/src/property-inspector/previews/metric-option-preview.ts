@@ -282,25 +282,24 @@ function buildWidgetData(options: {
     readonly secondaryDisplayValue?: string | undefined;
     readonly barLabel?: string | undefined;
 }): WidgetData {
-    const fixedScaleMaximum = options.unit === "%" ? 100 : undefined;
-    const historyMaximum = fixedScaleMaximum ?? Math.max(1, options.current / Math.max(0.01, options.progress));
+    const fixedScaleMaximum = options.unit === "%"
+        ? 100
+        : Math.max(1, options.current / Math.max(0.01, options.progress));
 
     return {
         current: options.current,
         progress: Math.min(Math.max(options.progress, 0), 1),
-        history: SAMPLE_HISTORY.map(sample => sample * historyMaximum / 100),
+        history: SAMPLE_HISTORY.map(sample => sample * fixedScaleMaximum / 100),
         unit: options.unit,
         label: options.label,
         displayValue: options.displayValue,
         secondaryDisplayValue: options.secondaryDisplayValue,
         barLabel: options.barLabel,
-        sparklineScale: fixedScaleMaximum === undefined
-            ? undefined
-            : {
-                mode: "fixed",
-                minimumValue: 0,
-                maximumValue: fixedScaleMaximum,
-            },
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: fixedScaleMaximum,
+        },
         sampleTimestampMilliseconds: PREVIEW_SAMPLE_TIMESTAMP_MILLISECONDS,
     };
 }

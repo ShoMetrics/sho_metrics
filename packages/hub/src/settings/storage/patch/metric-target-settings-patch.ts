@@ -174,6 +174,9 @@ export function applyNetworkPatch(
         const ping = ensureNetworkPingTarget(target);
         ping.targetHost = normalizeNetworkPingTargetInput(patch.pingTargetHost).targetHost;
     }
+    if (patch.pingMaximumLatencyMilliseconds !== undefined) {
+        ensureNetworkPingTarget(target).maximumLatencyMilliseconds = patch.pingMaximumLatencyMilliseconds;
+    }
 
     if (target.reading.case === "ping" || !hasNetworkDisplayPatch(patch)) {
         return;

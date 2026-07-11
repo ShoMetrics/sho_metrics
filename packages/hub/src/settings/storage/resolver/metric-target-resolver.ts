@@ -25,6 +25,7 @@ import {
 import { normalizeCustomHttpSourceUrlInput } from "../../../runtime/sources/custom-http/custom-http-url";
 import { MetricUnit } from "../../../runtime/sources/metric-source";
 import {
+    DEFAULT_NETWORK_PING_MAXIMUM_LATENCY_MILLISECONDS,
     DEFAULT_NETWORK_PING_TARGET_HOST,
     normalizeNetworkPingTargetInput,
 } from "../../network-ping-target";
@@ -358,6 +359,8 @@ function resolveNetworkReading(
                 targetHost: normalizeNetworkPingTargetInput(
                     reading.value.targetHost ?? DEFAULT_NETWORK_PING_TARGET_HOST,
                 ).targetHost,
+                maximumLatencyMilliseconds: reading.value.maximumLatencyMilliseconds
+                    ?? DEFAULT_NETWORK_PING_MAXIMUM_LATENCY_MILLISECONDS,
             };
         case "traffic":
             return {

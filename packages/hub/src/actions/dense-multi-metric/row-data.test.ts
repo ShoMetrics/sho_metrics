@@ -210,6 +210,11 @@ test("dense widget data applies catalog label and raw maximum resolution", () =>
         history: [],
         label: "PWR",
         unit: "W",
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: 600,
+        },
         sampleTimestampMilliseconds: 10_000,
     });
 });
@@ -313,8 +318,9 @@ test("dense network ping row treats expired latency samples as no data", () => {
         unit: "ms",
         displayValue: "",
         sparklineScale: {
-            mode: "adaptive",
+            mode: "fixed",
             minimumValue: 0,
+            maximumValue: 300,
         },
         sampleTimestampMilliseconds: undefined,
     });
@@ -561,6 +567,7 @@ function buildNetworkPingTarget(): Extract<ResolvedMetricTarget, { readonly doma
         reading: {
             kind: "ping",
             targetHost: "1.1.1.1",
+            maximumLatencyMilliseconds: 300,
         },
     };
 }

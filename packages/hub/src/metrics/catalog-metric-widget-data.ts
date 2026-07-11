@@ -33,6 +33,25 @@ export function formatCatalogMetricFreshWidgetData(options: {
         };
 }
 
+/** Adds a fixed sparkline scale that matches the catalog metric's bar maximum. */
+export function buildCatalogMetricScaledWidgetData(options: {
+    readonly widgetData: WidgetData;
+    readonly maximumValue: number;
+}): WidgetData {
+    return {
+        ...options.widgetData,
+        // Negative rails intentionally stay on the baseline, matching the
+        // existing clamped bar. Fit-to-data would turn small ADC noise around
+        // values such as -12 V into a misleading full-height trend. A future
+        // negative range should add an explicit custom minimum instead.
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: options.maximumValue,
+        },
+    };
+}
+
 function formatCatalogMetricValue(options: {
     readonly value: number;
     readonly unit: MetricUnit;

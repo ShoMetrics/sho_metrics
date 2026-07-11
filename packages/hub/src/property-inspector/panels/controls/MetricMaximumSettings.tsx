@@ -136,6 +136,27 @@ export function NetworkTrafficMaximumSetting({
     );
 }
 
+export function NetworkPingMaximumSetting({
+    value,
+    onValueChange,
+}: {
+    readonly value: number;
+    readonly onValueChange: (value: number) => void;
+}): React.JSX.Element {
+    const { t } = useI18n();
+
+    return (
+        <MetricMaximumNumberSetting
+            input={buildNetworkPingMaximumInputSpec(t, value)}
+            onValueChange={(nextValue) => {
+                if (nextValue !== undefined) {
+                    onValueChange(nextValue);
+                }
+            }}
+        />
+    );
+}
+
 export function buildTemperatureMaximumInputSpec(
     t: I18n["t"],
     value: number,
@@ -191,6 +212,19 @@ export function buildNetworkTrafficMaximumInputSpec(
         step: 1,
         optional: true,
         disabled,
+    };
+}
+
+export function buildNetworkPingMaximumInputSpec(
+    t: I18n["t"],
+    value: number,
+): MetricMaximumInputSpec {
+    return {
+        label: t(networkMessages.pingMaximumLatencyLabel),
+        value,
+        minimum: 1,
+        step: 1,
+        optional: false,
     };
 }
 

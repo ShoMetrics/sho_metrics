@@ -90,7 +90,7 @@ export function buildDiskThroughputWidgetData(options: {
         pollingFrequencySeconds: options.pollingFrequencySeconds,
         graceMilliseconds: DISK_THROUGHPUT_SAMPLE_STALE_GRACE_MILLISECONDS,
     })) {
-        return buildUnavailableDiskThroughputWidgetData(options.label);
+        return buildUnavailableDiskThroughputWidgetData(options.label, options.maximumBytesPerSecond);
     }
 
     const safeBytesPerSecond = Math.max(0, options.bytesPerSecondWidgetData.current);
@@ -109,12 +109,16 @@ export function buildDiskThroughputWidgetData(options: {
         unit: formattedThroughput.unit,
         label: options.label,
         displayValue: formattedThroughput.value,
-        sparklineScale: { mode: "adaptive", minimumValue: 0 },
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: maximumBytesPerSecond,
+        },
         sampleTimestampMilliseconds: options.bytesPerSecondWidgetData.sampleTimestampMilliseconds,
     };
 }
 
-function buildUnavailableDiskThroughputWidgetData(label: string): WidgetData {
+function buildUnavailableDiskThroughputWidgetData(label: string, configuredMaximumBytesPerSecond: number): WidgetData {
     // Renderer-facing N/A is driven by the missing sample timestamp. The zero
     // value only keeps the WidgetData shape safe for logs, progress, and units.
     const formattedThroughput = formatBytesPerSecond({
@@ -123,6 +127,10 @@ function buildUnavailableDiskThroughputWidgetData(label: string): WidgetData {
         base: BINARY_BASE,
         maximumDisplayDigits: MAXIMUM_THROUGHPUT_DISPLAY_DIGITS,
     });
+    const maximumBytesPerSecond = Math.max(
+        configuredMaximumBytesPerSecond,
+        MINIMUM_DISK_RATE_MAXIMUM_BYTES_PER_SECOND,
+    );
 
     return {
         current: 0,
@@ -131,7 +139,11 @@ function buildUnavailableDiskThroughputWidgetData(label: string): WidgetData {
         unit: formattedThroughput.unit,
         label,
         displayValue: formattedThroughput.value,
-        sparklineScale: { mode: "adaptive", minimumValue: 0 },
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: maximumBytesPerSecond,
+        },
         sampleTimestampMilliseconds: undefined,
     };
 }

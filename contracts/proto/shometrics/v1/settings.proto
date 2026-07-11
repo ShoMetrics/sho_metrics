@@ -314,6 +314,7 @@ message NetworkMetricTarget {
 
   message Ping {
     optional string target_host = 1 [(buf.validate.field).string.max_len = 253];
+    optional uint32 maximum_latency_milliseconds = 2 [(buf.validate.field).uint32.gt = 0];
   }
 }
 

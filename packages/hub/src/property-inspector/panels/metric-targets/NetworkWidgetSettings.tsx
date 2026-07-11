@@ -15,7 +15,10 @@ import {
 import { AppearanceSettings } from "../controls/AppearanceSettings";
 import { PollingSettings } from "../controls/PollingSettings";
 import { LineSettings } from "../controls/LineSettings";
-import { NetworkTrafficMaximumSetting } from "../controls/MetricMaximumSettings";
+import {
+    NetworkPingMaximumSetting,
+    NetworkTrafficMaximumSetting,
+} from "../controls/MetricMaximumSettings";
 import { SettingsSection } from "../controls/SettingsSection";
 import type { WidgetSettingsPanelProps } from "../panel-props";
 import {
@@ -42,12 +45,17 @@ type ResolvedNetworkTrafficMetricTarget = ResolvedNetworkMetricTarget & {
     readonly reading: Extract<ResolvedNetworkReading, { readonly kind: "traffic" }>;
 };
 
+type ResolvedNetworkPingMetricTarget = ResolvedNetworkMetricTarget & {
+    readonly reading: Extract<ResolvedNetworkReading, { readonly kind: "ping" }>;
+};
+
 type NetworkTrafficWidgetSettingsProps = Omit<NetworkWidgetSettingsProps, "target"> & {
     target: ResolvedNetworkTrafficMetricTarget;
 };
 
 export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.JSX.Element {
     const trafficTarget = readNetworkTrafficMetricTarget(props.target);
+    const pingTarget = readNetworkPingMetricTarget(props.target);
 
     return (
         <>
@@ -55,6 +63,9 @@ export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.
             <AppearanceSettings {...props} />
             {trafficTarget && (
                 <NetworkScaleSettings {...props} target={trafficTarget} />
+            )}
+            {pingTarget && (
+                <NetworkPingScaleSettings {...props} target={pingTarget} />
             )}
             <LineSettings {...props} />
             {trafficTarget && trafficTarget.reading.direction === "both" ? (
@@ -64,6 +75,26 @@ export function NetworkWidgetSettings(props: NetworkWidgetSettingsProps): React.
             )}
             {props.showPolling !== false && <PollingSettings {...props} />}
         </>
+    );
+}
+
+function NetworkPingScaleSettings({
+    target,
+    onSettingsPatch,
+}: Omit<NetworkWidgetSettingsProps, "target"> & {
+    readonly target: ResolvedNetworkPingMetricTarget;
+}): React.JSX.Element {
+    const { t } = useI18n();
+
+    return (
+        <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
+            <NetworkPingMaximumSetting
+                value={target.reading.maximumLatencyMilliseconds}
+                onValueChange={(pingMaximumLatencyMilliseconds) => onSettingsPatch({
+                    network: { pingMaximumLatencyMilliseconds },
+                })}
+            />
+        </SettingsSection>
     );
 }
 
@@ -265,8 +296,18 @@ function readNetworkTrafficMetricTarget(
     return isNetworkTrafficMetricTarget(target) ? target : undefined;
 }
 
+function readNetworkPingMetricTarget(
+    target: ResolvedNetworkMetricTarget,
+): ResolvedNetworkPingMetricTarget | undefined {
+    return isNetworkPingMetricTarget(target) ? target : undefined;
+}
+
 function isNetworkTrafficMetricTarget(target: ResolvedNetworkMetricTarget): target is ResolvedNetworkTrafficMetricTarget {
     return target.reading.kind === "traffic";
+}
+
+function isNetworkPingMetricTarget(target: ResolvedNetworkMetricTarget): target is ResolvedNetworkPingMetricTarget {
+    return target.reading.kind === "ping";
 }
 
 const networkMetricKindMessageByValue = {

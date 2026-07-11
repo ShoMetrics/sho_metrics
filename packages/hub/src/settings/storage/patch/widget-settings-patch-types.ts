@@ -38,6 +38,7 @@ export interface StoredWidgetSettingsPatch {
         readonly interfaceId: string;
         readonly trafficDisplayMode: NetworkTrafficDisplayMode;
         readonly pingTargetHost: string;
+        readonly pingMaximumLatencyMilliseconds: number;
         readonly scaleMode: ScaleMode;
         readonly maximumDownloadSpeedMegabitsPerSecond: number | undefined;
         readonly maximumUploadSpeedMegabitsPerSecond: number | undefined;

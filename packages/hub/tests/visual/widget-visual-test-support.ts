@@ -78,6 +78,7 @@ export const CPU_USAGE_WIDGET_DATA: WidgetData = {
     unit: "%",
     label: "CPU",
     displayValue: "40",
+    sparklineScale: { mode: "fixed", minimumValue: 0, maximumValue: 100 },
     sampleTimestampMilliseconds: 1,
 };
 
@@ -88,6 +89,7 @@ export const CPU_USAGE_NO_DATA_WIDGET_DATA: WidgetData = {
     unit: "",
     label: "CPU",
     displayValue: "N/A",
+    sparklineScale: { mode: "fixed", minimumValue: 0, maximumValue: 100 },
 };
 
 export const CPU_USAGE_BAR_WIDGET_DATA: WidgetData = {
@@ -109,6 +111,7 @@ export const CPU_USAGE_SWINGING_HISTORY_WIDGET_DATA: WidgetData = {
     unit: "%",
     label: "CPU",
     displayValue: "86",
+    sparklineScale: { mode: "fixed", minimumValue: 0, maximumValue: 100 },
     sampleTimestampMilliseconds: 1,
 };
 
@@ -119,6 +122,7 @@ export const NETWORK_DOWNLOAD_WIDGET_DATA: WidgetData = {
     unit: "MB/s",
     label: "DOWN",
     displayValue: "87.4",
+    sparklineScale: { mode: "fixed", minimumValue: 0, maximumValue: 128.5 },
     sampleTimestampMilliseconds: 1,
 };
 
@@ -129,6 +133,7 @@ export const NETWORK_UPLOAD_WIDGET_DATA: WidgetData = {
     unit: "MB/s",
     label: "UP",
     displayValue: "16.2",
+    sparklineScale: { mode: "fixed", minimumValue: 0, maximumValue: 47.65 },
     sampleTimestampMilliseconds: 1,
 };
 

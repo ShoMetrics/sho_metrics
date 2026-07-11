@@ -744,6 +744,11 @@ function MetricResultPreview({ state }: { readonly state: SourceEditorState }): 
             <p className="section-note">
                 {`${t(customMetricMessages.transformPreviewLabel)}: ${metric.label} ${metric.value}${maximumText} ${metric.unitText}${iconText}`}
             </p>
+            {metric.maximum === undefined && (
+                <p className="section-note">
+                    {t(customMetricMessages.transformPreviewMissingMaximumNote)}
+                </p>
+            )}
         </InspectorItem>
     );
 }

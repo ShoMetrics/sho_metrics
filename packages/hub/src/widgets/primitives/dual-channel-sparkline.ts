@@ -83,7 +83,6 @@ export const DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG: DualChannelSparklineConfig =
     gridLineType: "horizontal",
     timeGuideTickCount: 5,
     historyWindowSeconds: 60,
-    sparklineScale: { mode: "adaptive", minimumValue: 0 },
     paints: {
         primaryText: "rgba(255,255,255,0.96)",
         secondaryText: "rgba(255,255,255,0.88)",
@@ -166,7 +165,7 @@ export function renderDualChannelSparkline(
     const channelModels = buildDualSparklineChannelModels({
         channels: channelInputs,
         plotLayout,
-        sparklineScale: config.sparklineScale ?? data.positive.sparklineScale ?? data.negative.sparklineScale,
+        sparklineScale: resolveDualChannelSparklineScale(config.sparklineScale, data),
         lineSmoothingPercent: config.lineSmoothingPercent,
     });
     const positiveModel = channelModels.find(channel => channel.channelId === "positive");
@@ -269,6 +268,29 @@ export function renderDualChannelSparkline(
             outline: config.shapeOutline,
         })}
     `;
+}
+
+/** Resolves one shared scale without letting the smaller channel clip its peer. */
+export function resolveDualChannelSparklineScale(
+    configuredScale: SparklineScale | undefined,
+    data: DualChannelWidgetData,
+): SparklineScale | undefined {
+    if (configuredScale !== undefined) {
+        return configuredScale;
+    }
+
+    const positiveScale = data.positive.sparklineScale;
+    const negativeScale = data.negative.sparklineScale;
+
+    if (positiveScale?.mode === "fixed" && negativeScale?.mode === "fixed") {
+        return {
+            mode: "fixed",
+            minimumValue: Math.min(positiveScale.minimumValue, negativeScale.minimumValue),
+            maximumValue: Math.max(positiveScale.maximumValue, negativeScale.maximumValue),
+        };
+    }
+
+    return positiveScale ?? negativeScale;
 }
 
 function buildChannelInputs(options: {

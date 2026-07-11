@@ -36,19 +36,23 @@ export function buildNetworkSpeedWidgetData(options: NetworkSpeedDisplayOptions)
         base: SI_BASE,
         maximumDisplayDigits: options.maximumDisplayDigits,
     });
-    const progressMaximumBytesPerSecond = Math.max(
+    const maximumBytesPerSecond = Math.max(
         options.maximumBytesPerSecond,
         MINIMUM_PROGRESS_MAXIMUM_BYTES_PER_SECOND,
     );
 
     return {
         current: safeBytesPerSecond,
-        progress: Math.min(Math.max(safeBytesPerSecond / progressMaximumBytesPerSecond, 0), 1),
+        progress: Math.min(Math.max(safeBytesPerSecond / maximumBytesPerSecond, 0), 1),
         history: options.historyBytesPerSecond,
         unit: formattedSpeed.unit,
         label: options.label,
         displayValue: formattedSpeed.value,
-        sparklineScale: { mode: "adaptive", minimumValue: 0 },
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: maximumBytesPerSecond,
+        },
         sampleTimestampMilliseconds: options.sampleTimestampMilliseconds,
     };
 }
@@ -62,6 +66,10 @@ function buildUnavailableNetworkSpeedWidgetData(options: NetworkSpeedDisplayOpti
         base: SI_BASE,
         maximumDisplayDigits: options.maximumDisplayDigits,
     });
+    const maximumBytesPerSecond = Math.max(
+        options.maximumBytesPerSecond,
+        MINIMUM_PROGRESS_MAXIMUM_BYTES_PER_SECOND,
+    );
 
     return {
         current: 0,
@@ -70,7 +78,11 @@ function buildUnavailableNetworkSpeedWidgetData(options: NetworkSpeedDisplayOpti
         unit: formattedSpeed.unit,
         label: options.label,
         displayValue: formattedSpeed.value,
-        sparklineScale: { mode: "adaptive", minimumValue: 0 },
+        sparklineScale: {
+            mode: "fixed",
+            minimumValue: 0,
+            maximumValue: maximumBytesPerSecond,
+        },
         sampleTimestampMilliseconds: undefined,
     };
 }

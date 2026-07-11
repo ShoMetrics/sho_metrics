@@ -154,6 +154,11 @@ export const networkMessages = {
         zh_CN: "Ping 目标",
         ja: "Ping ターゲット",
     },
+    pingMaximumLatencyLabel: {
+        en: "Max Latency (ms)",
+        zh_CN: "最大延迟（毫秒）",
+        ja: "最大遅延（ミリ秒）",
+    },
     networkInterfaceLabel: {
         en: "Network Interface",
         zh_CN: "网络接口",
@@ -893,6 +898,11 @@ export const customMetricMessages = {
         en: "Validated Metric",
         zh_CN: "已验证指标",
         ja: "検証済みメトリクス",
+    },
+    transformPreviewMissingMaximumNote: {
+        en: "No maximum was returned. When jq declares the built-in percent unit, ShoMetrics uses 100 as the maximum; otherwise line charts fit their scale to observed data.",
+        zh_CN: "输出中未提供 maximum。若 jq 将单位声明为内置百分比，ShoMetrics 会使用 100 作为最大值；否则折线图会根据观测数据调整量程。",
+        ja: "出力に maximum がありません。jq が組み込みのパーセント単位を指定した場合、ShoMetrics は最大値に 100 を使用します。その他の折れ線グラフは観測データに合わせてスケールを調整します。",
     },
     transformStatusMetricReady: {
         en: "Valid metric output.",

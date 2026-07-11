@@ -220,11 +220,12 @@ function buildPingNetworkViewUpdate(options: BuildPingNetworkViewOptions): Netwo
         networkMetricKey,
         "PING",
         "ms",
-        200,
+        options.target.reading.maximumLatencyMilliseconds,
     );
     const viewWidgetData = buildNetworkPingWidgetData({
         latencyMilliseconds: sourceWidgetData.current,
         historyLatencyMilliseconds: sourceWidgetData.history,
+        maximumLatencyMilliseconds: options.target.reading.maximumLatencyMilliseconds,
         sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,

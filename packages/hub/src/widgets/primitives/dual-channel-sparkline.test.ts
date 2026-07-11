@@ -4,6 +4,7 @@ import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/wid
 import {
     DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG,
     renderDualChannelSparkline,
+    resolveDualChannelSparklineScale,
 } from "./dual-channel-sparkline";
 
 test("mirrored sparkline renders a solid x axis without grid lines", () => {
@@ -69,6 +70,25 @@ test("dual-channel sparkline honors metric-specific display values", () => {
 
     assert.match(svgFragment, />1</);
     assert.doesNotMatch(svgFragment, />1\.0</);
+});
+
+test("dual-channel sparkline shares the larger fixed channel maximum", () => {
+    const data = {
+        positive: {
+            ...buildWidgetData({ label: "Upload", current: 8, displayValue: "8" }),
+            sparklineScale: { mode: "fixed" as const, minimumValue: 0, maximumValue: 20 },
+        },
+        negative: {
+            ...buildWidgetData({ label: "Download", current: 24, displayValue: "24" }),
+            sparklineScale: { mode: "fixed" as const, minimumValue: 0, maximumValue: 100 },
+        },
+    };
+
+    assert.deepEqual(resolveDualChannelSparklineScale(undefined, data), {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 100,
+    });
 });
 
 function buildDualChannelData(): DualChannelWidgetData {

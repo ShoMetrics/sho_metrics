@@ -354,6 +354,7 @@ test("widget patch switches network traffic to ping and writes target host", () 
         network: {
             kind: "ping",
             pingTargetHost: "https://Example.COM/path?q=1",
+            pingMaximumLatencyMilliseconds: 750,
         },
     });
 
@@ -362,6 +363,7 @@ test("widget patch switches network traffic to ping and writes target host", () 
     if (target?.case === "network") {
         assert.equal(target.value.reading.case, "ping");
         assert.equal(target.value.reading.value?.targetHost, "example.com");
+        assert.equal(target.value.reading.value?.maximumLatencyMilliseconds, 750);
     }
 });
 

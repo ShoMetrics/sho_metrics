@@ -32,6 +32,7 @@ import {
     type SparklineGridLineVisibility,
 } from "./sparkline-grid-lines";
 import { buildSparklineAreaPath, buildSparklineLinePath } from "./sparkline-path";
+import { resolveSparklineScaleBounds } from "./sparkline-scale";
 import { smoothSparklineValues } from "./sparkline-smoothing";
 
 export type { SparklineGridLineType, SparklineGridLineVisibility } from "./sparkline-grid-lines";
@@ -101,7 +102,6 @@ export const DEFAULT_SPARKLINE_CONFIG: SparklineConfig = {
 
 const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
-const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
 const CHART_PLOT_TOP_INSET = 2;
 const CHART_PANEL_RADIUS = 7;
 const CHART_LABEL_BAND_HEIGHT = 14;
@@ -416,48 +416,6 @@ function buildSparklinePoints(
             yCoordinate: chartLayout.yCoordinate + chartLayout.height - visualProgress * chartLayout.height,
         };
     });
-}
-
-function resolveSparklineScaleBounds(
-    values: readonly number[],
-    sparklineScale: SparklineScale | undefined,
-): { minimumValue: number; maximumValue: number } {
-    if (sparklineScale?.mode === "fixed") {
-        const minimumValue = Number.isFinite(sparklineScale.minimumValue) ? sparklineScale.minimumValue : 0;
-        const maximumValue = Number.isFinite(sparklineScale.maximumValue)
-            ? sparklineScale.maximumValue
-            : minimumValue + MINIMUM_VISIBLE_RANGE;
-
-        return {
-            minimumValue,
-            maximumValue: Math.max(maximumValue, minimumValue + MINIMUM_VISIBLE_RANGE),
-        };
-    }
-
-    const minimumValue = resolveAdaptiveMinimumValue(values, sparklineScale);
-    const maximumHistoryValue = Math.max(...values, minimumValue + MINIMUM_VISIBLE_RANGE);
-    const maximumValue = minimumValue >= 0
-        ? maximumHistoryValue * ADAPTIVE_SCALE_HEADROOM_RATIO
-        : maximumHistoryValue;
-
-    return {
-        minimumValue,
-        maximumValue: Math.max(maximumValue, minimumValue + MINIMUM_VISIBLE_RANGE),
-    };
-}
-
-function resolveAdaptiveMinimumValue(
-    values: readonly number[],
-    sparklineScale: SparklineScale | undefined,
-): number {
-    if (sparklineScale?.mode !== "adaptive") {
-        return Math.min(...values, 0);
-    }
-
-    const candidateMinimumValue = sparklineScale.minimumValue;
-    return typeof candidateMinimumValue === "number" && Number.isFinite(candidateMinimumValue)
-        ? candidateMinimumValue
-        : Math.min(...values, 0);
 }
 
 function buildPlotLayout(

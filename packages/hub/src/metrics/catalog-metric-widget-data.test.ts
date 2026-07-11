@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import { MetricUnit } from "../runtime/sources/metric-source";
 import type { WidgetData } from "../view-rendering/widget-data";
-import { formatCatalogMetricFreshWidgetData } from "./catalog-metric-widget-data";
+import {
+    buildCatalogMetricScaledWidgetData,
+    formatCatalogMetricFreshWidgetData,
+} from "./catalog-metric-widget-data";
 
 test("catalog metric widget data formats hertz values across display ranges", () => {
     assertFormattedHertz(800, "800", "Hz");
@@ -24,6 +27,21 @@ test("catalog metric widget data leaves ordinary units unchanged", () => {
         unit: MetricUnit.WATTS,
         category: "gpu",
     }), widgetData);
+});
+
+test("catalog metric fixed scale leaves negative readings on the zero baseline", () => {
+    const widgetData = buildCatalogMetricScaledWidgetData({
+        widgetData: buildWidgetData({ current: -12, history: [-12.2, -11.8] }),
+        maximumValue: 20,
+    });
+
+    assert.equal(widgetData.current, -12);
+    assert.deepEqual(widgetData.history, [-12.2, -11.8]);
+    assert.deepEqual(widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 20,
+    });
 });
 
 function assertFormattedHertz(current: number, displayValue: string, unit: string): void {

@@ -3,6 +3,9 @@ import isIP from "validator/lib/isIP";
 import stripLow from "validator/lib/stripLow";
 
 export const DEFAULT_NETWORK_PING_TARGET_HOST = "8.8.8.8";
+// Keeps ordinary LAN/WAN latency readable while leaving headroom for slower
+// Wi-Fi and cross-region connections before the chart saturates.
+export const DEFAULT_NETWORK_PING_MAXIMUM_LATENCY_MILLISECONDS = 300;
 
 export type NetworkPingTargetNormalizationStatus =
     | "normalized"

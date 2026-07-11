@@ -539,6 +539,7 @@ describe("stored settings proto resolver", () => {
                             kind: "KIND_PING",
                             ping: {
                                 targetHost: "https://Example.COM/path?q=1",
+                                maximumLatencyMilliseconds: 750,
                             },
                         },
                     },
@@ -560,6 +561,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.kind, "ping");
         if (target.reading.kind === "ping") {
             assert.equal(target.reading.targetHost, "example.com");
+            assert.equal(target.reading.maximumLatencyMilliseconds, 750);
         }
     });
 
@@ -588,6 +590,7 @@ describe("stored settings proto resolver", () => {
         assert.equal(target.reading.kind, "ping");
         if (target.reading.kind === "ping") {
             assert.equal(target.reading.targetHost, "8.8.8.8");
+            assert.equal(target.reading.maximumLatencyMilliseconds, 300);
         }
     });
 

@@ -125,6 +125,31 @@ test("custom metric panel sends fetch and transform test commands through the pl
 
     await screen.findByText(/Validated Metric: TEMP 23.5 \/ 100 °C/);
     assert.equal(screen.getByText("Valid metric output.").textContent, "Valid metric output.");
+    assert.equal(screen.queryByText(/No maximum was returned\./), null);
+
+    fireEvent.change(screen.getByRole("textbox", { name: /^jq Transform:/ }), {
+        target: { value: "{ metric: { label: \"TEMP\", value: .temp, unit: \"celsius\" } }" },
+    });
+    await user.click(screen.getByRole("button", { name: "Test Transform" }));
+
+    const transformWithoutMaximumMessage = readSentMessagePayload(client.sentMessages.at(-1));
+    dispatchCustomHttpResponse(client, {
+        type: CUSTOM_HTTP_SOURCE_EDITOR_MESSAGE_TYPE,
+        command: "testTransform",
+        requestId: transformWithoutMaximumMessage.requestId,
+        result: {
+            ok: true,
+            metric: {
+                label: "TEMP",
+                value: 23.5,
+                unitText: "°C",
+            },
+        },
+    });
+
+    await screen.findByText(
+        "No maximum was returned. When jq declares the built-in percent unit, ShoMetrics uses 100 as the maximum; otherwise line charts fit their scale to observed data.",
+    );
 });
 
 test("custom metric source editor visibly normalizes scheme-less URLs on blur", async () => {

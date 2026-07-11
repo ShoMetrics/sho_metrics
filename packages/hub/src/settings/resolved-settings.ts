@@ -250,6 +250,7 @@ export type ResolvedNetworkReading =
     | {
         readonly kind: "ping";
         readonly targetHost: string;
+        readonly maximumLatencyMilliseconds: number;
     };
 
 export interface ResolvedDiskMetricTarget {

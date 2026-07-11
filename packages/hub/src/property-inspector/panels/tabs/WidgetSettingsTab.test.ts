@@ -201,12 +201,15 @@ test("network ping settings render ping target and hide traffic controls", () =>
             network: {
                 kind: "ping",
                 pingTargetHost: "8.8.8.8",
+                pingMaximumLatencyMilliseconds: 300,
             },
         }),
     });
 
     assert.match(markup, /Network Metric:/);
     assert.match(markup, /Ping Target:/);
+    assert.match(markup, /Max Latency \(ms\):/);
+    assert.match(markup, /value="300"/);
     assert.match(markup, /Solid Color:/);
     assert.match(markup, /Polling Frequency:/);
     assert.doesNotMatch(markup, /Direction:/);

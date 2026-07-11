@@ -1,6 +1,7 @@
 import type { SparklineScale } from "../../view-rendering/widget-data";
 import { clamp } from "../../view-rendering/rasterize/svg-utils";
 import { buildSparklineAreaPath, buildSparklineLinePath } from "./sparkline-path";
+import { resolveSparklineScaleBounds } from "./sparkline-scale";
 import { smoothSparklineValues } from "./sparkline-smoothing";
 
 export type DualSparklineChannelOrientation = "positive" | "negative";
@@ -36,7 +37,6 @@ export interface DualSparklineChannelModel {
 
 const MINIMUM_VISIBLE_RANGE = 1;
 const MINIMUM_AREA_PROGRESS = 0.09;
-const ADAPTIVE_SCALE_HEADROOM_RATIO = 1.18;
 
 /**
  * Builds dual-channel sparkline geometry with shared scaling. The orientation
@@ -53,7 +53,7 @@ export function buildDualSparklineChannelModels(options: {
         ...channel,
         values: buildRenderableValues(channel.values),
     }));
-    const scaleBounds = resolveSharedScaleBounds(
+    const scaleBounds = resolveSparklineScaleBounds(
         renderableChannels.flatMap(channel => channel.values),
         options.sparklineScale,
     );
@@ -127,38 +127,6 @@ function buildChannelPoints(options: {
             visualProgress,
         };
     });
-}
-
-function resolveSharedScaleBounds(
-    values: readonly number[],
-    sparklineScale: SparklineScale | undefined,
-): { minimumValue: number; maximumValue: number } {
-    if (sparklineScale?.mode === "fixed") {
-        const minimumValue = Number.isFinite(sparklineScale.minimumValue) ? sparklineScale.minimumValue : 0;
-        const maximumValue = Number.isFinite(sparklineScale.maximumValue)
-            ? sparklineScale.maximumValue
-            : minimumValue + MINIMUM_VISIBLE_RANGE;
-
-        return {
-            minimumValue,
-            maximumValue: Math.max(maximumValue, minimumValue + MINIMUM_VISIBLE_RANGE),
-        };
-    }
-
-    const minimumValue = sparklineScale?.mode === "adaptive"
-        && typeof sparklineScale.minimumValue === "number"
-        && Number.isFinite(sparklineScale.minimumValue)
-        ? sparklineScale.minimumValue
-        : Math.min(...values, 0);
-    const maximumHistoryValue = Math.max(...values, minimumValue + MINIMUM_VISIBLE_RANGE);
-    const maximumValue = minimumValue >= 0
-        ? maximumHistoryValue * ADAPTIVE_SCALE_HEADROOM_RATIO
-        : maximumHistoryValue;
-
-    return {
-        minimumValue,
-        maximumValue: Math.max(maximumValue, minimumValue + MINIMUM_VISIBLE_RANGE),
-    };
 }
 
 function resolveBaselineYCoordinate(

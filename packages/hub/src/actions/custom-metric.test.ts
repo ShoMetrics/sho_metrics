@@ -216,6 +216,7 @@ test("Custom Metric view renders pending copy before the first configured sample
     });
 
     assert.equal(viewOptions.widgetData.unavailableDisplayValue, "...");
+    assert.deepEqual(viewOptions.widgetData.sparklineScale, { mode: "fitToData" });
 });
 
 test("Custom Metric view keeps N/A path after runtime failure", () => {

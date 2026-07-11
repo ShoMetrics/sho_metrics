@@ -48,6 +48,9 @@ export function readCustomHttpWidgetData(options: {
         options.displayOverrides?.label,
     );
     const unit = resolveCustomHttpUnitText(displayHint);
+    // Fixed-scale precedence is the Dense row override, the jq output's
+    // maximum, then the implicit 100 maximum for built-in percent metrics.
+    // Only a value with none of those maxima uses fit-to-data scaling.
     const maximum = options.displayOverrides?.maximum ?? resolveCustomHttpMaximum(displayHint);
     const progress = maximum === undefined
         ? 0
@@ -57,15 +60,17 @@ export function readCustomHttpWidgetData(options: {
         label,
         unit,
         progress,
-        ...(maximum === undefined
-            ? {}
+        sparklineScale: maximum === undefined
+            ? {
+                // Custom HTTP is the intentional fit-to-data boundary: without
+                // any resolved maximum, the value domain may be unknown or negative.
+                mode: "fitToData" as const,
+            }
             : {
-                sparklineScale: {
-                    mode: "fixed" as const,
-                    minimumValue: 0,
-                    maximumValue: maximum,
-                },
-            }),
+                mode: "fixed" as const,
+                minimumValue: 0,
+                maximumValue: maximum,
+            },
     };
 
     if (widgetData.sampleTimestampMilliseconds === undefined) {

@@ -25,7 +25,10 @@ import type { WidgetData } from "../view-rendering/widget-data";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 import { formatMetricUnit } from "../metrics/metric-unit-format";
 import { resolveCatalogMetricDefaultMaximumValue } from "../metrics/catalog-metric-scale";
-import { formatCatalogMetricFreshWidgetData } from "../metrics/catalog-metric-widget-data";
+import {
+    buildCatalogMetricScaledWidgetData,
+    formatCatalogMetricFreshWidgetData,
+} from "../metrics/catalog-metric-widget-data";
 import { metricStatusIconForCatalogReadingKind } from "../metrics/catalog-metric-view-icons";
 import {
     limitMetricCustomLabelCharacters,
@@ -194,23 +197,26 @@ export function buildCatalogMetricSelectedViewOptions(options: {
             options.target.detectedReadingKind,
         );
 
-    const baseWidgetData = readHelperBackedWidgetData({
-        metrics: options.metrics,
-        metricKey: options.target.metricId,
-        label,
-        unit,
-        maxValue,
-        helperStatus: options.helperStatus,
-        sampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(
-            options.settings.preferences.pollingFrequencySeconds,
-        ),
-        // Catalog-specific formatting runs only after the helper freshness
-        // gate accepts the sample, so helper-error and no-data copy stays intact.
-        transformFreshWidgetData: (freshWidgetData) => formatCatalogMetricFreshWidgetData({
-            widgetData: freshWidgetData,
-            unit: options.target.detectedUnit,
-            category: options.target.detectedCategory,
+    const baseWidgetData = buildCatalogMetricScaledWidgetData({
+        widgetData: readHelperBackedWidgetData({
+            metrics: options.metrics,
+            metricKey: options.target.metricId,
+            label,
+            unit,
+            maxValue,
+            helperStatus: options.helperStatus,
+            sampleFreshnessBudgetMilliseconds: resolveHelperBackedSampleFreshnessBudgetMilliseconds(
+                options.settings.preferences.pollingFrequencySeconds,
+            ),
+            // Catalog-specific formatting runs only after the helper freshness
+            // gate accepts the sample, so helper-error and no-data copy stays intact.
+            transformFreshWidgetData: (freshWidgetData) => formatCatalogMetricFreshWidgetData({
+                widgetData: freshWidgetData,
+                unit: options.target.detectedUnit,
+                category: options.target.detectedCategory,
+            }),
         }),
+        maximumValue: maxValue,
     });
     const widgetData = selectedView === "bar"
         ? { ...baseWidgetData, secondaryDisplayValue: secondaryLabel }

@@ -43,7 +43,11 @@ test("network speed widget data uses decimal bit units for traffic displays", ()
     assert.equal(widgetData.progress, 0.5);
     assert.equal(widgetData.displayValue, "100");
     assert.equal(widgetData.unit, "Kb/s");
-    assert.deepEqual(widgetData.sparklineScale, { mode: "adaptive", minimumValue: 0 });
+    assert.deepEqual(widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 25_000,
+    });
 });
 
 test("network speed widget data treats stale rate samples as no data", () => {
@@ -61,6 +65,11 @@ test("network speed widget data treats stale rate samples as no data", () => {
 
     assert.equal(widgetData.current, 0);
     assert.deepEqual(widgetData.history, []);
+    assert.deepEqual(widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 25_000,
+    });
     assert.equal(widgetData.sampleTimestampMilliseconds, undefined);
 });
 

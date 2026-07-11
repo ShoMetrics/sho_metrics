@@ -99,6 +99,7 @@ test("network ping mode subscribes to the ping target key", () => {
         reading: {
             kind: "ping",
             targetHost: "8.8.8.8",
+            maximumLatencyMilliseconds: 300,
         },
     });
 
@@ -113,4 +114,3 @@ function buildNetworkDisplaySettings() {
         unitBase: "byte",
     } as const;
 }
-

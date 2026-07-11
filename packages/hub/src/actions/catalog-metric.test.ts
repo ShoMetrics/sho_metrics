@@ -251,6 +251,11 @@ test("catalog metric selected view uses stored detected label unit and unit maxi
     assert.equal(viewOptions.widgetData.progress, 1 / 3);
     assert.equal(viewOptions.widgetData.label, "GPU Board Po");
     assert.equal(viewOptions.widgetData.unit, "W");
+    assert.deepEqual(viewOptions.widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 450,
+    });
 });
 
 test("catalog metric selected view uses catalog metadata icons", () => {
@@ -370,6 +375,11 @@ test("catalog metric selected view uses custom label and custom maximum", () => 
     ]);
     assert.equal(viewOptions.widgetData.progress, 0.5);
     assert.equal(viewOptions.widgetData.label, "Board");
+    assert.deepEqual(viewOptions.widgetData.sparklineScale, {
+        mode: "fixed",
+        minimumValue: 0,
+        maximumValue: 600,
+    });
 });
 
 test("catalog metric bar view keeps category as title and moves custom label below the bar", () => {

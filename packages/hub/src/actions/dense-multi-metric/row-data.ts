@@ -56,7 +56,10 @@ import { buildNetworkPingWidgetData } from "../../metrics/network-ping-widget-da
 import { buildNetworkSpeedWidgetData } from "../../metrics/network-speed-widget-data";
 import { buildPercentageWidgetData } from "../../metrics/percentage-widget-data";
 import { resolveCatalogMetricDefaultMaximumValue } from "../../metrics/catalog-metric-scale";
-import { formatCatalogMetricFreshWidgetData } from "../../metrics/catalog-metric-widget-data";
+import {
+    buildCatalogMetricScaledWidgetData,
+    formatCatalogMetricFreshWidgetData,
+} from "../../metrics/catalog-metric-widget-data";
 import { formatMetricUnit } from "../../metrics/metric-unit-format";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import type { DiskThroughputMetricDirection } from "../../runtime/disk-metric-keys";
@@ -544,16 +547,19 @@ function buildNetworkRowWidgetData(
 
     const label = resolveDenseRowLabel(row);
     if (row.target.reading.kind === "ping") {
+        const maximumLatencyMilliseconds = row.customMaximumValue
+            ?? row.target.reading.maximumLatencyMilliseconds;
         const sourceWidgetData = metrics.getWidgetData(
             row.displayMetricKey,
             label,
             "ms",
-            row.customMaximumValue,
+            maximumLatencyMilliseconds,
         );
 
         return buildNetworkPingWidgetData({
             latencyMilliseconds: sourceWidgetData.current,
             historyLatencyMilliseconds: sourceWidgetData.history,
+            maximumLatencyMilliseconds,
             sampleTimestampMilliseconds: sourceWidgetData.sampleTimestampMilliseconds,
             currentTimestampMilliseconds,
             pollingFrequencySeconds,
@@ -596,10 +602,13 @@ function buildCatalogRowWidgetData(row: DenseMetricConfiguredRow, metrics: Metri
         );
     const widgetData = metrics.getWidgetData(row.target.metricId, resolveDenseRowLabel(row), unit, maxValue);
 
-    return formatCatalogMetricFreshWidgetData({
-        widgetData,
-        unit: row.target.detectedUnit,
-        category: row.target.detectedCategory,
+    return buildCatalogMetricScaledWidgetData({
+        widgetData: formatCatalogMetricFreshWidgetData({
+            widgetData,
+            unit: row.target.detectedUnit,
+            category: row.target.detectedCategory,
+        }),
+        maximumValue: maxValue,
     });
 }
 
