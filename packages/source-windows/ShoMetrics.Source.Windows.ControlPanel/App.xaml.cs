@@ -1,15 +1,31 @@
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
 namespace ShoMetrics.Source.Windows.ControlPanel;
 
+/// <summary>
+/// Entry point of the Control Panel. Owns app startup and startup-failure
+/// diagnostics only.
+/// </summary>
+/// <remarks>
+/// Keep this file thin. Every launch path runs through it, so it is the first
+/// place a crash or hang is investigated, and unrelated code here makes that
+/// harder.
+///
+/// New app-wide behavior belongs in its own <c>App.*.cs</c> partial (the same
+/// split MainWindow uses), exposing one named seam that <c>OnLaunched</c> or
+/// the constructor calls. Only add code here when it is part of starting the
+/// app or reporting a startup failure.
+/// </remarks>
 public partial class App : Application
 {
     private const string FirstChanceLogEnvironmentVariable = "SHOMETRICS_CONTROL_PANEL_FIRST_CHANCE_LOG";
     private const int MessageBoxIconError = 0x00000010;
     private const int MessageBoxOk = 0x00000000;
 
+    private readonly DispatcherQueue _dispatcherQueue;
     private Window? _window;
 
     /// <summary>
@@ -18,6 +34,9 @@ public partial class App : Application
     public App()
     {
         ControlPanelStartupLog.Write("App ctor enter");
+        // Redirected launches raise their activation off the UI thread, so the
+        // dispatcher has to be captured here while the UI thread still owns us.
+        _dispatcherQueue = ResolveUiDispatcherQueue();
         // FirstChanceException is useful for XAML loader forensics, but far too
         // noisy for normal runs. Enable it only when diagnosing startup crashes.
         if (IsFirstChanceExceptionLoggingEnabled())
@@ -39,12 +58,21 @@ public partial class App : Application
         }
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         ControlPanelStartupLog.Write("OnLaunched enter");
 
         try
         {
+            if (await TryRedirectActivationToRunningPanelAsync())
+            {
+                // This process handed its activation to the running panel and owns
+                // no window. It must terminate rather than fall through into XAML
+                // startup, which would leave a second, windowless panel process.
+                System.Diagnostics.Process.GetCurrentProcess().Kill();
+                return;
+            }
+
             _window = new MainWindow();
             ControlPanelStartupLog.Write("MainWindow created");
             _window.Activate();
