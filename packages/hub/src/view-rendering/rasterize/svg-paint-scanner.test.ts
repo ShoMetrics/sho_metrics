@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { resolveColorForThresholdValue } from "../color/color-resolver";
+import { resolveThresholdColorForProgress } from "../color/color-resolver";
 import { renderDualMetricBodyView } from "../views/dual-metric-view";
 import { renderMetricFrame } from "../frame/metric-frame";
 import { DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS, type MetricRenderAppearance } from "../color/render-appearance";
@@ -194,7 +194,7 @@ function renderDualFinalSvg(options: {
         themePreset: options.theme,
         circleVariant: options.circleVariant ?? "full-ring",
     });
-    const channelColor = resolveColorForThresholdValue(50, visualSettings.paints.primaryMetric);
+    const channelColor = resolveThresholdColorForProgress(0.5, visualSettings.paints.primaryMetric);
     const body = renderDualMetricBodyView({
         data: buildDualChannelData(),
         visual: visualSettings,

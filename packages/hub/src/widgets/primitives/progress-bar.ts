@@ -3,7 +3,7 @@ import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
 } from "../../view-rendering/color/render-appearance";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
@@ -241,7 +241,7 @@ function renderSingleBar(
     layoutPlan: ProgressBarLayoutPlan,
 ): string {
     const fillWidth = Math.max(0, layoutPlan.singleBar.width * clamp(data.progress, 0, 1));
-    const barColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const barColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const barHeadColor = adjustHexColorBrightness(barColor, config.gradientHeadAdjustmentPercent ?? -15);
     const gradientId = `progress-bar-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
     const fillPaint = config.colorConfig.isGradientEnabled ? `url(#${gradientId})` : barColor;

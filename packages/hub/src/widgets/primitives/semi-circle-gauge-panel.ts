@@ -1,5 +1,5 @@
 import type { ColorConfig } from "../../view-rendering/color/color-resolver";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -170,10 +170,7 @@ export function renderSemiCircleGaugePanel(
     const layout = buildSemiCircleGaugePanelLayout(keySize);
     const primaryReading = data.primary;
     const secondaryReadings = data.secondary;
-    const primaryColor = resolveColorForThresholdValue(
-        clamp(primaryReading.progress, 0, 1) * 100,
-        config.colorConfig,
-    );
+    const primaryColor = resolveThresholdColorForProgress(primaryReading.progress, config.colorConfig);
 
     return `
         <g class="semi-circle-gauge-panel">

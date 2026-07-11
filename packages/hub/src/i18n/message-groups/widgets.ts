@@ -900,9 +900,9 @@ export const customMetricMessages = {
         ja: "検証済みメトリクス",
     },
     transformPreviewMissingMaximumNote: {
-        en: "No maximum was returned. When jq declares the built-in percent unit, ShoMetrics uses 100 as the maximum; otherwise line charts fit their scale to observed data.",
-        zh_CN: "输出中未提供 maximum。若 jq 将单位声明为内置百分比，ShoMetrics 会使用 100 作为最大值；否则折线图会根据观测数据调整量程。",
-        ja: "出力に maximum がありません。jq が組み込みのパーセント単位を指定した場合、ShoMetrics は最大値に 100 を使用します。その他の折れ線グラフは観測データに合わせてスケールを調整します。",
+        en: "No maximum was returned. When jq declares the built-in percent unit, ShoMetrics uses 100 as the maximum; otherwise line charts fit their scale to observed data. Threshold colors also need a maximum: without one the widget stays in the lowest color band.",
+        zh_CN: "输出中未提供 maximum。若 jq 将单位声明为内置百分比，ShoMetrics 会使用 100 作为最大值；否则折线图会根据观测数据调整量程。阈值配色同样依赖 maximum：未提供时，widget 会一直停留在最低色段。",
+        ja: "出力に maximum がありません。jq が組み込みのパーセント単位を指定した場合、ShoMetrics は最大値に 100 を使用します。その他の折れ線グラフは観測データに合わせてスケールを調整します。しきい値カラーにも maximum が必要です。未指定の場合、ウィジェットは常に最低カラー帯のままになります。",
     },
     transformStatusMetricReady: {
         en: "Valid metric output.",

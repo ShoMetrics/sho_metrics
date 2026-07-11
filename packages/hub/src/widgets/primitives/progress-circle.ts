@@ -3,7 +3,7 @@ import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
 } from "../../view-rendering/color/render-appearance";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
@@ -187,7 +187,7 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
             radius,
             circumference,
         };
-        const arcColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+        const arcColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
         const gradientId = `progress-circle-${Math.round(data.current * 10)}-${keySize.width}-${keySize.height}`;
         const circleVariant = config.circleVariant;
         const rangeColorPlan = buildGaugeRangeColorPlan({

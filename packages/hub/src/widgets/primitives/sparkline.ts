@@ -3,7 +3,7 @@ import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
 } from "../../view-rendering/color/render-appearance";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
@@ -151,7 +151,9 @@ export const sparkline: Widget<SparklineConfig> = {
         const layoutPlan = buildSparklineLayoutPlan(keySize);
         const rawValues = buildRenderableValues(data);
         const visualValues = smoothSparklineValues(rawValues, config.lineSmoothingPercent);
-        const currentColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+        // Threshold color follows metric progress, deliberately independent of the
+        // sparkline's geometric scale; fit-to-data height does not imply high load.
+        const currentColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
         const lineHeadColor = config.colorConfig.isGradientEnabled
             ? adjustHexColorBrightness(currentColor, config.gradientHeadAdjustmentPercent ?? 28)
             : currentColor;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { DEFAULT_RENDER_THEME_EFFECT_TOKENS } from "../../view-rendering/rasterize/render-svg-effects";
+import type { ColorConfig } from "../../view-rendering/color/color-resolver";
 import { DEFAULT_RENDER_TEXT_STYLES, PIXEL_RENDER_TEXT_STYLES } from "../../view-rendering/rasterize/render-text-style";
 import type { DualChannelWidgetData, WidgetData } from "../../view-rendering/widget-data";
 import { progressCircle, DEFAULT_PROGRESS_CIRCLE_CONFIG } from "./progress-circle";
@@ -10,7 +10,6 @@ import { progressBar, DEFAULT_PROGRESS_BAR_CONFIG } from "./progress-bar";
 import { DEFAULT_SPARKLINE_CONFIG, sparkline } from "./sparkline";
 import { DEFAULT_DUAL_CHANNEL_SPARKLINE_CONFIG, renderDualChannelSparkline } from "./dual-channel-sparkline";
 import { renderMetricTextRow } from "./metric-text-row";
-import { DEFAULT_MIRRORED_TRAFFIC_CONFIG, renderMirroredTraffic } from "./mirrored-traffic";
 import {
     DEFAULT_TEXT_METRIC_CONFIG,
     renderCenteredDualTextMetric,
@@ -1042,36 +1041,6 @@ test("metric text row keeps pixel unit text inside the shifted clip box", () => 
     assert.match(svgFragment, /height="34\.80"/);
 });
 
-test("mirrored traffic renders labels, center line, and both channel graphs", () => {
-    const svgFragment = renderMirroredTraffic(buildDualChannelData(), {
-        ...DEFAULT_MIRRORED_TRAFFIC_CONFIG,
-        textStyles: {
-            ...DEFAULT_RENDER_TEXT_STYLES,
-            smallLabel: {
-                ...DEFAULT_RENDER_TEXT_STYLES.smallLabel,
-                fontFamily: "Traffic Label Font",
-                filter: "url(#label-glow)",
-            },
-        },
-        themeEffects: {
-            ...DEFAULT_RENDER_THEME_EFFECT_TOKENS,
-            metricFilter: "url(#metric-glow)",
-            subtleFilter: "url(#subtle-glow)",
-        },
-    }, keySize);
-
-    assert.match(svgFragment, /Mirrored Traffic: labels/);
-    assert.match(svgFragment, /Mirrored Traffic: center line/);
-    assert.match(svgFragment, /Mirrored Traffic: positive/);
-    assert.match(svgFragment, /Mirrored Traffic: negative/);
-    assert.match(svgFragment, /mirrored-pos-/);
-    assert.match(svgFragment, /mirrored-neg-/);
-    assert.match(svgFragment, /font-family="Traffic Label Font"/);
-    assert.match(svgFragment, /filter="url\(#label-glow\)"/);
-    assert.match(svgFragment, /filter="url\(#metric-glow\)"/);
-    assert.match(svgFragment, /filter="url\(#subtle-glow\)"/);
-});
-
 test("dual text metric renders two escaped value rows", () => {
     const svgFragment = renderCenteredDualTextMetric({
         positive: {
@@ -1233,6 +1202,65 @@ test("title-card dual text metric renders compact channel rows", () => {
     assert.match(svgFragment, /id="title-card-negative-value"/);
     assert.match(svgFragment, /id="title-card-positive-unit"[\s\S]*y="64\.80"/);
     assert.match(svgFragment, /id="title-card-negative-unit"[\s\S]*y="93\.80"/);
+});
+
+test("threshold colors follow normalized progress, not raw source-unit values", () => {
+    // Regression shape from production: a catalog byte metric (3 GiB used of a
+    // 32 GiB maximum). Threshold bands are percent-of-maximum, so this widget
+    // must render in the low band even though its raw value dwarfs every band.
+    const lowBandColor = "#0f9d58";
+    const highBandColor = "#d93025";
+    const thresholdColorConfig: ColorConfig = {
+        mode: "threshold",
+        solidColor: "#3b82f6",
+        thresholds: [
+            { min: 0, max: 50, color: lowBandColor },
+            { min: 50, max: 80, color: "#f4b400" },
+            { min: 80, max: 101, color: highBandColor },
+        ],
+        isGradientEnabled: false,
+    };
+    const byteWidgetData: WidgetData = {
+        current: 3.2e9,
+        progress: 0.094,
+        history: [2.9e9, 3.0e9, 3.2e9],
+        unit: "GiB",
+        label: "VRAM",
+        displayValue: "3.0",
+    };
+    const titleCardContent = {
+        codeText: "GPU",
+        compactCodeText: "GPU",
+        threeCharacterCaptionText: "ABC",
+        unitText: "GiB",
+    };
+    const fragmentsByPrimitive = {
+        progressBar: progressBar.render(byteWidgetData, {
+            ...DEFAULT_PROGRESS_BAR_CONFIG,
+            colorConfig: thresholdColorConfig,
+        }, keySize),
+        progressCircle: progressCircle.render(byteWidgetData, {
+            ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+            colorConfig: thresholdColorConfig,
+        }, keySize),
+        sparkline: sparkline.render(byteWidgetData, {
+            ...DEFAULT_SPARKLINE_CONFIG,
+            colorConfig: thresholdColorConfig,
+        }, keySize),
+        textMetric: renderCenteredTextMetric(byteWidgetData, {
+            ...DEFAULT_TEXT_METRIC_CONFIG,
+            colorConfig: thresholdColorConfig,
+        }, keySize),
+        titleCardTextMetric: renderTitleCardTextMetric(byteWidgetData, {
+            ...DEFAULT_TEXT_METRIC_CONFIG,
+            colorConfig: thresholdColorConfig,
+        }, keySize, titleCardContent, "white"),
+    };
+
+    for (const [primitiveName, svgFragment] of Object.entries(fragmentsByPrimitive)) {
+        assert.match(svgFragment, new RegExp(lowBandColor, "u"), `${primitiveName} must use the low band color`);
+        assert.doesNotMatch(svgFragment, new RegExp(highBandColor, "u"), `${primitiveName} must not use the high band color`);
+    }
 });
 
 function buildWidgetData(): WidgetData {

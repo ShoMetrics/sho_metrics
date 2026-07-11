@@ -1,6 +1,12 @@
 /**
  * A single color threshold band.
- * When value falls within [min, max), the associated color is used.
+ *
+ * `min` and `max` are percent-of-maximum bounds (0-100): the same domain as
+ * the user-facing low/high threshold percent settings that produce them. Raw
+ * source-unit values (bytes, hertz, RPM) must never reach a band lookup
+ * directly; byte-scale magnitudes would land past every band and read as
+ * permanently "high". When the percent value falls within [min, max), the
+ * associated color is used.
  */
 export interface ColorThreshold {
     min: number;
@@ -18,66 +24,47 @@ export interface ColorConfig {
 }
 
 /**
- * Resolves the renderer paint color for a metric threshold value.
+ * Resolves the renderer paint color for a normalized metric progress (0-1).
  *
- * In solid mode the threshold value is ignored and the configured solid color
- * is returned. In threshold mode the value is matched against the configured
- * [min, max) bands and the matching band color is returned.
+ * This is deliberately the only exported single-value threshold lookup. When
+ * each call site converted its own value into the band domain, primitives
+ * written against percent metrics passed raw `current` values, which worked by
+ * coincidence until non-percent metrics flowed through the same primitives.
+ * Progress is the one already-normalized input every render surface has, so
+ * the domain conversion happens here exactly once. If absolute source-unit
+ * thresholds ever become a product feature, extend ColorConfig with an
+ * explicit domain marker instead of re-exporting the percent lookup.
+ *
+ * The parameter is a bare progress fraction rather than WidgetData because
+ * not every caller has one: channel view-builders and gauge panels color
+ * per-reading fractions that never materialize a WidgetData. Passing a raw
+ * source value here is still a caller bug; the clamp bounds the damage to the
+ * top band and the primitive smoke test guards the WidgetData-based callers.
+ *
+ * In solid mode the progress is ignored and the configured solid color is
+ * returned. In threshold mode the percent value is matched against the
+ * configured [min, max) bands and the matching band color is returned.
  */
-export function resolveColorForThresholdValue(thresholdValue: number, colorConfig: ColorConfig): string {
+export function resolveThresholdColorForProgress(progress: number, colorConfig: ColorConfig): string {
+    return resolveColorForThresholdPercent(toThresholdPercent(progress), colorConfig);
+}
+
+function resolveColorForThresholdPercent(thresholdPercent: number, colorConfig: ColorConfig): string {
     if (colorConfig.mode === "solid") {
         return colorConfig.solidColor;
     }
     for (const threshold of colorConfig.thresholds) {
-        if (thresholdValue >= threshold.min && thresholdValue < threshold.max) {
+        if (thresholdPercent >= threshold.min && thresholdPercent < threshold.max) {
             return threshold.color;
         }
     }
     return colorConfig.thresholds[colorConfig.thresholds.length - 1]?.color ?? colorConfig.solidColor;
 }
 
-/**
- * Builds SVG gradient stops for a sparkline where each data point
- * may have a different threshold color.
- *
- * Returns an array of { offset (0-1), color } entries with paired stops
- * for sharp color transitions.
- */
-export function buildGradientStops(
-    values: readonly number[],
-    config: ColorConfig,
-): Array<{ offset: number; color: string }> {
-    if (values.length === 0) {
-        return [];
+function toThresholdPercent(progress: number): number {
+    if (!Number.isFinite(progress)) {
+        return 0;
     }
 
-    if (config.mode === "solid" || !config.isGradientEnabled) {
-        const color = config.mode === "solid"
-            ? config.solidColor
-            : resolveColorForThresholdValue(values[values.length - 1] ?? 0, config);
-
-        return [
-            { offset: 0, color },
-            { offset: 1, color },
-        ];
-    }
-
-    const stops: Array<{ offset: number; color: string }> = [];
-    let previousColor = resolveColorForThresholdValue(values[0], config);
-    stops.push({ offset: 0, color: previousColor });
-
-    for (let index = 1; index < values.length; index++) {
-        const currentColor = resolveColorForThresholdValue(values[index], config);
-        const offset = index / (values.length - 1);
-
-        if (currentColor !== previousColor) {
-            // Paired stops at the same offset create a sharp color transition.
-            stops.push({ offset, color: previousColor });
-            stops.push({ offset, color: currentColor });
-            previousColor = currentColor;
-        }
-    }
-
-    stops.push({ offset: 1, color: previousColor });
-    return stops;
+    return Math.min(Math.max(progress, 0), 1) * 100;
 }

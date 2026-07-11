@@ -40,7 +40,7 @@ const MINIMUM_AREA_PROGRESS = 0.09;
 
 /**
  * Builds dual-channel sparkline geometry with shared scaling. The orientation
- * flag is intentionally part of the data model so the future mirrored mode can
+ * flag is intentionally part of the data model so the mirrored chart mode can
  * render one channel below its axis without replacing smoothing or path logic.
  */
 export function buildDualSparklineChannelModels(options: {

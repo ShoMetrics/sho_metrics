@@ -1,5 +1,5 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rendering/widget-data";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import { buildSvgFilterAttributes } from "../../view-rendering/rasterize/render-svg-effects";
 import type { RenderTextStyle } from "../../view-rendering/rasterize/render-text-style";
 import { renderTitleCardDirectionIconFragment } from "../icons/title-card-icons";
@@ -210,7 +210,7 @@ function renderSquareTitleCardTextMetric(
     staticTextColor: string,
 ): string {
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const resolvedValueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const resolvedValueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const layout = buildSquareTitleCardLayout(keySize);
     const singleValueLayout = resolveSquareTitleCardSingleValueLayout(
         valueText,
@@ -291,7 +291,7 @@ function renderWideTitleCardTextMetric(
     staticTextColor: string,
 ): string {
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const resolvedValueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const resolvedValueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const singleValueLayout = resolveTitleCardSingleValueLayout(valueText, {
         valueXCoordinate: TITLE_CARD_WIDE_LAYOUT.valueX,
         valueYCoordinate: TITLE_CARD_WIDE_LAYOUT.valueY,

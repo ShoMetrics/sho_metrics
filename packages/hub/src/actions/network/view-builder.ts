@@ -7,7 +7,7 @@ import {
     type NetworkMetricDirection,
 } from "../../runtime/network-metric-keys";
 import type { WidgetData } from "../../view-rendering/widget-data";
-import { resolveColorForThresholdValue, type ColorConfig } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress, type ColorConfig } from "../../view-rendering/color/color-resolver";
 import type {
     ResolvedAppearanceSettings,
     ResolvedNetworkMetricTarget,
@@ -646,7 +646,7 @@ function resolveNetworkWidgetChannelColor(
     settings: ResolvedWidgetSettings,
     widgetData: WidgetData,
 ): string {
-    return resolveColorForThresholdValue(widgetData.progress * 100, buildNetworkChannelColorConfig(direction, settings));
+    return resolveThresholdColorForProgress(widgetData.progress, buildNetworkChannelColorConfig(direction, settings));
 }
 
 function buildNetworkChannelColorConfig(

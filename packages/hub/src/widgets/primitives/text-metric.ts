@@ -3,7 +3,7 @@ import {
     DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS,
     type RenderOutlineTokens,
 } from "../../view-rendering/color/render-appearance";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import {
     buildSvgFilterAttributes,
     DEFAULT_RENDER_THEME_EFFECT_TOKENS,
@@ -145,7 +145,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
     const centerXCoordinate = keySize.width / 2;
     const textWidth = Math.max(24, keySize.width - SINGLE_TEXT_SQUARE_LAYOUT.horizontalPadding * 2);
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const valueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const labelTextStyle = config.textStyles.label;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
@@ -197,7 +197,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
 
 function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig, keySize: KeySize): string {
     const valueText = data.displayValue ?? data.current.toFixed(0);
-    const valueTextColor = resolveColorForThresholdValue(data.current, config.colorConfig);
+    const valueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const labelTextStyle = config.textStyles.label;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;

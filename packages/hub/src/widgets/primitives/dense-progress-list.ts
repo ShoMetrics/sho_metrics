@@ -6,7 +6,7 @@ import {
     resolveRelativeLuminance,
     type RgbColor,
 } from "../../shared/color-utils";
-import { resolveColorForThresholdValue } from "../../view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import type { RenderOutlineTokens } from "../../view-rendering/color/render-appearance";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
@@ -270,8 +270,8 @@ function renderDenseProgressListRow(options: {
     const valueBoxWidth = Math.max(1, valueBoxRightCoordinate - bar.xCoordinate);
     const unitXCoordinate = bar.xCoordinate + bar.width - options.layout.unitWidth - options.layout.valuePaddingX;
     const fillWidth = Math.max(0, bar.width * clamp(options.row.widgetData.progress, 0, 1));
-    const filledColor = resolveColorForThresholdValue(
-        clamp(options.row.widgetData.progress, 0, 1) * 100,
+    const filledColor = resolveThresholdColorForProgress(
+        options.row.widgetData.progress,
         options.config.colorConfig,
     );
     const barTextColor = resolveDenseBarTextColor({

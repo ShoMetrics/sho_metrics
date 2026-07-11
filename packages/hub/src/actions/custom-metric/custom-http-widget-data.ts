@@ -52,6 +52,12 @@ export function readCustomHttpWidgetData(options: {
     // maximum, then the implicit 100 maximum for built-in percent metrics.
     // Only a value with none of those maxima uses fit-to-data scaling.
     const maximum = options.displayOverrides?.maximum ?? resolveCustomHttpMaximum(displayHint);
+    // Without a resolved maximum, progress is pinned to 0 on purpose: percent
+    // features (progress fill, threshold color bands) have no defined scale, so
+    // the widget deliberately sits in the lowest band instead of guessing a
+    // domain. Threshold colors start working as soon as any maximum above
+    // resolves. If a neutral look is ever preferred over lowest-band for this
+    // state, change the renderer's threshold handling, not this pin.
     const progress = maximum === undefined
         ? 0
         : Math.min(Math.max(readResult.widgetData.current / maximum, 0), 1);

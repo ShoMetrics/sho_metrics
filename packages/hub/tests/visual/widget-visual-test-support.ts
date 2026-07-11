@@ -11,7 +11,7 @@ import { resolveResvgFontOptions } from "../../src/view-rendering/rasterize/resv
 import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
 import type { TextMetricVariant } from "../../src/view-rendering/color/render-appearance";
 import type { ColorConfig } from "../../src/view-rendering/color/color-resolver";
-import { resolveColorForThresholdValue } from "../../src/view-rendering/color/color-resolver";
+import { resolveThresholdColorForProgress } from "../../src/view-rendering/color/color-resolver";
 import type {
     DualChannelWidgetData,
     KeySize,
@@ -499,8 +499,8 @@ function renderDualMetricFramePngBuffer(testCase: DualMetricVisualTestCase): Buf
     const resolvedSettings = buildDefaultAppearanceSettings(testCase.appearance);
     const positiveColorConfig = buildColorConfigFromAppearance(resolvedSettings, "upload");
     const negativeColorConfig = buildColorConfigFromAppearance(resolvedSettings, "download");
-    const positiveColor = resolveColorForThresholdValue(testCase.data.positive.progress * 100, positiveColorConfig);
-    const negativeColor = resolveColorForThresholdValue(testCase.data.negative.progress * 100, negativeColorConfig);
+    const positiveColor = resolveThresholdColorForProgress(testCase.data.positive.progress, positiveColorConfig);
+    const negativeColor = resolveThresholdColorForProgress(testCase.data.negative.progress, negativeColorConfig);
     const frame = composeMetricViewFrame({
         renderTarget: testCase.renderTarget ?? "key",
         viewOptions: {
