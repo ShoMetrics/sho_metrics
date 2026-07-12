@@ -50,6 +50,11 @@ import {
     buildPropertyInspectorPluginRuntimePingMessage,
     readPropertyInspectorPluginRuntimePongMessage,
 } from "../property-inspector/plugin-runtime-connection-messages";
+import {
+    buildOpenHelperControlPanelMessage,
+    readHelperControlPanelLaunchResultMessage,
+} from "../property-inspector/helper-control-panel-messages";
+import type { WindowsHelperControlPanelLauncher } from "../runtime/sources/windows-helper/windows-helper-control-panel";
 
 const TEST_CURRENT_TIMESTAMP_MILLISECONDS = 10_000;
 
@@ -892,6 +897,65 @@ test("plugin runtime connection pings reply to the Property Inspector", () => {
     }
 });
 
+test("Helper Control Panel requests launch the installed panel and reply to the PI", async () => {
+    const controlPanelLauncher = new RecordingWindowsHelperControlPanelLauncher();
+    const action = new TestMetricAction(undefined, undefined, controlPanelLauncher);
+    const streamDeckAction = new FakeStreamDeckAction("open-helper-control-panel-action");
+    const sendToPropertyInspector = vi.spyOn(streamDeck.ui, "sendToPropertyInspector")
+        .mockResolvedValue(undefined);
+
+    try {
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildOpenHelperControlPanelMessage("request-1"),
+        ));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        assert.equal(controlPanelLauncher.openCallCount, 1);
+        assert.deepEqual(
+            readHelperControlPanelLaunchResultMessage(sendToPropertyInspector.mock.calls[0][0]),
+            {
+                type: "shoMetrics.helperControlPanel",
+                command: "result",
+                requestId: "request-1",
+                outcome: "opened",
+            },
+        );
+        assert.equal(action.metricsUpdateSnapshots.length, 0);
+    } finally {
+        sendToPropertyInspector.mockRestore();
+    }
+});
+
+test("Helper Control Panel launch failures reply to the PI without alerting the hardware key", async () => {
+    const action = new TestMetricAction(undefined, undefined, new FailingWindowsHelperControlPanelLauncher());
+    const streamDeckAction = new FakeStreamDeckAction("failed-helper-control-panel-action");
+    const sendToPropertyInspector = vi.spyOn(streamDeck.ui, "sendToPropertyInspector")
+        .mockResolvedValue(undefined);
+
+    try {
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildOpenHelperControlPanelMessage("request-2"),
+        ));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        assert.deepEqual(
+            readHelperControlPanelLaunchResultMessage(sendToPropertyInspector.mock.calls[0][0]),
+            {
+                type: "shoMetrics.helperControlPanel",
+                command: "result",
+                requestId: "request-2",
+                outcome: "failed",
+            },
+        );
+    } finally {
+        sendToPropertyInspector.mockRestore();
+    }
+});
+
 test("runtime cache publishes to Property Inspector without writing settings", async () => {
     const setSettingsCalls: unknown[] = [];
     const streamDeckAction = {
@@ -985,8 +1049,9 @@ class TestMetricAction extends MetricAction {
     constructor(
         bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
         displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver,
+        windowsHelperControlPanelLauncher?: WindowsHelperControlPanelLauncher,
     ) {
-        super({ displayedMetricNoDataObserver });
+        super({ displayedMetricNoDataObserver, windowsHelperControlPanelLauncher });
         this.bindingFactory = bindingFactory ?? (() => new FakeMetricCollectionBinding());
     }
 
@@ -1200,6 +1265,20 @@ class RecordingDisplayedMetricNoDataObserver implements DisplayedMetricNoDataObs
 
     clearAction(actionId: string): void {
         this.clearedActionIds.push(actionId);
+    }
+}
+
+class RecordingWindowsHelperControlPanelLauncher implements WindowsHelperControlPanelLauncher {
+    openCallCount = 0;
+
+    async open(): Promise<void> {
+        this.openCallCount += 1;
+    }
+}
+
+class FailingWindowsHelperControlPanelLauncher implements WindowsHelperControlPanelLauncher {
+    async open(): Promise<void> {
+        throw new Error("The diagnostics executable could not be started.");
     }
 }
 

@@ -15,6 +15,7 @@ $serviceStartCommandPath = Join-Path $repoRoot "packages\source-windows\ShoMetri
 $controlPanelMainWindowXamlPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml"
 $controlPanelMainWindowCodePath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml.cs"
 $brandAssetsScriptPath = Join-Path $repoRoot "packages\assets\brand\sync-brand-assets.ts"
+$launcherPath = Join-Path $repoRoot "packages\hub\src\runtime\sources\windows-helper\windows-helper-control-panel.ts"
 
 $scriptFiles = @(
     $mainScriptPath
@@ -34,6 +35,7 @@ $controlPanelProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $r
 $serviceProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.Service\ShoMetrics.Source.Windows.Service.csproj") -Raw
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
+$launcherText = Get-Content -Encoding UTF8 -LiteralPath $launcherPath -Raw
 $serviceProgramText = Get-Content -Encoding UTF8 -LiteralPath $serviceProgramPath -Raw
 $serviceStartCommandText = Get-Content -Encoding UTF8 -LiteralPath $serviceStartCommandPath -Raw
 $controlPanelMainWindowCodeText = (Get-ChildItem -LiteralPath (Split-Path -Parent $controlPanelMainWindowCodePath) -Filter "MainWindow*.cs" -File |
@@ -136,12 +138,46 @@ Assert-Contains -Name "Inno requires ShoMetricsVersion from build script" -Text 
 Assert-NotContains -Name "Inno must not provide a fallback ShoMetricsVersion" -Text $mainScriptText -Pattern '#define\s+ShoMetricsVersion\s+"'
 Assert-Contains -Name "Installer deletes stale service payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\Service"\r?$'
 Assert-Contains -Name "Installer deletes stale Control Panel payload before copying files" -Text $mainScriptText -Pattern '(?m)^Type:\s*filesandordirs;\s*Name:\s*"\{app\}\\ControlPanel"\r?$'
+Assert-Contains -Name "Installer registers the diagnostics executable through App Paths" -Text $mainScriptText -Pattern '(?s)\[Registry\].*?Root:\s*HKLM64;\s*Subkey:\s*"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\ShoMetricsHelper\.exe";.*?ValueData:\s*"\{app\}\\ControlPanel\\ShoMetricsHelper\.exe";.*?uninsdeletekey'
 Assert-Contains -Name "Existing install page uses Next to continue the normal flow" -Text $scriptText -Pattern '(?s)procedure\s+CreateExistingInstallPage;.*?ShoMetrics Helper is already installed.*?Click Next to stop ShoMetrics Helper'
 Assert-Contains -Name "Existing install page appears before the license page" -Text $scriptText -Pattern '(?s)if\s+ExistingShoMetricsInstalledBeforeSetup\s+then.*?CreateExistingInstallPage;.*?LicensePagePreviousPageID\s*:=\s*ExistingInstallPage\.ID.*?CreateShoMetricsLicensePage\(LicensePagePreviousPageID\)'
 Assert-NotContains -Name "Existing install page must not bypass license or PawnIO pages" -Text $scriptText -Pattern 'ExistingInstallPage.*?(InstallServiceAfterFiles|wpInstalling|PrepareToInstall|UpdateInstallButtonCaption)'
 if (($setupAppIdGuid -eq '') -or ($uninstallRegistryGuid -eq '') -or ($setupAppIdGuid.ToUpperInvariant() -ne $uninstallRegistryGuid.ToUpperInvariant())) {
     $failures.Add("Existing install detection uses the same AppId as setup")
 }
+
+# The Stream Deck plugin launches the diagnostics window by reading registry
+# entries this installer writes. Those constants live in TypeScript and in the
+# Inno script with no shared source, so a rename on one side would silently stop
+# the plugin from finding the window. Lock the two sides together here.
+$launcherAppPathsKey = $launcherText |
+    ForEach-Object { [regex]::Match($_, 'WINDOWS_HELPER_APP_PATHS_REGISTRY_KEY\s*=\s*"(?<key>[^"]+)"').Groups["key"].Value } |
+    ForEach-Object { $_.Replace('\\', '\') }
+$launcherUninstallGuid = [regex]::Match(
+    $launcherText,
+    'WINDOWS_HELPER_UNINSTALL_REGISTRY_KEY\s*=\s*"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\\{(?<guid>[0-9A-Fa-f-]+)\}_is1"').Groups["guid"].Value
+$launcherRelativeExecutablePath = (
+    [regex]::Matches(
+        [regex]::Match($launcherText, 'CONTROL_PANEL_RELATIVE_EXECUTABLE_PATH\s*=\s*\[(?<segments>[^\]]+)\]').Groups["segments"].Value,
+        '"(?<segment>[^"]+)"') |
+    ForEach-Object { $_.Groups["segment"].Value }
+) -join '\'
+$innoAppPathsSubkey = [regex]::Match($mainScriptText, 'Root:\s*HKLM64;\s*Subkey:\s*"(?<subkey>[^"]+)"').Groups["subkey"].Value
+$innoAppPathsValueData = [regex]::Match($mainScriptText, 'Root:\s*HKLM64;[^\r\n]*?ValueData:\s*"(?<data>[^"]+)"').Groups["data"].Value
+
+if (($launcherAppPathsKey -eq '') -or ($innoAppPathsSubkey -eq '') -or ($launcherAppPathsKey -ne "HKLM\$innoAppPathsSubkey")) {
+    $failures.Add("Plugin App Paths lookup matches the installer App Paths subkey")
+}
+if (($launcherUninstallGuid -eq '') -or ($setupAppIdGuid -eq '') -or ($launcherUninstallGuid.ToUpperInvariant() -ne $setupAppIdGuid.ToUpperInvariant())) {
+    $failures.Add("Plugin uninstall-key fallback uses the same AppId as setup")
+}
+if (($launcherRelativeExecutablePath -eq '') -or ($innoAppPathsValueData -eq '') -or ($innoAppPathsValueData -ne "{app}\$launcherRelativeExecutablePath")) {
+    $failures.Add("Plugin fallback executable path matches the installed Control Panel layout")
+}
+Assert-Contains `
+    -Name "Plugin registry lookups pin the 64-bit view" `
+    -Text $launcherText `
+    -Pattern 'REGISTRY_64_BIT_VIEW_ARGUMENT\s*=\s*"/reg:64"'
 
 Assert-Contains `
     -Name "NeedRestart always returns false" `

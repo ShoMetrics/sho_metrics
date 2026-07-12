@@ -77,6 +77,12 @@ VersionInfoVersion={#ShoMetricsVersion}
 [Dirs]
 Name: "{commonappdata}\ShoMetrics\logs"; Flags: uninsneveruninstall
 
+[Registry]
+; App Paths is the installer-owned, relocation-safe path used by the Stream Deck
+; plugin to launch the diagnostics window. Older installations lack this entry,
+; so the plugin also keeps the uninstall-key lookup as a compatibility fallback.
+Root: HKLM64; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ShoMetricsHelper.exe"; ValueType: string; ValueName: ""; ValueData: "{app}\ControlPanel\ShoMetricsHelper.exe"; Flags: uninsdeletekey
+
 [InstallDelete]
 ; Switching between Standalone and FrameworkDependent changes the payload shape.
 ; Remove old app-local runtime files first so stale hostfxr/coreclr copies do

@@ -56,6 +56,10 @@ import {
     readPropertyInspectorPluginRuntimePingMessage,
 } from "../property-inspector/plugin-runtime-connection-messages";
 import {
+    readOpenHelperControlPanelMessage,
+    sendHelperControlPanelLaunchResultMessage,
+} from "../property-inspector/helper-control-panel-messages";
+import {
     BackgroundCollectionBinding,
     type BackgroundCollectionBindingRefreshOptions,
 } from "./shared/background-collection-binding";
@@ -80,6 +84,10 @@ import {
     SYSTEM_BATTERY_POLLING_FREQUENCY_SECONDS,
     VENDOR_HID_BATTERY_POLLING_FREQUENCY_SECONDS,
 } from "../settings/polling-frequency-options";
+import {
+    windowsHelperControlPanelLauncher,
+    type WindowsHelperControlPanelLauncher,
+} from "../runtime/sources/windows-helper/windows-helper-control-panel";
 
 const log = logger.for("MetricAction");
 
@@ -94,6 +102,7 @@ interface ActiveActionState {
 
 interface MetricActionOptions {
     readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
+    readonly windowsHelperControlPanelLauncher?: WindowsHelperControlPanelLauncher;
 }
 
 /** Tracks one manual refresh acknowledgement badge until the request settles and the badge is readable. */
@@ -121,6 +130,7 @@ export abstract class MetricAction extends SingletonAction {
     private metricCollectionBindings = new Map<string, MetricCollectionBinding>();
     private manualRefreshFeedbackStates = new Map<string, ManualRefreshFeedbackState>();
     private readonly displayedMetricNoDataObserver: DisplayedMetricNoDataObserver;
+    private readonly windowsHelperControlPanelLauncher: WindowsHelperControlPanelLauncher;
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -128,6 +138,8 @@ export abstract class MetricAction extends SingletonAction {
         super();
         this.displayedMetricNoDataObserver = options.displayedMetricNoDataObserver
             ?? new DefaultDisplayedMetricNoDataObserver();
+        this.windowsHelperControlPanelLauncher = options.windowsHelperControlPanelLauncher
+            ?? windowsHelperControlPanelLauncher;
         pluginGlobalSettingsStore.subscribe(() => {
             this.resubscribeAllActions();
             for (const activeActionState of this.activeActionStates.values()) {
@@ -232,6 +244,26 @@ export abstract class MetricAction extends SingletonAction {
         const diagnosticMessage = readPropertyInspectorDiagnosticMessage(event.payload);
         if (diagnosticMessage !== null) {
             writePropertyInspectorDiagnosticLog(diagnosticMessage.level, diagnosticMessage.message);
+            return;
+        }
+
+        const helperControlPanelMessage = readOpenHelperControlPanelMessage(event.payload);
+        if (helperControlPanelMessage !== null) {
+            const reportLaunchResult = (outcome: "opened" | "failed"): void => {
+                sendHelperControlPanelLaunchResultMessage(streamDeck.ui, helperControlPanelMessage.requestId, outcome)
+                    .catch(responseError => {
+                        log.warn(() => `Failed to report Helper Diagnostics launch result outcome=${outcome}: ${String(responseError)}`);
+                    });
+            };
+            void this.windowsHelperControlPanelLauncher.open()
+                .then(() => {
+                    log.info(() => `Opened ShoMetrics Diagnostics actionId=${event.action.id}`);
+                    reportLaunchResult("opened");
+                })
+                .catch(error => {
+                    log.warn(() => `Failed to open ShoMetrics Diagnostics: ${String(error)}`);
+                    reportLaunchResult("failed");
+                });
             return;
         }
 

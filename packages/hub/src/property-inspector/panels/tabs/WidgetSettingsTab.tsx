@@ -96,8 +96,10 @@ export function WidgetSettingsTab({
         || isGlobalThemeOverrideEnabled
         || isGlobalTransparentSurfaceOverrideEnabled
         || isGlobalPaintOverrideEnabled;
+    const isWindowsHardwareSummary = context.isWindows
+        && context.resolved.widget.widgetKind === "hardwareSummary";
     const canShowMetricSourceDiagnostic = context.resolved.widget.widgetKind === "singleMetric"
-        || context.resolved.widget.widgetKind === "hardwareSummary";
+        || isWindowsHardwareSummary;
 
     return (
         <>
@@ -129,6 +131,7 @@ export function WidgetSettingsTab({
                     {canShowMetricSourceDiagnostic && (
                         <MetricSourceDiagnostic
                             trace={context.runtimeCache.displayedMetricReadTrace}
+                            isWindowsHardwareSummary={isWindowsHardwareSummary}
                         />
                     )}
                 </>

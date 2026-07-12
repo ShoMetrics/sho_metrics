@@ -355,6 +355,11 @@ export const helperMessages = {
         zh_CN: "下载或更新 Helper。",
         ja: "Helper をダウンロードまたは更新してください。",
     },
+    diagnosticsHelperNote: {
+        en: "If <helper>ShoMetrics Helper</helper> is installed, this panel can help diagnose sources that use it.",
+        zh_CN: "如果已安装 <helper>ShoMetrics Helper</helper>，此面板可帮助诊断使用它的数据源。",
+        ja: "<helper>ShoMetrics Helper</helper> がインストールされている場合、このパネルはそれを使用するソースの診断に役立ちます。",
+    },
 } as const satisfies LocalizedMessages;
 
 export const catalogMessages = {

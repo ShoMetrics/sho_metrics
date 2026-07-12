@@ -148,7 +148,7 @@ test("CPU hardware summary opens helper download guidance in the default browser
     }]);
 });
 
-test("hardware summary advanced controls render current metric read trace", async () => {
+test("hardware summary advanced controls render current metric trace and diagnostics launcher", async () => {
     render(<HardwareSummarySettingsHarness
         actionKind="cpu"
         settings={buildCpuHardwareSummarySettings()}
@@ -170,6 +170,7 @@ test("hardware summary advanced controls render current metric read trace", asyn
     />);
 
     assert.notEqual(await screen.findByText(/Current source: Built-in/), null);
+    assert.notEqual(screen.queryByRole("button", { name: "Open ShoMetrics Diagnostics" }), null);
 });
 
 test("GPU hardware summary opens helper download guidance in the default browser", async () => {
