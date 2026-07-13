@@ -181,6 +181,19 @@ body {
     color: #f8d66d;
 }
 
+/* Reserved for a notice the user has to act on, currently a required Helper
+ * update. Spending red on anything softer leaves nothing for the case that has
+ * to interrupt them. */
+.settings-notice-critical .section-note {
+    color: #ff8080;
+}
+
+.settings-notice-critical {
+    background: #3a1f1f;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
 /* This notice includes recovery text and a literal support URL. Both must be
  * copyable when the plugin runtime cannot open the URL in the default browser. */
 .plugin-runtime-connection-notice .inspector-item-content {

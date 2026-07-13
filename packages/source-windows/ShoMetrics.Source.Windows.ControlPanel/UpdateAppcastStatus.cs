@@ -62,20 +62,33 @@ internal sealed record UpdateAppcastStatus
         };
     }
 
+    /// <summary>
+    /// Reports the newest release this install is behind, and how urgently to install it.
+    /// </summary>
+    /// <param name="updateItem">The newest release missed, which is the one offered.</param>
+    /// <param name="isCriticalUpdateMissed">
+    /// Whether any release missed was critical, not only <paramref name="updateItem"/>.
+    /// The two differ for a user who skipped the critical one: they are behind a fix
+    /// that has to be installed, and reading urgency off the newest release alone
+    /// would tell precisely that user it is optional.
+    /// </param>
     internal static UpdateAppcastStatus UpdateAvailable(
         string currentVersion,
         UpdateAppcastItem updateItem,
+        bool isCriticalUpdateMissed,
         DateTimeOffset checkedAt)
     {
         return new UpdateAppcastStatus
         {
-            Kind = updateItem.IsCritical ? UpdateAppcastStatusKind.CriticalUpdateAvailable : UpdateAppcastStatusKind.UpdateAvailable,
+            Kind = isCriticalUpdateMissed
+                ? UpdateAppcastStatusKind.CriticalUpdateAvailable
+                : UpdateAppcastStatusKind.UpdateAvailable,
             CheckedAt = checkedAt,
             CurrentVersionText = FormatDisplayVersion(currentVersion),
-            StatusText = updateItem.IsCritical
+            StatusText = isCriticalUpdateMissed
                 ? $"Critical update available: {FormatDisplayVersion(updateItem.DisplayVersion)}"
                 : $"Update available: {FormatDisplayVersion(updateItem.DisplayVersion)}",
-            DetailText = updateItem.IsCritical
+            DetailText = isCriticalUpdateMissed
                 ? "Install this update before continuing normal use."
                 : "A newer ShoMetrics Helper version is available.",
             ReleaseNotesUri = updateItem.ReleaseNotesUri,

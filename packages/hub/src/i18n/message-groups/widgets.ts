@@ -360,6 +360,21 @@ export const helperMessages = {
         zh_CN: "如果已安装 <helper>ShoMetrics Helper</helper>，此面板可帮助诊断使用它的数据源。",
         ja: "<helper>ShoMetrics Helper</helper> がインストールされている場合、このパネルはそれを使用するソースの診断に役立ちます。",
     },
+    helperUpdateAvailableNotice: {
+        en: "ShoMetrics Helper {version} is available. <download>Download the update.</download>",
+        zh_CN: "ShoMetrics Helper {version} 已发布。<download>下载更新。</download>",
+        ja: "ShoMetrics Helper {version} が利用可能です。<download>更新をダウンロードしてください。</download>",
+    },
+    helperUpdateRequiredNotice: {
+        en: "ShoMetrics Helper update required: {version}. <download>Download the update.</download>",
+        zh_CN: "ShoMetrics Helper 需要更新：{version}。<download>下载更新。</download>",
+        ja: "ShoMetrics Helper の更新が必要です：{version}。<download>更新をダウンロードしてください。</download>",
+    },
+    helperUpdateRequiredDetail: {
+        en: "Install this update before continuing normal use.",
+        zh_CN: "请先安装此更新，再继续正常使用。",
+        ja: "通常の使用を続ける前に、この更新をインストールしてください。",
+    },
 } as const satisfies LocalizedMessages;
 
 export const catalogMessages = {

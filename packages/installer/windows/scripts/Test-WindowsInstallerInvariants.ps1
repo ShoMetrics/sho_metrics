@@ -16,6 +16,10 @@ $controlPanelMainWindowXamlPath = Join-Path $repoRoot "packages\source-windows\S
 $controlPanelMainWindowCodePath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\MainWindow.xaml.cs"
 $brandAssetsScriptPath = Join-Path $repoRoot "packages\assets\brand\sync-brand-assets.ts"
 $launcherPath = Join-Path $repoRoot "packages\hub\src\runtime\sources\windows-helper\windows-helper-control-panel.ts"
+$helperUpdateFeedPath = Join-Path $repoRoot "packages\hub\src\runtime\helper-update\helper-update-feed.ts"
+$helperUpdateRolloutPath = Join-Path $repoRoot "packages\hub\src\runtime\helper-update\phased-rollout.ts"
+$updateAppcastClientPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\UpdateAppcastClient.cs"
+$updatePhasedRolloutPath = Join-Path $repoRoot "packages\source-windows\ShoMetrics.Source.Windows.ControlPanel\UpdatePhasedRollout.cs"
 
 $scriptFiles = @(
     $mainScriptPath
@@ -36,6 +40,10 @@ $serviceProjectText = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRo
 $innoProjectText = Get-Content -Encoding UTF8 -LiteralPath $innoProjectPath -Raw
 $serviceConstantsText = Get-Content -Encoding UTF8 -LiteralPath $serviceConstantsPath -Raw
 $launcherText = Get-Content -Encoding UTF8 -LiteralPath $launcherPath -Raw
+$helperUpdateFeedText = Get-Content -Encoding UTF8 -LiteralPath $helperUpdateFeedPath -Raw
+$helperUpdateRolloutText = Get-Content -Encoding UTF8 -LiteralPath $helperUpdateRolloutPath -Raw
+$updateAppcastClientText = Get-Content -Encoding UTF8 -LiteralPath $updateAppcastClientPath -Raw
+$updatePhasedRolloutText = Get-Content -Encoding UTF8 -LiteralPath $updatePhasedRolloutPath -Raw
 $serviceProgramText = Get-Content -Encoding UTF8 -LiteralPath $serviceProgramPath -Raw
 $serviceStartCommandText = Get-Content -Encoding UTF8 -LiteralPath $serviceStartCommandPath -Raw
 $controlPanelMainWindowCodeText = (Get-ChildItem -LiteralPath (Split-Path -Parent $controlPanelMainWindowCodePath) -Filter "MainWindow*.cs" -File |
@@ -178,6 +186,33 @@ Assert-Contains `
     -Name "Plugin registry lookups pin the 64-bit view" `
     -Text $launcherText `
     -Pattern 'REGISTRY_64_BIT_VIEW_ARGUMENT\s*=\s*"/reg:64"'
+
+# The Control Panel and the plugin read the same update feed and place the same
+# user in the same rollout group. A plugin pointed at a feed nobody publishes
+# reports "no update" forever, and it does it silently: nothing else in the
+# system notices that the update notice has simply stopped working.
+$csharpAppcastUrls = [regex]::Matches($updateAppcastClientText, '(?m)^\s*private const string (?:Prod|Staging)AppcastUrl\s*=\s*"(?<url>[^"]+)"') |
+    ForEach-Object { $_.Groups["url"].Value } | Sort-Object
+$pluginAppcastUrls = [regex]::Matches($helperUpdateFeedText, '(?m)^export const (?:PROD|STAGING)_APPCAST_URL\s*=\s*"(?<url>[^"]+)"') |
+    ForEach-Object { $_.Groups["url"].Value } | Sort-Object
+if (($csharpAppcastUrls.Count -ne 2) -or ($pluginAppcastUrls.Count -ne 2) -or
+    (Compare-Object $csharpAppcastUrls $pluginAppcastUrls)) {
+    $failures.Add("Plugin and Control Panel read the same update feed URLs")
+}
+
+foreach ($appcastUrl in $pluginAppcastUrls) {
+    $appcastFileName = ([uri]$appcastUrl).Segments[-1]
+    $publishedAppcastPath = Join-Path $repoRoot "site\static\update\$appcastFileName"
+    if (-not (Test-Path -LiteralPath $publishedAppcastPath)) {
+        $failures.Add("Update feed $appcastFileName is published from site/static/update")
+    }
+}
+
+$csharpRolloutGroupCount = [regex]::Match($updatePhasedRolloutText, 'GroupCount\s*=\s*(?<count>\d+)').Groups["count"].Value
+$pluginRolloutGroupCount = [regex]::Match($helperUpdateRolloutText, 'PHASED_ROLLOUT_GROUP_COUNT\s*=\s*(?<count>\d+)').Groups["count"].Value
+if (($csharpRolloutGroupCount -eq '') -or ($csharpRolloutGroupCount -ne $pluginRolloutGroupCount)) {
+    $failures.Add("Plugin and Control Panel split a staged rollout into the same group count")
+}
 
 Assert-Contains `
     -Name "NeedRestart always returns false" `

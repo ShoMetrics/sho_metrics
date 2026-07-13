@@ -54,7 +54,13 @@ import {
     buildOpenHelperControlPanelMessage,
     readHelperControlPanelLaunchResultMessage,
 } from "../property-inspector/helper-control-panel-messages";
+import {
+    buildHelperUpdateNoticeRequestMessage,
+    readHelperUpdateNoticeResultMessage,
+} from "../property-inspector/helper-update-notice-messages";
 import type { WindowsHelperControlPanelLauncher } from "../runtime/sources/windows-helper/windows-helper-control-panel";
+import type { HelperUpdateNoticeReader } from "../runtime/helper-update/helper-update-notifier";
+import type { HelperUpdateNotice } from "../runtime/helper-update/helper-update-notice";
 
 const TEST_CURRENT_TIMESTAMP_MILLISECONDS = 10_000;
 
@@ -897,6 +903,41 @@ test("plugin runtime connection pings reply to the Property Inspector", () => {
     }
 });
 
+test("Helper update notice requests answer the Property Inspector with a refreshed notice", () => {
+    const noticeReader = new RecordingHelperUpdateNoticeReader({
+        state: "updateAvailable",
+        urgency: "required",
+        availableVersion: "0.2.0",
+    });
+    const action = new TestMetricAction(undefined, undefined, undefined, noticeReader);
+    const streamDeckAction = new FakeStreamDeckAction("helper-update-notice-action");
+    const sendToPropertyInspector = vi.spyOn(streamDeck.ui, "sendToPropertyInspector")
+        .mockResolvedValue(undefined);
+
+    try {
+        action.onSendToPlugin(buildSendToPluginEvent(
+            streamDeckAction,
+            buildHelperUpdateNoticeRequestMessage(),
+        ));
+
+        // The order is the behavior. Reading the cache first would answer with the
+        // notice as of the last feed read, which is the notice a user who just
+        // installed the Helper is no longer behind, and the panel would ask them
+        // to install it again.
+        assert.deepEqual(noticeReader.calls, ["refreshNotice", "readCachedNotice"]);
+
+        assert.equal(sendToPropertyInspector.mock.calls.length, 1);
+        const message = sendToPropertyInspector.mock.calls[0][0] as JsonValue;
+        assert.deepEqual(readHelperUpdateNoticeResultMessage(message)?.notice, {
+            state: "updateAvailable",
+            urgency: "required",
+            availableVersion: "0.2.0",
+        });
+    } finally {
+        sendToPropertyInspector.mockRestore();
+    }
+});
+
 test("Helper Control Panel requests launch the installed panel and reply to the PI", async () => {
     const controlPanelLauncher = new RecordingWindowsHelperControlPanelLauncher();
     const action = new TestMetricAction(undefined, undefined, controlPanelLauncher);
@@ -1033,6 +1074,22 @@ test("unchanged runtime cache patch does not publish to Property Inspector", asy
     }
 });
 
+/** Records the order the action reads the notice in, which is what the reply depends on. */
+class RecordingHelperUpdateNoticeReader implements HelperUpdateNoticeReader {
+    readonly calls: string[] = [];
+
+    constructor(private readonly notice: HelperUpdateNotice) {}
+
+    readCachedNotice(): HelperUpdateNotice {
+        this.calls.push("readCachedNotice");
+        return this.notice;
+    }
+
+    refreshNotice(): void {
+        this.calls.push("refreshNotice");
+    }
+}
+
 class TestMetricAction extends MetricAction {
     protected readonly actionKind = "network";
     readonly bindings: FakeMetricCollectionBinding[] = [];
@@ -1050,8 +1107,9 @@ class TestMetricAction extends MetricAction {
         bindingFactory: (() => FakeMetricCollectionBinding) | undefined = undefined,
         displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver,
         windowsHelperControlPanelLauncher?: WindowsHelperControlPanelLauncher,
+        helperUpdateNoticeReader?: HelperUpdateNoticeReader,
     ) {
-        super({ displayedMetricNoDataObserver, windowsHelperControlPanelLauncher });
+        super({ displayedMetricNoDataObserver, windowsHelperControlPanelLauncher, helperUpdateNoticeReader });
         this.bindingFactory = bindingFactory ?? (() => new FakeMetricCollectionBinding());
     }
 

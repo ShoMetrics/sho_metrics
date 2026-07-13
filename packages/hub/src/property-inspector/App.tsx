@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { shellMessages } from "../i18n/message-groups/shell";
 import { useI18n } from "../i18n/react";
-import { InspectorItem } from "./components/InspectorItem";
 import { ColorCompensationWizard } from "./color-compensation/ColorCompensationWizard";
 import { propertyInspectorExternalUrls } from "./external-urls";
 import { PropertyInspectorExternalLink } from "./panels/external-link";
+import {
+    HelperUpdateNoticeSlot,
+    useHelperUpdateNotice,
+} from "./panels/notices/HelperUpdateNoticeSlot";
+import { PropertyInspectorNotice } from "./panels/notices/PropertyInspectorNotice";
 import { GlobalSettingsTab } from "./panels/tabs/GlobalSettingsTab";
 import { WidgetSettingsTab } from "./panels/tabs/WidgetSettingsTab";
 import {
@@ -34,6 +38,7 @@ export function App({ client }: AppProps): React.JSX.Element {
     const [activeTab, setActiveTab] = useState<SettingsTabId>("widget");
     const [isColorCompensationWizardOpen, setIsColorCompensationWizardOpen] = useState(false);
     const pluginRuntimeConnectionStatus = usePluginRuntimeConnectionStatus(client);
+    const helperUpdateNotice = useHelperUpdateNotice(client);
     const {
         visibilityContext,
         resolvedGlobalSettings,
@@ -85,11 +90,28 @@ export function App({ client }: AppProps): React.JSX.Element {
                         ))}
                     </div>
 
-                    <PluginRuntimeConnectionNoticeSlot status={pluginRuntimeConnectionStatus} />
+                    {/*
+                      * Notices stack in one place, most immediate first. A dead
+                      * plugin runtime makes everything below it untrustworthy, a
+                      * settings notice is about what the user is doing right now,
+                      * and a Helper update is about their environment. They are
+                      * stacked rather than reduced to the loudest one: the rare
+                      * overlap costs a line, while hiding one would cost the user
+                      * the information it carried.
+                      *
+                      * The wrapper carries no class: each notice already spaces
+                      * itself with .settings-notice, so a class here would match no
+                      * rule. It exists to group them and to hold this comment.
+                      */}
+                    <div>
+                        <PluginRuntimeConnectionNoticeSlot status={pluginRuntimeConnectionStatus} />
 
-                    <SettingsNoticeSlot
-                        notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
-                    />
+                        <SettingsNoticeSlot
+                            notice={activeTab === "widget" ? widgetSettingsNotice : globalSettingsNotice}
+                        />
+
+                        <HelperUpdateNoticeSlot notice={helperUpdateNotice} />
+                    </div>
 
                     {activeTab === "widget" ? (
                         <WidgetSettingsTab
@@ -142,14 +164,14 @@ function PluginRuntimeConnectionNoticeSlot(options: {
     // the address by hand. The link stays clickable for the common case where
     // opening works.
     return (
-        <InspectorItem className="settings-notice settings-notice-warning plugin-runtime-connection-notice">
+        <PropertyInspectorNotice tone="warning" className="plugin-runtime-connection-notice">
             <p className="section-note">{t(shellMessages.pluginRuntimeUnresponsive)}</p>
             <p className="section-note">
                 <PropertyInspectorExternalLink url={propertyInspectorExternalUrls.pluginEngineNotRespondingFaq}>
                     {propertyInspectorExternalUrls.pluginEngineNotRespondingFaq}
                 </PropertyInspectorExternalLink>
             </p>
-        </InspectorItem>
+        </PropertyInspectorNotice>
     );
 }
 
@@ -166,9 +188,12 @@ function SettingsNoticeSlot(options: {
 function SettingsNoticeView({ notice }: { notice: SettingsNotice }): React.JSX.Element {
     const { t } = useI18n();
 
+    // A settings notice reports what the sync is doing; the tone reports how hard
+    // to press. They lined up while "loading" was the only quiet kind, and reading
+    // one as the other is how a third kind would silently pick up a colour.
     return (
-        <InspectorItem className={`settings-notice settings-notice-${notice.kind}`}>
+        <PropertyInspectorNotice tone={notice.kind === "warning" ? "warning" : "plain"}>
             <p className="section-note">{t(notice.message, notice.values)}</p>
-        </InspectorItem>
+        </PropertyInspectorNotice>
     );
 }

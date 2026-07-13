@@ -12,6 +12,8 @@ const sdPlugin = "com.ez.sho-metrics.sdPlugin";
 const buildMode = normalizeBuildMode(process.env.SHO_METRICS_BUILD_MODE ?? (isWatching ? "development" : "production"));
 const devLocaleOverride = normalizeDevLocaleOverride(process.env.SHO_METRICS_DEV_LOCALE_OVERRIDE);
 const devLocaleOverrideLiteral = devLocaleOverride === undefined ? "undefined" : JSON.stringify(devLocaleOverride);
+const devAppcastUrl = normalizeDevAppcastUrl(process.env.SHO_METRICS_DEV_APPCAST_URL, buildMode);
+const devAppcastUrlLiteral = devAppcastUrl === undefined ? "undefined" : JSON.stringify(devAppcastUrl);
 const logLevel = normalizeLogLevel(process.env.SHO_METRICS_LOG_LEVEL ?? (buildMode === "production" ? "info" : "debug"));
 const pluginBinDirectory = `${sdPlugin}/bin`;
 const propertyInspectorScriptPath = `${sdPlugin}/ui/property-inspector.js`;
@@ -52,6 +54,7 @@ function replaceCompileTimeConstants() {
                     .replaceAll("process.env.NODE_ENV", JSON.stringify("production"))
                     .replaceAll("__BUILD_MODE__", JSON.stringify(buildMode))
                     .replaceAll("__DEV_LOCALE_OVERRIDE__", devLocaleOverrideLiteral)
+                    .replaceAll("__DEV_APPCAST_URL__", devAppcastUrlLiteral)
                     .replaceAll("__LOG_LEVEL__", JSON.stringify(logLevel)),
                 map: null,
             };
@@ -149,6 +152,38 @@ function normalizeDevLocaleOverride(value) {
     }
 
     throw new Error(`Unsupported SHO_METRICS_DEV_LOCALE_OVERRIDE: ${value}`);
+}
+
+/**
+ * Reads the development-only update feed override.
+ *
+ * Substituting the feed URL at build time rather than reading an environment
+ * variable at run time is what lets `npm run watch` pick it up: Stream Deck, not
+ * this shell, spawns the plugin process, so a variable exported here never
+ * reaches it. The locale override already works this way, and a second override
+ * with different rules is a trap.
+ *
+ * It also means a stale variable in a developer's environment would otherwise be
+ * baked into a shipped plugin, pointing real users at a gist. That is worth
+ * failing the build over, not warning about.
+ */
+function normalizeDevAppcastUrl(value, buildMode) {
+    if (value === undefined || value === "") {
+        return undefined;
+    }
+
+    if (buildMode !== "development") {
+        throw new Error(
+            `SHO_METRICS_DEV_APPCAST_URL is set, but this is a ${buildMode} build. `
+            + "Unset it, or build with SHO_METRICS_BUILD_MODE=development.",
+        );
+    }
+
+    if (!value.startsWith("https://") && !value.startsWith("file://")) {
+        throw new Error(`SHO_METRICS_DEV_APPCAST_URL must be an https or file URL: ${value}`);
+    }
+
+    return value;
 }
 
 function normalizeLogLevel(value) {

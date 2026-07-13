@@ -1,8 +1,3 @@
-using System.Security;
-using System.Security.Cryptography;
-using System.Security.Principal;
-using System.Text;
-
 namespace ShoMetrics.Source.Windows.ControlPanel;
 
 internal sealed class UpdateAppcastClient : IDisposable
@@ -11,7 +6,6 @@ internal sealed class UpdateAppcastClient : IDisposable
     private const string StagingAppcastUrl = "https://shometrics.github.io/update/windows-appcast-staging.xml";
     private const string AppcastUrlOverrideEnvironmentVariable = "SHOMETRICS_UPDATE_APPCAST_URL";
     private const string AppcastChannelEnvironmentVariable = "SHOMETRICS_UPDATE_CHANNEL";
-    private const int SparklePhasedRolloutGroupCount = 7;
     private const long MaximumAppcastResponseBytes = 1024 * 1024;
 
     private readonly Func<Uri, CancellationToken, Task<string>> _fetchAppcastAsync;
@@ -49,11 +43,17 @@ internal sealed class UpdateAppcastClient : IDisposable
         {
             string xml = await _fetchAppcastAsync(_endpoint.AppcastUri, cancellationToken).ConfigureAwait(false);
             UpdateAppcastFeed feed = UpdateAppcastParser.Parse(xml, _endpoint.AppcastUri);
-            UpdateAppcastItem? latestUpdate = SelectLatestUpdate(feed.Items, currentVersion, _endpoint, checkedAt);
+            IReadOnlyList<UpdateAppcastItem> missedUpdates =
+                SelectMissedUpdates(feed.Items, currentVersion, _endpoint, checkedAt);
+            UpdateAppcastItem? newestUpdate = SelectNewestUpdate(missedUpdates);
 
-            return latestUpdate is null
+            return newestUpdate is null
                 ? UpdateAppcastStatus.UpToDate(currentVersion, checkedAt)
-                : UpdateAppcastStatus.UpdateAvailable(currentVersion, latestUpdate, checkedAt);
+                : UpdateAppcastStatus.UpdateAvailable(
+                    currentVersion,
+                    newestUpdate,
+                    missedUpdates.Any(update => update.IsCritical),
+                    checkedAt);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -94,7 +94,19 @@ internal sealed class UpdateAppcastClient : IDisposable
         return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static UpdateAppcastItem? SelectLatestUpdate(
+    /// <summary>
+    /// Selects every release this install is behind, not only the newest one.
+    /// </summary>
+    /// <remarks>
+    /// How urgent the update is has to be read from all of them. A user who
+    /// stopped at 0.1.0 while 0.2.0 was critical and 0.2.1 was routine is exactly
+    /// the user 0.2.0 was published for, and looking only at the newest release
+    /// would tell them the fix they are missing is optional. Keep this in step
+    /// with selectHelperUpdateNotice in helper-update-notice.ts: the panel and the
+    /// Property Inspector read the same feed, and a user who is told to install
+    /// something urgently in one and casually in the other trusts neither.
+    /// </remarks>
+    private static IReadOnlyList<UpdateAppcastItem> SelectMissedUpdates(
         IReadOnlyList<UpdateAppcastItem> items,
         string currentVersion,
         UpdateAppcastEndpoint endpoint,
@@ -105,12 +117,42 @@ internal sealed class UpdateAppcastClient : IDisposable
             // The appcast is fetched over HTTPS, but update links can still be
             // edited incorrectly. Keep clickable URLs constrained to our
             // GitHub Releases surface instead of trusting arbitrary feed data.
+            //
+            // PENDING, and the one place the two surfaces can still disagree: a
+            // critical release whose link is wrong is dropped here, so this panel
+            // calls the update routine while the Property Inspector calls it
+            // required. The Property Inspector reads no URL from the feed at all,
+            // so nothing there can drop the item. The published feed is validated
+            // against UpdateAppcast.xsd in CI, but the schema constrains the link
+            // to any URI rather than to our host, so a release-authoring mistake
+            // reaches this.
+            //
+            // The fix is to move this filter out of the urgency question and apply
+            // it only when choosing the release to offer: whether a URL is safe to
+            // click and whether the user is behind an urgent fix are two questions,
+            // and answering them with one filter is the same conflation that made
+            // urgency read off the newest release alone. Left alone for now because
+            // it moves a security control, which is not a change to make alongside
+            // the one above.
             .Where(item => IsAllowedAppcastLink(item.ReleaseNotesUri) && IsAllowedAppcastLink(item.DownloadUri))
             .Where(item => IsReadyForPhasedRollout(item, endpoint.PhasedRolloutGroup, checkedAt))
             .Where(item => IsNewerThanCurrentVersion(item, currentVersion))
-            // IsNewerThanCurrentVersion rejects malformed feed versions before
-            // this throwing comparer runs; malformed items should be ignored,
-            // not make the whole update check fail.
+            .ToList();
+    }
+
+    /// <summary>
+    /// Picks the release to offer, which is always the newest one missed.
+    /// </summary>
+    /// <remarks>
+    /// Which intermediate release carried the urgent fix is not something the user
+    /// can act on: installing the newest gets them all of it.
+    /// </remarks>
+    private static UpdateAppcastItem? SelectNewestUpdate(IReadOnlyList<UpdateAppcastItem> missedUpdates)
+    {
+        // IsNewerThanCurrentVersion rejected malformed feed versions before this
+        // throwing comparer runs; malformed items should be ignored, not make the
+        // whole update check fail.
+        return missedUpdates
             .OrderByDescending(item => item.Version, Comparer<string>.Create(UpdateVersionComparer.Compare))
             .FirstOrDefault();
     }
@@ -195,7 +237,7 @@ internal sealed class UpdateAppcastClient : IDisposable
             {
                 AppcastUri = appcastUri,
                 Channel = channel,
-                PhasedRolloutGroup = ResolvePhasedRolloutGroup(),
+                PhasedRolloutGroup = UpdatePhasedRollout.ResolveCurrentUserGroup(),
             };
         }
 
@@ -245,30 +287,6 @@ internal sealed class UpdateAppcastClient : IDisposable
                 uri.AbsolutePath.StartsWith("/update/", StringComparison.Ordinal);
         }
 
-        private static int? ResolvePhasedRolloutGroup()
-        {
-            string? userSid;
-            try
-            {
-                userSid = WindowsIdentity.GetCurrent().User?.Value;
-            }
-            catch (Exception exception) when (
-                exception is SecurityException ||
-                exception is UnauthorizedAccessException ||
-                exception is InvalidOperationException)
-            {
-                return null;
-            }
-
-            if (string.IsNullOrWhiteSpace(userSid))
-            {
-                return null;
-            }
-
-            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(userSid));
-            int hashPrefix = BitConverter.ToInt32(hash, startIndex: 0) & int.MaxValue;
-            return hashPrefix % SparklePhasedRolloutGroupCount;
-        }
     }
 }
 

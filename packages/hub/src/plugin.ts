@@ -13,6 +13,8 @@ import { StackedMetric } from "./actions/stacked-metric";
 import { logger } from "./logging/node-logger";
 import { pluginGlobalSettingsStore } from "./settings/global-settings-store";
 import { backgroundMetricCollection } from "./runtime/metric-collection/background-metric-collection";
+import { helperUpdateNotifier } from "./runtime/helper-update/helper-update-notifier";
+import { sendHelperUpdateNoticeResultMessage } from "./property-inspector/helper-update-notice-messages";
 import { updateCommittedColorCompensationProfileFromStoredSettings } from "./color-compensation/runtime-store";
 import { STREAM_DECK_PLUGIN_UUID } from "./shared/stream-deck-actions";
 
@@ -41,6 +43,22 @@ for (const action of registeredActions) {
     streamDeck.actions.registerAction(action);
 }
 
+// The Helper is a Windows product, and createDefaultSourceRegistry registers its
+// source client on no other platform. Started anywhere else the notifier would
+// wait forever for a version that nothing can ever report, so it is not started:
+// an update check for something that cannot be installed has no answer to give.
+if (process.platform === "win32") {
+    // A check that resolves after the panel is already open still has to reach
+    // it, so the notifier pushes as well as caches. An open panel asks for the
+    // cached notice itself, and Stream Deck drops this send when no panel is open.
+    helperUpdateNotifier.subscribe(notice => {
+        sendHelperUpdateNoticeResultMessage(streamDeck.ui, notice).catch(error => {
+            log.info(() => `Failed to push the Helper update notice: ${String(error)}`);
+        });
+    });
+    helperUpdateNotifier.start();
+}
+
 log.info(() => [
     "pluginStarted",
     `pluginUuid=${STREAM_DECK_PLUGIN_UUID}`,
@@ -52,6 +70,7 @@ log.info(() => [
 ].join(" "));
 
 process.once("exit", () => {
+    helperUpdateNotifier.dispose();
     backgroundMetricCollection.dispose();
 });
 

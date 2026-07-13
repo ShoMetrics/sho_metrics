@@ -60,6 +60,14 @@ import {
     sendHelperControlPanelLaunchResultMessage,
 } from "../property-inspector/helper-control-panel-messages";
 import {
+    readHelperUpdateNoticeRequestMessage,
+    sendHelperUpdateNoticeResultMessage,
+} from "../property-inspector/helper-update-notice-messages";
+import {
+    helperUpdateNotifier,
+    type HelperUpdateNoticeReader,
+} from "../runtime/helper-update/helper-update-notifier";
+import {
     BackgroundCollectionBinding,
     type BackgroundCollectionBindingRefreshOptions,
 } from "./shared/background-collection-binding";
@@ -103,6 +111,7 @@ interface ActiveActionState {
 interface MetricActionOptions {
     readonly displayedMetricNoDataObserver?: DisplayedMetricNoDataObserver;
     readonly windowsHelperControlPanelLauncher?: WindowsHelperControlPanelLauncher;
+    readonly helperUpdateNoticeReader?: HelperUpdateNoticeReader;
 }
 
 /** Tracks one manual refresh acknowledgement badge until the request settles and the badge is readable. */
@@ -131,6 +140,7 @@ export abstract class MetricAction extends SingletonAction {
     private manualRefreshFeedbackStates = new Map<string, ManualRefreshFeedbackState>();
     private readonly displayedMetricNoDataObserver: DisplayedMetricNoDataObserver;
     private readonly windowsHelperControlPanelLauncher: WindowsHelperControlPanelLauncher;
+    private readonly helperUpdateNoticeReader: HelperUpdateNoticeReader;
 
     protected abstract readonly actionKind: ActionKind;
 
@@ -140,6 +150,7 @@ export abstract class MetricAction extends SingletonAction {
             ?? new DefaultDisplayedMetricNoDataObserver();
         this.windowsHelperControlPanelLauncher = options.windowsHelperControlPanelLauncher
             ?? windowsHelperControlPanelLauncher;
+        this.helperUpdateNoticeReader = options.helperUpdateNoticeReader ?? helperUpdateNotifier;
         pluginGlobalSettingsStore.subscribe(() => {
             this.resubscribeAllActions();
             for (const activeActionState of this.activeActionStates.values()) {
@@ -244,6 +255,22 @@ export abstract class MetricAction extends SingletonAction {
         const diagnosticMessage = readPropertyInspectorDiagnosticMessage(event.payload);
         if (diagnosticMessage !== null) {
             writePropertyInspectorDiagnosticLog(diagnosticMessage.level, diagnosticMessage.message);
+            return;
+        }
+
+        // Refreshing first is what makes the cached answer worth having: it costs
+        // no I/O when the feed has already been read, and it is the only thing
+        // that notices a Helper the user installed since. The answer then comes
+        // from the cache, so it is on screen the moment the panel opens instead of
+        // a network round trip later. A panel opened before the feed was ever read
+        // starts that read, and the notifier pushes the notice when it lands.
+        const helperUpdateNoticeRequest = readHelperUpdateNoticeRequestMessage(event.payload);
+        if (helperUpdateNoticeRequest !== null) {
+            this.helperUpdateNoticeReader.refreshNotice();
+            sendHelperUpdateNoticeResultMessage(streamDeck.ui, this.helperUpdateNoticeReader.readCachedNotice())
+                .catch(error => {
+                    log.warn(() => `Failed to report the Helper update notice: ${String(error)}`);
+                });
             return;
         }
 
