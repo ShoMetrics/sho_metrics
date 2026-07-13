@@ -757,6 +757,18 @@ export class WindowsHelperSourceClient implements SourceClient {
             ? this.selectPipeMissingRetryCooldownMilliseconds(nowMilliseconds)
             : this.nextUnavailableRetryCooldownMilliseconds(nowMilliseconds);
 
+        // A failed request means we no longer know what is on the other end of
+        // the pipe. The helper that identified itself at the last health check
+        // may since have been stopped, upgraded, or replaced by a build speaking
+        // a different protocol, and nothing in a metric read would say so:
+        // GetSourceHealth is the only call the helper identifies itself in.
+        // Forgetting what it said forces the next request to ask again.
+        //
+        // Carrying the old identity forward instead would be worse than losing
+        // it. The likeliest reason the pipe just dropped is the user installing
+        // the update we told them about, and a version we keep asserting through
+        // that restart tells them to install it a second time.
+        this.protocolCompatibility = "unknown";
         this.helperUnavailableRetryAfterMonotonicMilliseconds = nowMilliseconds + cooldownMilliseconds;
         this.status = {
             state: "unavailable",
@@ -781,10 +793,21 @@ export class WindowsHelperSourceClient implements SourceClient {
         this.cachedServiceStatus = "running";
         this.serviceStatusCacheExpiresAtMonotonicMilliseconds = this.monotonicNow()
             + HELPER_SERVICE_STATUS_CACHE_MILLISECONDS;
+        // Rebuilding the status is what clears the previous failure fields, and
+        // that is deliberate: a success means the last error no longer describes
+        // this source. What the helper *is*, though, does not change between a
+        // health check and a metric read, and a metric read carries no health
+        // payload. Anything identifying the helper therefore has to be carried
+        // across the rebuild by hand, or the one health check at connect time is
+        // the only moment it is ever known.
+        const protocolVersion = health?.protocolVersion
+            ?? this.status.protocolVersion
+            ?? SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION;
+        const helperVersion = health?.helperVersion ?? this.status.helperVersion;
         this.status = {
             state: "available",
-            protocolVersion: health?.protocolVersion ?? this.status.protocolVersion ?? SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
-            ...(health?.helperVersion ? { helperVersion: health.helperVersion } : {}),
+            protocolVersion,
+            ...(helperVersion ? { helperVersion } : {}),
             lastSuccessAtTimestampMilliseconds: this.wallClockNow(),
         };
     }

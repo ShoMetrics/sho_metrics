@@ -596,6 +596,95 @@ test("windows helper source client sends requested metric ids and returns a runt
     );
 });
 
+test("windows helper source client keeps the helper version across metric reads", async () => {
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "readMetricSnapshot":
+                return buildSnapshotResponse();
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport);
+
+    // Health is read once, at the protocol check. Every later success is a metric
+    // read that carries no health payload, so a status rebuild that does not carry
+    // the helper version forward erases it for the rest of the process: the
+    // version would be known for a few milliseconds at connect time and never
+    // again. Anything that has to know which Helper is installed, such as the
+    // update notice, would then see nothing at all.
+    await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(client.getCachedStatus().helperVersion, "0.0.0-test");
+
+    await client.readSnapshot(["cpu.usage_percent"]);
+    await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(client.getCachedStatus().helperVersion, "0.0.0-test");
+    assert.deepEqual(
+        transport.requests.map(request => request.method),
+        ["getSourceHealth", "readMetricSnapshot", "readMetricSnapshot", "readMetricSnapshot"],
+    );
+});
+
+test("windows helper source client re-reads the helper version after the pipe drops", async () => {
+    let nowMilliseconds = 1000;
+    let isHelperReachable = true;
+    let installedHelperVersion = "0.1.0";
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        if (!isHelperReachable) {
+            throw new Error("pipe unavailable");
+        }
+
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse(SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION, installedHelperVersion);
+            case "readMetricSnapshot":
+                return buildSnapshotResponse();
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(
+        transport,
+        { healthMilliseconds: 10, readSnapshotMilliseconds: 10 },
+        { monotonicNow: () => nowMilliseconds, wallClockNow: () => nowMilliseconds },
+    );
+
+    await client.readSnapshot(["cpu.usage_percent"]);
+
+    assert.equal(client.getCachedStatus().helperVersion, "0.1.0");
+
+    // This is what installing a Helper update looks like from here: the service
+    // restarts, the pipe drops, and the helper that comes back is a different
+    // build. Nothing in a metric read says so, and the protocol check that would
+    // have asked is satisfied from the connection that just died.
+    isHelperReachable = false;
+    await assert.rejects(async () => await client.readSnapshot(["cpu.usage_percent"]));
+
+    nowMilliseconds += MAXIMUM_HELPER_UNAVAILABLE_RETRY_COOLDOWN_MILLISECONDS;
+    isHelperReachable = true;
+    installedHelperVersion = "0.2.0";
+
+    await client.readSnapshot(["cpu.usage_percent"]);
+
+    // Carrying "0.1.0" across the restart would keep telling this user to install
+    // the update they just installed.
+    assert.equal(client.getCachedStatus().helperVersion, "0.2.0");
+    assert.deepEqual(
+        transport.requests.map(request => request.method),
+        [
+            "getSourceHealth",
+            "readMetricSnapshot",
+            "readMetricSnapshot",
+            "getSourceHealth",
+            "readMetricSnapshot",
+        ],
+    );
+});
+
 test("windows helper source client records missing snapshot responses as source errors", async () => {
     const nowMilliseconds = 1000;
     const transport = new FakeWindowsHelperGrpcTransport(request => {
@@ -1041,6 +1130,9 @@ test("windows helper source client recovers after protocol mismatch cooldown", a
     assert.deepEqual(client.getCachedStatus(), {
         state: "available",
         protocolVersion: SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
+        // The recovering health check reported this version, and the metric read
+        // after it must not throw it away.
+        helperVersion: "0.0.0-test",
         lastSuccessAtTimestampMilliseconds: nowMilliseconds,
     });
     assert.deepEqual(
@@ -1435,6 +1527,9 @@ test("windows helper source client resets transient backoff after successful rea
     assert.deepEqual(client.getCachedStatus(), {
         state: "available",
         protocolVersion: SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
+        // The reset dropped the connection the helper identified itself on, so
+        // recovering re-reads health and learns who it is talking to now.
+        helperVersion: "0.0.0-test",
         lastSuccessAtTimestampMilliseconds: nowMilliseconds,
     });
 
@@ -1686,11 +1781,12 @@ async function drainAsyncOperations(): Promise<void> {
 
 function buildHealthResponse(
     protocolVersion = SUPPORTED_WINDOWS_SOURCE_PROTOCOL_VERSION,
+    helperVersion = "0.0.0-test",
 ): GetSourceHealthResponse {
     return create(GetSourceHealthResponseSchema, {
         sourceId: WINDOWS_HELPER_SOURCE_ID,
         protocolVersion,
-        helperVersion: "0.0.0-test",
+        helperVersion,
     });
 }
 
