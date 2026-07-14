@@ -6,6 +6,9 @@
   --surface-muted-color: #e6ebf3;
   --text-color: #101418;
   --muted-color: #59646b;
+  --code-keyword-color: #6f42c1;
+  --code-string-color: #a13d18;
+  --code-variable-color: #005cc5;
   --border-color: rgba(16, 20, 24, 0.12);
   --shadow-color: rgba(16, 20, 24, 0.16);
   --accent-color: #245f93;
@@ -50,6 +53,9 @@
     --surface-muted-color: #1d2730;
     --text-color: #f1f7fb;
     --muted-color: #a5b4be;
+    --code-keyword-color: #d2a8ff;
+    --code-string-color: #ffa657;
+    --code-variable-color: #79c0ff;
     --border-color: rgba(255, 255, 255, 0.12);
     --shadow-color: rgba(0, 0, 0, 0.4);
     --accent-color: #9ec5ff;
@@ -653,11 +659,39 @@ details[open] summary::after {
   border-radius: 0.5rem;
 }
 
-.page-content code {
+.page-content :not(pre) > code {
   padding: 0.1rem 0.3rem;
   background: var(--surface-muted-color);
   border-radius: 0.25rem;
   color: var(--text-color);
+}
+
+.page-content pre {
+  max-width: 100%;
+  padding: 1rem;
+  background: var(--surface-muted-color);
+  border-radius: 0.5rem;
+  color: var(--text-color);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Minimal palette for the site's PowerShell and Bash diagnostic commands.
+   Add token classes here when adding fenced code in another language. */
+.page-content .highlight .k {
+  color: var(--code-keyword-color);
+}
+
+.page-content .highlight .nb,
+.page-content .highlight .nv {
+  color: var(--code-variable-color);
+}
+
+.page-content .highlight .s1,
+.page-content .highlight .s2,
+.page-content .highlight .se,
+.page-content .highlight .si {
+  color: var(--code-string-color);
 }
 
 .link-list {

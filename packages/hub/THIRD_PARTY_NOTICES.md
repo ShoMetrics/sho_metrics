@@ -95,6 +95,7 @@ The plugin package uses these non-development npm packages from the locked depen
 | @resvg/resvg-js-win32-arm64-msvc | MPL-2.0 |
 | @resvg/resvg-js-win32-ia32-msvc | MPL-2.0 |
 | @resvg/resvg-js-win32-x64-msvc | MPL-2.0 |
+| @rgrove/parse-xml | ISC |
 | @types/d3-path | MIT |
 | @types/d3-shape | MIT |
 | @types/node | MIT |

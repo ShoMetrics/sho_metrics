@@ -12,6 +12,8 @@ description = "A Stream Deck plugin for clear, glanceable system metrics."
 ogImage = "og-image.png"
 
 [markup]
+  [markup.highlight]
+    noClasses = false
   [markup.goldmark]
     [markup.goldmark.renderer]
       unsafe = false
