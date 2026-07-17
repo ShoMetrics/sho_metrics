@@ -63,7 +63,7 @@ export function createWindowsHelperControlPanelLauncher(
             }
 
             await dependencies.launchExecutable(
-                path.join(installLocation, ...CONTROL_PANEL_RELATIVE_EXECUTABLE_PATH),
+                path.win32.join(installLocation, ...CONTROL_PANEL_RELATIVE_EXECUTABLE_PATH),
             );
         },
     };
