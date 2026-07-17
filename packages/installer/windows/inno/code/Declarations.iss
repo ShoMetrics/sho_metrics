@@ -18,6 +18,7 @@ const
   ErrorServiceMarkedForDelete = 1072;
   ErrorAlreadyExists = 183;
   ErrorSuccessRebootRequired = 3010;
+  ListBoxGetItemHeightMessage = $01A1;
 
 var
   ExistingInstallPage: TWizardPage;
@@ -34,6 +35,7 @@ var
   PawnIoAcceptRadioButton: TNewRadioButton;
   PawnIoDeclineRadioButton: TNewRadioButton;
   PawnIoInstalledBeforeSetup: Boolean;
+  FinishedRestartAdviceLabel: TNewStaticText;
   DefaultBackButtonLeft: Integer;
   DefaultNextButtonLeft: Integer;
   DefaultCancelButtonLeft: Integer;

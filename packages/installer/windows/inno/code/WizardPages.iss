@@ -216,6 +216,44 @@ begin
   CaptureDefaultWizardButtonLayout;
 end;
 
+// Created when the Finished page is entered, not in InitializeWizard: the
+// stock label and RunList receive their final layout only after Setup knows
+// how the install went. The advice follows that final RunList layout.
+procedure ShowFinishedRestartAdvice;
+var
+  FinishedRunListContentHeight: Integer;
+  RunListItemIndex: Integer;
+begin
+  if FinishedRestartAdviceLabel = nil then
+  begin
+    FinishedRestartAdviceLabel := TNewStaticText.Create(WizardForm);
+    FinishedRestartAdviceLabel.Parent := WizardForm.FinishedPage;
+    FinishedRestartAdviceLabel.AutoSize := False;
+    FinishedRestartAdviceLabel.WordWrap := True;
+    FinishedRestartAdviceLabel.Font.Style := [fsBold];
+    FinishedRestartAdviceLabel.Caption := #13#10 +
+      'We recommend restarting your computer before you start using ShoMetrics Helper.';
+  end;
+
+  FinishedRestartAdviceLabel.Left := WizardForm.FinishedLabel.Left;
+  FinishedRestartAdviceLabel.Width := WizardForm.FinishedLabel.Width;
+  // RunList fills the remaining page, so its Height does not describe the
+  // occupied rows. Query each owner-drawn row after Inno Setup has measured it;
+  // MinItemHeight alone would be wrong when a caption wraps. The leading blank
+  // line above mirrors the trailing blank line in Inno's FinishedLabel layout.
+  FinishedRunListContentHeight := 0;
+  for RunListItemIndex := 0 to WizardForm.RunList.Items.Count - 1 do
+    FinishedRunListContentHeight := FinishedRunListContentHeight +
+      SendMessage(
+        WizardForm.RunList.Handle,
+        ListBoxGetItemHeightMessage,
+        RunListItemIndex,
+        0);
+  FinishedRestartAdviceLabel.Top := WizardForm.RunList.Top +
+    FinishedRunListContentHeight;
+  FinishedRestartAdviceLabel.AdjustHeight;
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = PawnIoOptionPage.ID then
@@ -223,7 +261,8 @@ begin
   else if CurPageID = wpFinished then
   begin
     RestoreDefaultWizardButtonLayout;
-    WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish)
+    WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish);
+    ShowFinishedRestartAdvice
   end
   else
   begin
