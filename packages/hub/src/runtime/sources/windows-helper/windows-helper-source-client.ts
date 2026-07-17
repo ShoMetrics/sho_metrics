@@ -130,8 +130,23 @@ const DESCRIPTOR_PRELOAD_STARTUP_RETRY_WINDOW_MILLISECONDS = 60000;
  * Steady descriptor preload retry interval after the startup window has passed.
  * This timer is metadata-only and runs only while descriptor listeners exist
  * and no descriptor snapshot has loaded yet.
+ *
+ * Most machines in this lane have no Helper installed at all, and for them the
+ * retry is not a recovery mechanism but a permanent idle loop. It was
+ * introduced as "avoid polling a missing helper aggressively for the whole
+ * session" (cc28806) at ten seconds; thirty finishes that intent while keeping
+ * the dial the install detector: a user who installs the Helper sees it
+ * connect within one interval, with no dependency on the service status query
+ * being right. The dial is paced, never skipped.
+ *
+ * The machines that pay for the slower pace are installed ones whose service
+ * is still not reachable a full startup window after launch. They have already
+ * waited a minute, and one more half-minute retry does not change what they
+ * are waiting on. A status-dependent fast lane for them was tried and removed:
+ * it cost a branch, a constant, and two tests to serve that sliver, and left
+ * machines whose service state cannot be read at all polling fast forever.
  */
-const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 10000;
+const DEFAULT_DESCRIPTOR_PRELOAD_RETRY_MILLISECONDS = 30000;
 
 /**
  * Throttles repeated descriptor preload warnings to one supportable log per
@@ -779,7 +794,23 @@ export class WindowsHelperSourceClient implements SourceClient {
             lastFailureAtTimestampMilliseconds: wallClockNowMilliseconds,
         };
 
-        if (failure.reason === "pipeMissing") {
+        // Once the service manager has positively answered notInstalled, asking
+        // it again on every failure buys nothing: an install is detected by the
+        // next dial succeeding, which writes the status back to running without
+        // SCM's help. Without this gate the steady preload retry on a machine
+        // that never installs the Helper spawns an sc.exe that exits with error
+        // 1060 every status-cache expiry for the whole session. Skipping it
+        // avoids that repeated process creation and the AV inspection overhead
+        // that rides on process creation.
+        //
+        // Only notInstalled is gated. A stopped service keeps probing, because
+        // there SCM's answer still distinguishes "start the service" from
+        // "install the Helper" in what the user is told, and unknown keeps
+        // probing because a failed probe must not become the reason to stop
+        // probing. The cost is one stale label: a Helper installed mid-session
+        // whose service never starts reads as not installed until a dial
+        // succeeds or the plugin restarts.
+        if (failure.reason === "pipeMissing" && this.cachedServiceStatus !== "notInstalled") {
             this.refreshCachedServiceStatus();
         }
     }

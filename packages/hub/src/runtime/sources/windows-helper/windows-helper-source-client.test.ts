@@ -450,6 +450,151 @@ test("windows helper uses fast descriptor preload retry only during startup wind
     unsubscribe();
 });
 
+test("windows helper connects on the next steady retry once the Helper is installed", async () => {
+    // The steady retry is also the install detector, so installing the Helper
+    // must be noticed by the very next dial with no dependency on the service
+    // probe updating first. The delay assertion pins the shipped cadence: it is
+    // the longest a user who just installed the Helper can wait for metrics,
+    // and the whole-session poll rate for the majority who never install it.
+    let currentTimestampMilliseconds = 1000;
+    let isHelperInstalled = false;
+    const retryTimer = new FakeDescriptorPreloadTimer();
+    const transport = new FakeWindowsHelperGrpcTransport(request => {
+        if (!isHelperInstalled) {
+            throw createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
+        }
+
+        switch (request.method) {
+            case "getSourceHealth":
+                return buildHealthResponse();
+            case "listMetricDescriptors":
+                return buildDescriptorResponse();
+            default:
+                throw new Error(`Unexpected request: ${request.method ?? "empty"}`);
+        }
+    });
+    const client = createClient(transport, {}, {
+        descriptorPreloadTimer: retryTimer,
+        monotonicNow: () => currentTimestampMilliseconds,
+        wallClockNow: () => currentTimestampMilliseconds,
+        serviceStatusReader: { readStatus: async () => "notInstalled" },
+    });
+    const invalidations: SourceMetadataInvalidation[] = [];
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(invalidation => {
+        invalidations.push(invalidation);
+    });
+    await drainAsyncOperations();
+    currentTimestampMilliseconds += 60_001;
+    retryTimer.runNext();
+    await drainAsyncOperations();
+
+    assert.equal(retryTimer.activeDelayMilliseconds(), 30_000);
+
+    isHelperInstalled = true;
+    currentTimestampMilliseconds += 30_000;
+    retryTimer.runNext();
+    await drainAsyncOperations();
+
+    assert.equal(invalidations.length, 1);
+    assert.equal(invalidations[0]?.reason, "descriptorLoaded");
+    // Descriptors are loaded, so the loop is over: no further retry is pending.
+    assert.equal(retryTimer.activeHandleCount(), 0);
+
+    unsubscribe();
+});
+
+test("windows helper stops asking the service manager once notInstalled is confirmed", async () => {
+    // On a machine that never installs the Helper, every pipe failure would
+    // otherwise re-spawn an sc.exe that exits with error 1060, at every status
+    // cache expiry, for the whole session. Once notInstalled is a confirmed
+    // answer there is nothing left to ask: an install is detected by the next
+    // dial succeeding, which writes the status back to running by itself.
+    let currentTimestampMilliseconds = 1000;
+    let statusProbeCount = 0;
+    const retryTimer = new FakeDescriptorPreloadTimer();
+    const transport = new FakeWindowsHelperGrpcTransport(() => {
+        throw createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
+    });
+    const client = createClient(transport, {}, {
+        descriptorPreloadTimer: retryTimer,
+        monotonicNow: () => currentTimestampMilliseconds,
+        wallClockNow: () => currentTimestampMilliseconds,
+        serviceStatusReader: {
+            readStatus: async () => {
+                statusProbeCount += 1;
+                return "notInstalled";
+            },
+        },
+    });
+
+    const unsubscribe = client.subscribeSourceMetadataInvalidations(() => undefined);
+    await drainAsyncOperations();
+
+    const probesBeforeConfirmation = statusProbeCount;
+    assert.equal(probesBeforeConfirmation >= 1, true, "confirming notInstalled requires at least one probe");
+
+    // Each retry lands after the status cache has expired, so without the gate
+    // every one of them would spawn another service query.
+    for (let retryCount = 0; retryCount < 3; retryCount++) {
+        currentTimestampMilliseconds += 31_000;
+        retryTimer.runNext();
+        await drainAsyncOperations();
+    }
+
+    assert.equal(statusProbeCount, probesBeforeConfirmation);
+
+    unsubscribe();
+});
+
+test("windows helper keeps asking the service manager unless notInstalled is confirmed", async () => {
+    // A stopped service is the state where the service manager's answer still
+    // matters: it is what separates telling the user to start the service from
+    // telling them to install the Helper, and it is the state an uninstall
+    // would be noticed in. An unknown state means the probe itself failed, and
+    // a failed probe must not become the reason probing stops. Only the
+    // confirmed notInstalled answer may stop it; this pins both of the states
+    // the gate promises to leave alone.
+    for (const serviceStatus of ["installedStopped", "unknown"] as const) {
+        let currentTimestampMilliseconds = 1000;
+        let statusProbeCount = 0;
+        const retryTimer = new FakeDescriptorPreloadTimer();
+        const transport = new FakeWindowsHelperGrpcTransport(() => {
+            throw createGrpcServiceError(grpcStatus.UNAVAILABLE, "ENOENT: pipe not found");
+        });
+        const client = createClient(transport, {}, {
+            descriptorPreloadTimer: retryTimer,
+            monotonicNow: () => currentTimestampMilliseconds,
+            wallClockNow: () => currentTimestampMilliseconds,
+            serviceStatusReader: {
+                readStatus: async () => {
+                    statusProbeCount += 1;
+                    return serviceStatus;
+                },
+            },
+        });
+
+        const unsubscribe = client.subscribeSourceMetadataInvalidations(() => undefined);
+        await drainAsyncOperations();
+
+        const probesBeforeSteadyState = statusProbeCount;
+
+        for (let retryCount = 0; retryCount < 3; retryCount++) {
+            currentTimestampMilliseconds += 31_000;
+            retryTimer.runNext();
+            await drainAsyncOperations();
+        }
+
+        assert.equal(
+            statusProbeCount > probesBeforeSteadyState,
+            true,
+            `service status ${serviceStatus} must keep being probed so its status can change`,
+        );
+
+        unsubscribe();
+    }
+});
+
 test("windows helper dispose stops descriptor preload retry timer", async () => {
     const retryTimer = new FakeDescriptorPreloadTimer();
     const transport = new FakeWindowsHelperGrpcTransport(request => {
