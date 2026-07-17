@@ -10,6 +10,7 @@ import {
 test("Windows Helper Control Panel launcher uses the installer's configured directory", async () => {
     const launchedExecutablePathList: string[] = [];
     const launcher = createWindowsHelperControlPanelLauncher({
+        platform: "win32",
         readAppPath: async () => undefined,
         readInstallLocation: async () => "D:\\Tools\\ShoMetrics Helper\\",
         launchExecutable: async (executablePath) => {
@@ -26,6 +27,7 @@ test("Windows Helper Control Panel launcher uses the installer's configured dire
 
 test("Windows Helper Control Panel launcher rejects a missing installation", async () => {
     const launcher = createWindowsHelperControlPanelLauncher({
+        platform: "win32",
         readAppPath: async () => undefined,
         readInstallLocation: async () => undefined,
         launchExecutable: async () => {
@@ -39,6 +41,7 @@ test("Windows Helper Control Panel launcher rejects a missing installation", asy
 test("Windows Helper Control Panel launcher prefers the installer App Paths entry", async () => {
     const launchedExecutablePathList: string[] = [];
     const launcher = createWindowsHelperControlPanelLauncher({
+        platform: "win32",
         readAppPath: async () => "D:\\Moved\\ShoMetricsHelper.exe",
         readInstallLocation: async () => {
             assert.fail("App Paths should avoid the compatibility fallback.");
@@ -51,6 +54,23 @@ test("Windows Helper Control Panel launcher prefers the installer App Paths entr
     await launcher.open();
 
     assert.deepEqual(launchedExecutablePathList, ["D:\\Moved\\ShoMetricsHelper.exe"]);
+});
+
+test("Windows Helper Control Panel launcher rejects non-Windows platforms", async () => {
+    const launcher = createWindowsHelperControlPanelLauncher({
+        platform: "linux",
+        readAppPath: async () => {
+            assert.fail("A non-Windows platform must not read the registry.");
+        },
+        readInstallLocation: async () => {
+            assert.fail("A non-Windows platform must not read the registry.");
+        },
+        launchExecutable: async () => {
+            assert.fail("A non-Windows platform must not launch an executable.");
+        },
+    });
+
+    await assert.rejects(launcher.open(), /only available on Windows/u);
 });
 
 test("Windows Helper registry queries always read the 64-bit view", () => {

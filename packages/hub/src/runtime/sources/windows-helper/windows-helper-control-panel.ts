@@ -15,6 +15,7 @@ export interface WindowsHelperControlPanelLauncher {
 }
 
 interface WindowsHelperControlPanelLauncherDependencies {
+    readonly platform: NodeJS.Platform;
     readAppPath(): Promise<string | undefined>;
     readInstallLocation(): Promise<string | undefined>;
     launchExecutable(executablePath: string): Promise<void>;
@@ -34,6 +35,7 @@ const REGISTRY_64_BIT_VIEW_ARGUMENT = "/reg:64";
 
 /** Opens the installed Windows Helper Control Panel. */
 export const windowsHelperControlPanelLauncher = createWindowsHelperControlPanelLauncher({
+    platform: process.platform,
     readAppPath: readWindowsHelperAppPath,
     readInstallLocation: readWindowsHelperInstallLocation,
     launchExecutable: launchDetachedExecutable,
@@ -45,7 +47,7 @@ export function createWindowsHelperControlPanelLauncher(
 ): WindowsHelperControlPanelLauncher {
     return {
         async open(): Promise<void> {
-            if (process.platform !== "win32") {
+            if (dependencies.platform !== "win32") {
                 throw new Error("ShoMetrics Helper Control Panel is only available on Windows.");
             }
 
