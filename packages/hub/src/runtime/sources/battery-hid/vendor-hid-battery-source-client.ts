@@ -22,7 +22,10 @@ import type {
     SourceMetricValueMetadata,
     SourceSnapshotReadResult,
 } from "../source-client";
-import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
+import {
+    BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
+    type SourceMetricPollingGroupResolution,
+} from "../source-polling-groups";
 import type {
     BatteryDeviceDescriptor,
     BatteryDeviceDiscoveryDiagnostics,
@@ -154,7 +157,14 @@ export class VendorHidBatterySourceClient implements SourceClient {
         return new Map(metricKeys.map(metricKey => [
             metricKey,
             isVendorHidBatteryMetricKey(metricKey)
-                ? { state: "owned", pollingGroupId: VENDOR_HID_BATTERY_POLLING_GROUP_ID }
+                ? {
+                    // Vendor HID devices sleep with the machine and share a
+                    // device queue with manufacturer software, so this source
+                    // declares the recovery cadence for its own group.
+                    state: "owned",
+                    pollingGroupId: VENDOR_HID_BATTERY_POLLING_GROUP_ID,
+                    recoveryRetryOffsetsMilliseconds: BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
+                }
                 : { state: "unsupported" },
         ]));
     }

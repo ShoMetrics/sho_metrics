@@ -24,6 +24,13 @@ interface PlannedCollectorGroupBase {
 
     /** Visible subscribers that currently depend on this group. */
     readonly subscriberIds: readonly string[];
+
+    /**
+     * Source-declared recovery retry offsets for this polling group, copied
+     * through from the owned polling-group resolution. The planner does not
+     * decide this; the source is the authority on how its group recovers.
+     */
+    readonly recoveryRetryOffsetsMilliseconds?: readonly number[];
 }
 
 /** Planned loop for a source-declared collector/cost group. */
@@ -50,6 +57,7 @@ interface CollectorGroupAccumulatorBase {
     readonly metricKeys: Set<string>;
     readonly subscriberIds: Set<string>;
     intervalMilliseconds: number;
+    recoveryRetryOffsetsMilliseconds?: readonly number[];
 }
 
 interface SourceDeclaredCollectorGroupAccumulator extends CollectorGroupAccumulatorBase {
@@ -104,6 +112,10 @@ export class CollectorGroupPlanner {
 
                 const existingGroup = groupsByKey.get(groupIdentity.collectorGroupKey);
 
+                const declaredRecoveryRetryOffsetsMilliseconds = resolution.state === "owned"
+                    ? resolution.recoveryRetryOffsetsMilliseconds
+                    : undefined;
+
                 if (existingGroup) {
                     existingGroup.metricKeys.add(subscription.metricKey);
                     existingGroup.subscriberIds.add(subscription.subscriberId);
@@ -111,6 +123,8 @@ export class CollectorGroupPlanner {
                         existingGroup.intervalMilliseconds,
                         subscription.intervalMilliseconds,
                     );
+                    existingGroup.recoveryRetryOffsetsMilliseconds
+                        ??= declaredRecoveryRetryOffsetsMilliseconds;
                     continue;
                 }
 
@@ -121,6 +135,9 @@ export class CollectorGroupPlanner {
                     metricKeys: new Set([subscription.metricKey]),
                     subscriberIds: new Set([subscription.subscriberId]),
                     intervalMilliseconds: subscription.intervalMilliseconds,
+                    ...(declaredRecoveryRetryOffsetsMilliseconds === undefined
+                        ? {}
+                        : { recoveryRetryOffsetsMilliseconds: declaredRecoveryRetryOffsetsMilliseconds }),
                 });
             }
         }
@@ -238,6 +255,9 @@ function buildPlannedCollectorGroup(group: CollectorGroupAccumulator): PlannedCo
         metricKeys: Array.from(group.metricKeys).sort(),
         intervalMilliseconds: group.intervalMilliseconds,
         subscriberIds: Array.from(group.subscriberIds).sort(),
+        ...(group.recoveryRetryOffsetsMilliseconds === undefined
+            ? {}
+            : { recoveryRetryOffsetsMilliseconds: group.recoveryRetryOffsetsMilliseconds }),
     };
 
     switch (group.groupKind) {

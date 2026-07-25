@@ -35,6 +35,7 @@ export interface CollectorGroupSupervisorOptions {
     readonly snapshotStore: CollectorGroupSnapshotStore;
     readonly createBackoffPolicy: CollectorGroupBackoffPolicyFactory;
     readonly timer?: CollectorGroupRunnerTimer;
+    readonly monotonicNow?: () => number;
 }
 
 /**
@@ -66,6 +67,7 @@ export class CollectorGroupSupervisor {
     private readonly snapshotStore: CollectorGroupSnapshotStore;
     private readonly createBackoffPolicy: CollectorGroupBackoffPolicyFactory;
     private readonly timer: CollectorGroupRunnerTimer;
+    private readonly monotonicNow: (() => number) | undefined;
     private readonly runnersByCollectorGroupKey = new Map<string, CollectorGroupRunner>();
     private latestWindowsHelperDemandGroups: readonly SourceRefreshDemandGroup[] = [];
     private latestWindowsHelperDemandFingerprint = buildRefreshDemandFingerprint([]);
@@ -80,6 +82,7 @@ export class CollectorGroupSupervisor {
         this.snapshotStore = options.snapshotStore;
         this.createBackoffPolicy = options.createBackoffPolicy;
         this.timer = options.timer ?? nodeCollectorGroupSupervisorTimer;
+        this.monotonicNow = options.monotonicNow;
     }
 
     /**
@@ -173,10 +176,14 @@ export class CollectorGroupSupervisor {
     }
 
     /**
-     * Requests an immediate pull for every live collector group.
+     * Requests a pull for every live collector group.
      *
      * This is a process-lifecycle recovery hook. It does not re-plan groups;
-     * live runner ownership remains established by `reconcile()`.
+     * live runner ownership remains established by `reconcile()`. Most runners
+     * read immediately; runners whose planned group declares a recovery
+     * schedule (source-declared, battery groups today) defer their first read
+     * instead, because their devices are the ones still waking up when this
+     * fires.
      */
     async requestAllRefresh(reason: MetricCollectionRefreshReason): Promise<void> {
         // Must run before the demand resend and runner reads below: the first
@@ -189,10 +196,13 @@ export class CollectorGroupSupervisor {
         this.renewWindowsHelperRefreshDemand(reason);
 
         const runners = [...this.runnersByCollectorGroupKey.values()];
-        const runnerResults = await Promise.all(
-            runners.map(runner => runner.requestOnDemandRefresh()),
-        );
-        const status = runners.length === 0 ? "skipped" : aggregateSubscriberRefreshStatus(runnerResults);
+        const runnerRefreshPromises = runners
+            .map(runner => runner.requestRecoveryRefresh())
+            .filter(promise => promise !== undefined);
+        const runnerResults = await Promise.all(runnerRefreshPromises);
+        // An empty result set means every live runner deferred to its recovery
+        // schedule; aggregate([]) would report that as "refreshed", which lies.
+        const status = runnerResults.length === 0 ? "skipped" : aggregateSubscriberRefreshStatus(runnerResults);
 
         log.atInfo()
             .everyMs(`all-runner-refresh:${reason}`, ALL_RUNNER_REFRESH_LOG_INTERVAL_MILLISECONDS)
@@ -201,6 +211,7 @@ export class CollectorGroupSupervisor {
                 `reason=${reason}`,
                 `status=${status}`,
                 `runnerCount=${runners.length}`,
+                `deferredToRecoveryCount=${runners.length - runnerResults.length}`,
             ].join(" "));
     }
 
@@ -235,6 +246,7 @@ export class CollectorGroupSupervisor {
             snapshotStore: this.snapshotStore,
             backoffPolicy: this.createBackoffPolicy(collectorGroup),
             timer: this.timer,
+            ...(this.monotonicNow === undefined ? {} : { monotonicNow: this.monotonicNow }),
             onRefreshResult: (refreshedCollectorGroup, result) => {
                 this.recordCollectorGroupRefreshResult(refreshedCollectorGroup, result);
             },

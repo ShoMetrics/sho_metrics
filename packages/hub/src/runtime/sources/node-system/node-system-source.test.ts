@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "vitest";
 import type { Systeminformation } from "systeminformation";
+import { BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS } from "../source-polling-groups";
 import {
     buildScalarMetricValue,
     MetricUnit,
@@ -93,9 +94,11 @@ test("node system source declares polling groups for owned metric keys", () => {
         state: "owned",
         pollingGroupId: "cpu",
     });
+    // The battery group declares its own recovery cadence; other groups do not.
     assert.deepEqual(resolutions.get(SYSTEM_BATTERY_PERCENT_METRIC_KEY), {
         state: "owned",
         pollingGroupId: "battery",
+        recoveryRetryOffsetsMilliseconds: BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
     });
     assert.deepEqual(resolutions.get("net.down"), {
         state: "owned",

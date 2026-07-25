@@ -87,7 +87,10 @@ import type {
 } from "./node-system-source-types";
 import { BackoffPolicy } from "../backoff-policy";
 import { RefreshableCache, type RefreshableCacheReadResult } from "../refreshable-cache";
-import type { SourceMetricPollingGroupResolution } from "../source-polling-groups";
+import {
+    BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
+    type SourceMetricPollingGroupResolution,
+} from "../source-polling-groups";
 import { NODE_SYSTEM_SOURCE_ID } from "../source-ids";
 import { buildSystemBatteryMetrics } from "./node-system-battery";
 import {
@@ -290,7 +293,16 @@ export class NodeSystemSource implements MetricSource {
                 continue;
             }
 
-            resolutions.set(metricKey, { state: "owned", pollingGroupId: metricGroup });
+            // The battery group's reads miss for a while after wake (sleeping
+            // Bluetooth peripherals, PowerShell property reads), so this
+            // source declares the recovery cadence for its own group.
+            resolutions.set(metricKey, metricGroup === "battery"
+                ? {
+                    state: "owned",
+                    pollingGroupId: metricGroup,
+                    recoveryRetryOffsetsMilliseconds: BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
+                }
+                : { state: "owned", pollingGroupId: metricGroup });
         }
 
         return resolutions;

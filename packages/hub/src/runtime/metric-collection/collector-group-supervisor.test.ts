@@ -291,6 +291,100 @@ test("requestAllRefresh notifies the Windows helper source before resume recover
     ]);
 });
 
+test("reconcile passes a group's declared recovery schedule through to its runner", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, {}),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+        monotonicNow: () => 0,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "battery",
+            metricKeys: ["system.battery_percent", "bluetooth.battery_percent:mouse"],
+            intervalMilliseconds: 600_000,
+            recoveryRetryOffsetsMilliseconds: [10_000, 30_000],
+        }),
+    ]);
+    await fakeTimer.runNext();
+
+    // The first read produced nothing, so the next attempt follows the
+    // declared recovery schedule instead of waiting a full slow interval.
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 10_000]);
+});
+
+test("reconcile keeps groups without a declared recovery schedule on the plain interval", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, {}),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+        monotonicNow: () => 0,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 600_000,
+        }),
+    ]);
+    await fakeTimer.runNext();
+
+    assert.deepEqual(fakeTimer.recordedDelaysMilliseconds, [0, 600_000]);
+});
+
+test("requestAllRefresh defers battery runners to their recovery schedule", async () => {
+    const fakeTimer = new FakeTimer();
+    const sourceClient = new FakeSourceClient("node-system", [
+        buildSnapshot(1000, { "cpu.usage_percent": 42 }),
+        buildSnapshot(2000, { "bluetooth.battery_percent:mouse": 60 }),
+    ]);
+    const supervisor = new CollectorGroupSupervisor({
+        sourceRegistry: new FakeSourceRegistry([sourceClient]),
+        snapshotStore: new MetricStore(),
+        createBackoffPolicy: () => BackoffPolicy.flat(() => 0, 1000),
+        timer: fakeTimer,
+        monotonicNow: () => 0,
+    });
+
+    supervisor.reconcile([
+        buildCollectorGroup({
+            pollingGroupId: "cpu",
+            metricKeys: ["cpu.usage_percent"],
+            intervalMilliseconds: 600_000,
+        }),
+        buildCollectorGroup({
+            pollingGroupId: "battery",
+            metricKeys: ["bluetooth.battery_percent:mouse"],
+            intervalMilliseconds: 600_000,
+            recoveryRetryOffsetsMilliseconds: [10_000, 30_000],
+        }),
+    ]);
+    await supervisor.requestAllRefresh("resumeRecovery");
+
+    // The cpu runner read immediately; the battery runner deferred, replacing
+    // its pending initial timer with the first recovery offset.
+    assert.deepEqual(sourceClient.requestedMetricKeys, [["cpu.usage_percent"]]);
+
+    assert.equal(await fakeTimer.runNextWithDelay(10_000), true);
+
+    assert.deepEqual(sourceClient.requestedMetricKeys, [
+        ["cpu.usage_percent"],
+        ["bluetooth.battery_percent:mouse"],
+    ]);
+});
+
 test("requestSubscriberRefresh ignores runners for other subscribers", async () => {
     const sourceClient = new FakeSourceClient("node-system", [
         buildSnapshot(1000, { "cpu.usage_percent": 42 }),
@@ -1001,6 +1095,7 @@ function buildCollectorGroup(options: {
     readonly sourceId?: string;
     readonly pollingGroupId?: string;
     readonly subscriberIds?: readonly string[];
+    readonly recoveryRetryOffsetsMilliseconds?: readonly number[];
 }): PlannedCollectorGroup {
     const sourceId = options.sourceId ?? "node-system";
     const pollingGroupId = options.pollingGroupId ?? "cpu";
@@ -1014,6 +1109,9 @@ function buildCollectorGroup(options: {
         metricKeys: options.metricKeys,
         intervalMilliseconds: options.intervalMilliseconds ?? 1000,
         subscriberIds: options.subscriberIds ?? ["action-1"],
+        ...(options.recoveryRetryOffsetsMilliseconds === undefined
+            ? {}
+            : { recoveryRetryOffsetsMilliseconds: options.recoveryRetryOffsetsMilliseconds }),
     };
 }
 

@@ -16,6 +16,7 @@ import {
     readVendorHidBatteryDeviceDescriptors,
 } from "./vendor-hid-battery-source-client";
 import { VendorHidBatteryRouteRegistry } from "./vendor-hid-battery-route-registry";
+import { BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS } from "../source-polling-groups";
 
 test("vendor HID battery source does not load native HID during construction or planning", () => {
     let loadNativeHidCalls = 0;
@@ -33,6 +34,7 @@ test("vendor HID battery source does not load native HID during construction or 
     assert.deepEqual(pollingGroups.get(buildTestMetricKey()), {
         state: "owned",
         pollingGroupId: "vendor-hid-battery",
+        recoveryRetryOffsetsMilliseconds: BATTERY_RECOVERY_RETRY_OFFSETS_MILLISECONDS,
     });
     assert.deepEqual(pollingGroups.get("cpu.usage_percent"), { state: "unsupported" });
 });

@@ -42,6 +42,14 @@ export interface CollectorGroupRefreshResult {
     readonly status: CollectorGroupRefreshStatus;
     readonly backoffDelayMilliseconds?: number;
     readonly error?: unknown;
+
+    /**
+     * Present on refreshed results: whether the snapshot carried every
+     * requested metric key. Computed from the same snapshot the no-data
+     * observer sees. Carried on the result rather than kept as runner state so
+     * failed/skipped refreshes can never be misread as last cycle's coverage.
+     */
+    readonly hasAllRequestedMetrics?: boolean;
 }
 
 export interface CollectorGroupSnapshotStore {
@@ -66,6 +74,7 @@ export interface CollectorGroupRunnerOptions {
     readonly snapshotStore: CollectorGroupSnapshotStore;
     readonly backoffPolicy: BackoffPolicy;
     readonly timer?: CollectorGroupRunnerTimer;
+    readonly monotonicNow?: () => number;
     readonly collectorGroupNoDataObserver?: CollectorGroupNoDataObserver;
     readonly metricStoreIngestDiagnostics?: MetricStoreIngestDiagnostics;
     readonly onRefreshResult?: (
@@ -102,10 +111,12 @@ export class CollectorGroupRunner {
         collectorGroup: PlannedCollectorGroup,
         result: CollectorGroupRefreshResult,
     ) => void;
+    private readonly monotonicNow: () => number;
     private timerHandle: unknown | null = null;
     private scheduledRefreshFireAtMonotonicMilliseconds: number | null = null;
     private pendingRefreshPromise: Promise<CollectorGroupRefreshResult> | null = null;
     private shouldRefreshAfterPendingUpdate = false;
+    private recoveryTriggerAtMonotonicMilliseconds: number | null = null;
     private generation = 0;
     private isRunningLoop = false;
     private isStopped = false;
@@ -116,6 +127,7 @@ export class CollectorGroupRunner {
         this.snapshotStore = options.snapshotStore;
         this.backoffPolicy = options.backoffPolicy;
         this.timer = options.timer ?? defaultTimer;
+        this.monotonicNow = options.monotonicNow ?? monotonicNowMilliseconds;
         this.collectorGroupNoDataObserver = options.collectorGroupNoDataObserver
             ?? new DefaultCollectorGroupNoDataObserver();
         this.metricStoreIngestDiagnostics = options.metricStoreIngestDiagnostics
@@ -130,6 +142,10 @@ export class CollectorGroupRunner {
 
         this.isRunningLoop = true;
         this.isStopped = false;
+        // "Start" here means runner start, not process launch: a widget's
+        // first appearance and collector group rebuilds arrive here too, which
+        // is wanted (a freshly configured device reaches its first value fast).
+        this.armRecoverySchedule();
         this.scheduleNextRefresh(0);
     }
 
@@ -138,6 +154,7 @@ export class CollectorGroupRunner {
         this.isStopped = true;
         this.generation += 1;
         this.shouldRefreshAfterPendingUpdate = false;
+        this.recoveryTriggerAtMonotonicMilliseconds = null;
         this.collectorGroupNoDataObserver.clear(this.collectorGroup.collectorGroupKey);
 
         this.clearScheduledRefresh();
@@ -157,7 +174,7 @@ export class CollectorGroupRunner {
     }
 
     async refreshNow(): Promise<CollectorGroupRefreshResult> {
-        const refreshStartedAtMonotonicMilliseconds = monotonicNowMilliseconds();
+        const refreshStartedAtMonotonicMilliseconds = this.monotonicNow();
 
         if (this.isStopped) {
             return this.recordRefreshResult(
@@ -209,13 +226,54 @@ export class CollectorGroupRunner {
 
         this.clearScheduledRefresh();
 
+        let refreshResult: CollectorGroupRefreshResult | undefined;
         try {
-            return await this.refreshNow();
+            refreshResult = await this.refreshNow();
+            return refreshResult;
         } finally {
             if (this.isRunningLoop && !this.isStopped) {
-                this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
+                this.scheduleNextRefresh(this.resolveNextRefreshDelayMilliseconds(refreshResult));
             }
         }
+    }
+
+    /**
+     * Requests the refresh appropriate after a process-recovery event.
+     *
+     * A runner without a recovery schedule reads immediately (returning that
+     * refresh). A runner with one does not read at all: its sources are the
+     * ones whose devices are still waking up, so an immediate read is a wasted
+     * attempt whose miss would cost a full slow interval. Instead the schedule
+     * is re-armed from now and the first attempt lands at the first offset.
+     * Repeated calls only push that first attempt out again, so a burst of
+     * resume events produces zero extra reads; the first offset doubles as the
+     * debounce window.
+     */
+    requestRecoveryRefresh(): Promise<CollectorGroupRefreshResult> | undefined {
+        const recoveryRetryOffsetsMilliseconds = this.recoveryRetryOffsetsMilliseconds();
+        if (recoveryRetryOffsetsMilliseconds.length === 0) {
+            return this.requestOnDemandRefresh();
+        }
+
+        if (this.isStopped) {
+            return undefined;
+        }
+
+        // A read that started before this trigger describes the pre-sleep
+        // world. Left alone, its late result would ingest pre-sleep samples
+        // into the post-resume store and, if it happened to carry full
+        // coverage, unload the schedule that was just armed, leaving the
+        // remaining offsets unwalked. Bumping the generation makes it resolve
+        // skippedSuperseded through the existing in-flight guard, which also
+        // skips its store write and its scheduling influence entirely.
+        this.generation += 1;
+        this.armRecoverySchedule();
+        // scheduleNextRefresh keeps an existing earlier timer, and a pre-sleep
+        // overdue timer is exactly that: it would fire the moment the process
+        // resumes, which is the read this schedule exists to delay. Replace it.
+        this.clearScheduledRefresh();
+        this.scheduleNextRefresh(recoveryRetryOffsetsMilliseconds[0]);
+        return undefined;
     }
 
     /** Whether this runner currently backs the given subscriber id. */
@@ -248,11 +306,27 @@ export class CollectorGroupRunner {
             // Only a successful source read can answer "refreshed but produced
             // none of the requested keys"; failed/skipped states are logged by
             // the refresh status path below.
-            this.recordCollectorGroupNoDataState(readResult.snapshot);
+            const snapshotMetricKeys = new Set(Object.keys(readResult.snapshot.metrics));
+            this.recordCollectorGroupNoDataState(snapshotMetricKeys);
             this.backoffPolicy.recordSuccess();
 
-            return { status: "refreshed" };
+            return {
+                status: "refreshed",
+                hasAllRequestedMetrics: this.collectorGroup.metricKeys
+                    .every(metricKey => snapshotMetricKeys.has(metricKey)),
+            };
         } catch (error) {
+            // Same guard as the success path, for the same reason. A read whose
+            // generation has moved on describes a world this runner has left:
+            // after a resume it is the pre-sleep read, and rejecting is exactly
+            // what it is most likely to do once the pipe or device is gone.
+            // Recording that as a failure would arm a cooldown able to swallow
+            // the first recovery attempt, and log it as if the current epoch
+            // had failed.
+            if (this.isStopped || refreshGeneration !== this.generation) {
+                return { status: this.isStopped ? "stopped" : "skippedSuperseded" };
+            }
+
             const backoffDelayMilliseconds = this.backoffPolicy.recordFailure();
 
             return {
@@ -270,7 +344,7 @@ export class CollectorGroupRunner {
         // If a source read starts before system sleep and returns after wake,
         // this elapsed duration can include suspended time. Treat unusually
         // large values near processResumeDetected as diagnostic noise first.
-        const durationMilliseconds = monotonicNowMilliseconds() - refreshStartedAtMonotonicMilliseconds;
+        const durationMilliseconds = this.monotonicNow() - refreshStartedAtMonotonicMilliseconds;
         const logMessage = () => [
             "collectorGroupRefresh",
             `status=${result.status}`,
@@ -326,19 +400,98 @@ export class CollectorGroupRunner {
         ].join(":");
     }
 
-    private recordCollectorGroupNoDataState(snapshot: MetricSnapshot): void {
-        const snapshotMetricKeys = new Set(Object.keys(snapshot.metrics));
+    private recordCollectorGroupNoDataState(snapshotMetricKeys: ReadonlySet<string>): void {
         const hasAnyRequestedMetric = this.collectorGroup.metricKeys.some(metricKey => snapshotMetricKeys.has(metricKey));
 
         this.collectorGroupNoDataObserver.observe(
             this.collectorGroup,
             hasAnyRequestedMetric ? "ok" : "noData",
-            monotonicNowMilliseconds(),
+            this.monotonicNow(),
         );
     }
 
+    // The offsets live on the planned group because the source declares them
+    // for its own polling group; this runner only executes what was declared.
+    private recoveryRetryOffsetsMilliseconds(): readonly number[] {
+        return this.collectorGroup.recoveryRetryOffsetsMilliseconds ?? [];
+    }
+
+    private armRecoverySchedule(): void {
+        if (this.recoveryRetryOffsetsMilliseconds().length > 0) {
+            this.recoveryTriggerAtMonotonicMilliseconds = this.monotonicNow();
+            this.logRecoveryEvent("recoveryScheduleArmed");
+        }
+    }
+
+    /**
+     * Traces the recovery schedule's own decisions.
+     *
+     * This mechanism fails silently: a widget simply shows no data longer than
+     * it should, with no error anywhere, so the refresh log alone cannot say
+     * whether the schedule armed, which offset it is on, or why it stopped.
+     * Debug rather than info because that question is only asked while
+     * diagnosing, and unthrottled because the schedule is already bounded per
+     * trigger to one armed line, up to one line per offset, and one terminal
+     * line; a throttle would drop the middle of the very sequence being read.
+     */
+    private logRecoveryEvent(event: string, detail: string = ""): void {
+        log.debug(() => [
+            event,
+            `sourceId=${this.collectorGroup.sourceId}`,
+            `groupId=${formatCollectorGroupId(this.collectorGroup)}`,
+            `intervalMs=${this.collectorGroup.intervalMilliseconds}`,
+            detail,
+        ].filter(part => part !== "").join(" "));
+    }
+
+    /**
+     * Resolves the delay before the next scheduled refresh.
+     *
+     * While the recovery schedule is armed and refreshes have not yet covered
+     * every requested metric, the next attempt lands on the next offset that
+     * is still in the future, measured from the arming trigger. There is
+     * deliberately no attempt counter: any completion (a pre-trigger read
+     * finishing late, an on-demand refresh, a skipped attempt) merely causes
+     * this recomputation, so nothing can be miscounted as a consumed attempt.
+     * Once the offsets are exhausted the schedule disarms and only a new
+     * trigger (runner start or recovery request) re-arms it; an ordinary
+     * failure never does.
+     */
+    private resolveNextRefreshDelayMilliseconds(result?: CollectorGroupRefreshResult): number {
+        const intervalMilliseconds = this.collectorGroup.intervalMilliseconds;
+        const recoveryTriggerAtMonotonicMilliseconds = this.recoveryTriggerAtMonotonicMilliseconds;
+
+        if (recoveryTriggerAtMonotonicMilliseconds === null) {
+            return intervalMilliseconds;
+        }
+
+        if (result?.status === "refreshed" && result.hasAllRequestedMetrics === true) {
+            this.recoveryTriggerAtMonotonicMilliseconds = null;
+            this.logRecoveryEvent("recoveryScheduleCompleted");
+            return intervalMilliseconds;
+        }
+
+        const nowMilliseconds = this.monotonicNow();
+        for (const offsetMilliseconds of this.recoveryRetryOffsetsMilliseconds()) {
+            const fireAtMonotonicMilliseconds = recoveryTriggerAtMonotonicMilliseconds + offsetMilliseconds;
+            if (fireAtMonotonicMilliseconds > nowMilliseconds) {
+                const delayMilliseconds = fireAtMonotonicMilliseconds - nowMilliseconds;
+                this.logRecoveryEvent("recoveryRetryScheduled", [
+                    `offsetMs=${offsetMilliseconds}`,
+                    `delayMs=${Math.round(delayMilliseconds)}`,
+                    `lastStatus=${result?.status ?? "none"}`,
+                ].join(" "));
+                return delayMilliseconds;
+            }
+        }
+
+        this.recoveryTriggerAtMonotonicMilliseconds = null;
+        this.logRecoveryEvent("recoveryScheduleExhausted");
+        return intervalMilliseconds;
+    }
+
     private scheduleNextRefresh(delayMilliseconds: number): void {
-        const scheduledRefreshFireAtMonotonicMilliseconds = monotonicNowMilliseconds() + delayMilliseconds;
+        const scheduledRefreshFireAtMonotonicMilliseconds = this.monotonicNow() + delayMilliseconds;
         if (
             this.timerHandle !== null
             && this.scheduledRefreshFireAtMonotonicMilliseconds !== null
@@ -356,7 +509,7 @@ export class CollectorGroupRunner {
             this.refreshNow()
                 .then(result => {
                     if (!this.isStopped && result.status !== "skippedSuperseded") {
-                        this.scheduleNextRefresh(this.collectorGroup.intervalMilliseconds);
+                        this.scheduleNextRefresh(this.resolveNextRefreshDelayMilliseconds(result));
                     }
                 })
                 .catch(error => {

@@ -283,6 +283,46 @@ test("isolates metrics for missing source candidates", () => {
     ]);
 });
 
+test("copies a source-declared recovery schedule onto the planned group", () => {
+    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
+        new FakeSourceClient("node-system", metricKey => (metricKey.startsWith("bluetooth.")
+            ? {
+                state: "owned",
+                pollingGroupId: "battery",
+                recoveryRetryOffsetsMilliseconds: [10_000, 30_000],
+            }
+            : { state: "owned", pollingGroupId: "battery" })),
+    ]));
+
+    const groups = planner.plan([
+        // Declaration order must not matter: the schedule survives whether the
+        // declaring key creates the group or merges into it.
+        buildSubscription({ metricKey: "system.battery_percent", sourceIds: ["node-system"] }),
+        buildSubscription({ metricKey: "bluetooth.battery_percent:mouse", sourceIds: ["node-system"] }),
+    ]);
+
+    assert.deepEqual(groups.map(group => ({
+        metricKeys: group.metricKeys,
+        recoveryRetryOffsetsMilliseconds: group.recoveryRetryOffsetsMilliseconds,
+    })), [{
+        metricKeys: ["bluetooth.battery_percent:mouse", "system.battery_percent"],
+        recoveryRetryOffsetsMilliseconds: [10_000, 30_000],
+    }]);
+});
+
+test("plans no recovery schedule when the source declares none", () => {
+    const planner = new CollectorGroupPlanner(new FakeSourceRegistry([
+        new FakeSourceClient("node-system", () => ({ state: "owned", pollingGroupId: "cpu" })),
+    ]));
+
+    const groups = planner.plan([
+        buildSubscription({ metricKey: "cpu.usage_percent", sourceIds: ["node-system"] }),
+    ]);
+
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]?.recoveryRetryOffsetsMilliseconds, undefined);
+});
+
 class FakeSourceClient implements SourceClient {
     constructor(
         readonly sourceId: string,
