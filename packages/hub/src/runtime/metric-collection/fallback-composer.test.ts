@@ -3,7 +3,10 @@ import { test } from "vitest";
 import { MetricStore } from "../metric-store";
 import { buildMetricSnapshot, buildScalarMetricValue, buildTextMetricValue } from "../sources/metric-source";
 import { normalizeMetricReadPlan, type MetricReadPlan } from "../source-routing/metric-read-plan";
-import { createFallbackMetricStoreReader } from "./fallback-composer";
+import {
+    BATTERY_RETAINED_SAMPLE_MAX_AGE_MILLISECONDS,
+    createFallbackMetricStoreReader,
+} from "./fallback-composer";
 
 const TEST_NOW_MILLISECONDS = 3000;
 const TEST_MAXIMUM_SAMPLE_AGE_MILLISECONDS = 5000;
@@ -415,6 +418,119 @@ test("fallback reader returns render-safe defaults for metrics outside the read 
     });
     assert.equal(reader.getTextValue("cpu.model"), undefined);
 });
+
+const ONE_HOUR_MILLISECONDS = 60 * 60 * 1000;
+const BATTERY_METRIC_KEY = "bluetooth.battery_percent:test-device";
+
+test("fallback reader retains a healthy battery reading past the standard budget", () => {
+    // A peripheral battery poll can miss for a long stretch (sleep/wake,
+    // Bluetooth reconnect). The last percentage stays renderable within the
+    // battery retention window instead of collapsing to N/A.
+    const reader = createBatteryTestReader({
+        batteryPercent: 50,
+        sampleAgeMilliseconds: ONE_HOUR_MILLISECONDS,
+    });
+
+    assert.equal(reader.getWidgetData(BATTERY_METRIC_KEY, "Mouse", "%").current, 50);
+});
+
+test("fallback reader does not retain a low battery reading past the standard budget", () => {
+    // At or below the low-battery cutoff the percentage moves fastest and a
+    // stale number costs the user most; N/A is the honest answer.
+    const reader = createBatteryTestReader({
+        batteryPercent: 8,
+        sampleAgeMilliseconds: ONE_HOUR_MILLISECONDS,
+    });
+
+    assert.equal(
+        reader.getWidgetData(BATTERY_METRIC_KEY, "Mouse", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
+});
+
+test("fallback reader treats the low-battery cutoff itself as low", () => {
+    const reader = createBatteryTestReader({
+        batteryPercent: 10,
+        sampleAgeMilliseconds: ONE_HOUR_MILLISECONDS,
+    });
+
+    assert.equal(
+        reader.getWidgetData(BATTERY_METRIC_KEY, "Mouse", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
+});
+
+test("fallback reader retains a battery reading up to exactly the retention window", () => {
+    const reader = createBatteryTestReader({
+        batteryPercent: 50,
+        sampleAgeMilliseconds: BATTERY_RETAINED_SAMPLE_MAX_AGE_MILLISECONDS,
+    });
+
+    assert.equal(reader.getWidgetData(BATTERY_METRIC_KEY, "Mouse", "%").current, 50);
+});
+
+test("fallback reader drops a battery reading older than the retention window", () => {
+    const reader = createBatteryTestReader({
+        batteryPercent: 50,
+        sampleAgeMilliseconds: BATTERY_RETAINED_SAMPLE_MAX_AGE_MILLISECONDS + 1,
+    });
+
+    assert.equal(
+        reader.getWidgetData(BATTERY_METRIC_KEY, "Mouse", "%").sampleTimestampMilliseconds,
+        undefined,
+    );
+});
+
+test("fallback reader does not extend battery retention to other metrics", () => {
+    const metricStore = new MetricStore();
+    const readPlan = buildReadPlan();
+
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            "ram.used": buildScalarMetricValue(50),
+        },
+    }));
+
+    const reader = createTestFallbackReader(metricStore, readPlan, {
+        now: 1000 + ONE_HOUR_MILLISECONDS,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+
+    assert.equal(
+        reader.getWidgetData("ram.used", "RAM", "B").sampleTimestampMilliseconds,
+        undefined,
+    );
+});
+
+function createBatteryTestReader(options: {
+    readonly batteryPercent: number;
+    readonly sampleAgeMilliseconds: number;
+}) {
+    const metricStore = new MetricStore();
+    const sampleTimestampMilliseconds = 1000;
+
+    metricStore.ingest("node-system", buildMetricSnapshot({
+        timestampMilliseconds: sampleTimestampMilliseconds,
+        metrics: {
+            [BATTERY_METRIC_KEY]: buildScalarMetricValue(options.batteryPercent),
+        },
+    }));
+
+    const readPlan = normalizeMetricReadPlan({
+        metrics: [{
+            sourceScopeId: "local",
+            metricKey: BATTERY_METRIC_KEY,
+            sourceCandidates: [{ sourceId: "node-system" }],
+            failureMode: "empty",
+        }],
+    });
+
+    return createTestFallbackReader(metricStore, readPlan, {
+        now: sampleTimestampMilliseconds + options.sampleAgeMilliseconds,
+        maximumSampleAgeMilliseconds: 5000,
+    });
+}
 
 function createTestFallbackReader(
     metricStore: MetricStore,

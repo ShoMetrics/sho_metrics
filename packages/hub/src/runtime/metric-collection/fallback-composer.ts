@@ -6,6 +6,31 @@ import {
     selectMetricReadRouteSourceCandidates,
 } from "../source-routing/metric-read-plan";
 import { wallClockNowMilliseconds } from "../../shared/clock";
+import { isBatteryMetricKey } from "../metric-keys";
+
+/**
+ * How long a battery percent reading stays renderable past the standard
+ * per-action freshness budget.
+ *
+ * Battery sources are intentionally slow and can miss for long stretches: the
+ * peripherals sleep with the machine, and the first reads after wake fail
+ * while Bluetooth reconnects. A battery percentage barely moves over these
+ * gaps, so showing the last reading beats showing N/A. Six hours covers the
+ * within-a-day gaps this exists for (lunch, meetings, an afternoon lid close)
+ * and deliberately does not span a full night's sleep: after 8+ hours the
+ * number is stale enough that N/A until the next successful read is more
+ * honest. The drift estimate behind "barely moves" is judgment, not measured
+ * data.
+ */
+export const BATTERY_RETAINED_SAMPLE_MAX_AGE_MILLISECONDS = 6 * 60 * 60 * 1000;
+
+/**
+ * Battery readings at or below this percent are never retained past the
+ * standard budget. Low battery is when the percentage moves fastest and when
+ * a wrong number costs the user most, so a missing reading must show as N/A
+ * rather than as yesterday's value.
+ */
+export const BATTERY_RETAINED_MINIMUM_PERCENT_EXCLUSIVE = 10;
 
 export interface FallbackMetricStoreReaderOptions {
     /** Returns the current timestamp used to decide whether a candidate value is still fresh. */
@@ -84,6 +109,7 @@ export function createFallbackMetricStoreReader(
             }
 
             if (isFreshWidgetData(
+                metricKey,
                 readResult.widgetData,
                 currentTimestampMilliseconds,
                 options.maximumSampleAgeMilliseconds,
@@ -101,6 +127,7 @@ export function createFallbackMetricStoreReader(
 }
 
 function isFreshWidgetData(
+    metricKey: string,
     widgetData: WidgetData,
     currentTimestampMilliseconds: number,
     maximumSampleAgeMilliseconds: number,
@@ -111,8 +138,19 @@ function isFreshWidgetData(
         return false;
     }
 
-    return currentTimestampMilliseconds - valueTimestampMilliseconds
-        <= maximumSampleAgeMilliseconds;
+    const sampleAgeMilliseconds = currentTimestampMilliseconds - valueTimestampMilliseconds;
+
+    if (sampleAgeMilliseconds <= maximumSampleAgeMilliseconds) {
+        return true;
+    }
+
+    // Battery percentages get a longer retention window than the per-action
+    // budget. Making freshness look at the value is a deliberate layering
+    // trade: the low-battery cutoff needs the percent, and this is the one
+    // place that has both the value and the age.
+    return isBatteryMetricKey(metricKey)
+        && widgetData.current > BATTERY_RETAINED_MINIMUM_PERCENT_EXCLUSIVE
+        && sampleAgeMilliseconds <= BATTERY_RETAINED_SAMPLE_MAX_AGE_MILLISECONDS;
 }
 
 function buildNoDataWidgetData(options: {
