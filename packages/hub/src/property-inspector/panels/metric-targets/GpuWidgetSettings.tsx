@@ -62,12 +62,15 @@ function GpuMetricSettings({
     context,
     target,
     onSettingsPatch,
+    hardwareSummaryDisabled,
 }: GpuWidgetSettingsProps): React.JSX.Element {
     const { t } = useI18n();
     const metricOptions = buildGpuMetricKindOptionList(context.platform, target.reading.kind);
     const optionList = [
         ...metricOptions,
-        ...(isGpuHardwareSummarySupportedOnPlatform(context.platform) ? [summaryMetricKindOption] : []),
+        ...(!hardwareSummaryDisabled && isGpuHardwareSummarySupportedOnPlatform(context.platform)
+            ? [summaryMetricKindOption]
+            : []),
     ] as const satisfies readonly { readonly value: GpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isGpuReadingSupportedOnCurrentPlatform(context.platform, target);
     const shouldShowNoValueGuidance = shouldShowGpuNoValueGuidance(

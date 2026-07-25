@@ -57,6 +57,7 @@ function CpuMetricSettings({
     context,
     target,
     onSettingsPatch,
+    hardwareSummaryDisabled,
 }: CpuWidgetSettingsProps): React.JSX.Element {
     const i18n = useI18n();
     const { t } = i18n;
@@ -64,7 +65,9 @@ function CpuMetricSettings({
     const metricOptions = buildCpuMetricKindOptionList(context.platform, reading.kind);
     const optionList = [
         ...metricOptions,
-        ...(isCpuHardwareSummarySupportedOnPlatform(context.platform) ? [summaryMetricKindOption] : []),
+        ...(!hardwareSummaryDisabled && isCpuHardwareSummarySupportedOnPlatform(context.platform)
+            ? [summaryMetricKindOption]
+            : []),
     ] as const satisfies readonly { readonly value: CpuMetricChoice; readonly label: string; readonly disabled?: boolean }[];
     const isSelectedReadingSupported = isBuiltInMetricSupportedOnPlatform(
         resolveCpuMetricKindMetricKey(reading.kind),

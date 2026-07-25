@@ -244,6 +244,45 @@ test("stacked custom metric request warning uses the shared stacked polling rate
     );
 });
 
+test("stacked CPU slot editor hides the hardware summary (triple) option", async () => {
+    const user = userEvent.setup();
+
+    render(<StackedWidgetSettingsHarness />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Editing Metric #1" });
+
+    await user.click(screen.getByRole("combobox", { name: /CPU Metric/ }));
+
+    // A stacked slot can only hold a single metric, so the CPU "Triple" switch
+    // must not be offered here: selecting it emitted a widget-kind switch that
+    // never persisted, leaving a dead option.
+    assert.notEqual(screen.queryByRole("option", { name: "Temperature" }), null);
+    // Compare to a boolean, not the node. A failing assert.equal(node, null) puts
+    // the rendered DOM node in the error, and the vitest forks pool OOMs the machine
+    // handling that node's React-fiber graph over worker IPC. (Bare jsdom nodes are
+    // fine; a node from this heavy panel render is not.) assert.ok keeps it a boolean.
+    assert.ok(screen.queryByRole("option", { name: /^Triple:/ }) === null);
+});
+
+test("stacked GPU slot editor hides the hardware summary (triple) option", async () => {
+    const user = userEvent.setup();
+
+    render(<StackedWidgetSettingsHarness />);
+
+    await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await screen.findByRole("heading", { name: "Editing Metric #1" });
+
+    await user.click(screen.getByRole("combobox", { name: /Metric Type/ }));
+    await user.click(screen.getByRole("option", { name: "GPU" }));
+
+    await user.click(await screen.findByRole("combobox", { name: /GPU Metric/ }));
+
+    assert.notEqual(screen.queryByRole("option", { name: "Usage" }), null);
+    // Boolean compare on purpose; see the CPU test above for why.
+    assert.ok(screen.queryByRole("option", { name: /^Triple:/ }) === null);
+});
+
 function StackedWidgetSettingsHarness({
     settings: initialSettings,
     globalSettings: initialGlobalSettings,

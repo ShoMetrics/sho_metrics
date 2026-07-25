@@ -44,6 +44,32 @@ test("CPU metric selector can switch to hardware summary", async () => {
     });
 });
 
+test("GPU metric selector can switch to hardware summary", async () => {
+    const user = userEvent.setup();
+    const patches: StoredWidgetSettingsPatch[] = [];
+
+    render(<HardwareSummarySettingsHarness
+        actionKind="gpu"
+        settings={readTestSettingsRecord(resolveQuickStartStoredWidgetSettings(undefined, "gpu").rawSettings)}
+        onPatch={(patch) => patches.push(patch)}
+    />);
+
+    await user.click(screen.getByRole("combobox", { name: /^GPU Metric:/ }));
+    await user.click(screen.getByRole("option", { name: "Triple: Load, Temp, VRAM..." }));
+
+    await waitFor(() => {
+        assert.notEqual(screen.queryByRole("combobox", { name: /^Primary:/ }), null);
+    });
+    assert.deepEqual(patches.at(-1), {
+        hardwareSummary: {
+            switchTo: {
+                widgetKind: "hardwareSummary",
+                domain: "gpu",
+            },
+        },
+    });
+});
+
 test("CPU metric selector hides hardware summary when default readings are unsupported", async () => {
     const user = userEvent.setup();
 

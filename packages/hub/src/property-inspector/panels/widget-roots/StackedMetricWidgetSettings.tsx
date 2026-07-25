@@ -320,6 +320,7 @@ function StackedSelectedSlotSettings({
                 transparentSurfaceDisabled={transparentSurfaceDisabled}
                 colorDisabled={colorDisabled}
                 showPolling={false}
+                hardwareSummaryDisabled
                 customHttpConsumerSlug={buildStackedCustomHttpConsumerSlug(slot.slotId)}
                 onGlobalSettingsPatch={onGlobalSettingsPatch}
                 onCustomHttpCredentialUpsert={onCustomHttpCredentialUpsert}

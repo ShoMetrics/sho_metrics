@@ -16,4 +16,10 @@ export interface WidgetSettingsPanelProps {
     transparentSurfaceDisabled?: boolean | undefined;
     colorDisabled?: boolean | undefined;
     showPolling?: boolean | undefined;
+    /**
+     * Hides the CPU/GPU hardware-summary (triple) switch. A Stacked slot can
+     * only hold a single metric, so offering the switch there is a dead option
+     * whose patch never persists.
+     */
+    hardwareSummaryDisabled?: boolean | undefined;
 }
