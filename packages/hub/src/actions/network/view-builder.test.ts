@@ -510,6 +510,19 @@ test("network ping bar view shows target host as secondary text", () => {
     assert.equal(widgetData.secondaryDisplayValue, "example.com");
 });
 
+for (const { direction, fullLabel } of [
+    { direction: "upload", fullLabel: "Upload" },
+    { direction: "download", fullLabel: "Download" },
+] as const) {
+    test(`network single ${direction} line view titles with the full direction word`, () => {
+        assert.equal(buildSingleNetworkWidgetData("line", direction).label, fullLabel);
+    });
+
+    test(`network single ${direction} bar fills the secondary row with the full direction word`, () => {
+        assert.equal(buildSingleNetworkWidgetData("bar", direction).secondaryDisplayValue, fullLabel);
+    });
+}
+
 function buildNetworkInterfaceOption(id: string): NetworkInterfaceOption {
     return {
         id,
@@ -534,4 +547,34 @@ function buildNetworkMetricStore(): MetricStore {
         },
     }));
     return metricStore;
+}
+
+function buildSingleNetworkWidgetData(view: "line" | "bar", direction: "upload" | "download") {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "network").rawSettings,
+        {
+            appearance: { view: { selectedView: view } },
+            network: { direction },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "network").resolvedSettings;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+    if (target.domain !== "network") {
+        assert.fail("Expected network target.");
+    }
+
+    const viewUpdate = buildNetworkViewUpdate({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: buildNetworkMetricStore().forScope(LOCAL_SOURCE_SCOPE_ID),
+        selectedNetworkInterface: buildNetworkInterfaceOption("Ethernet"),
+        currentTimestampMilliseconds: 2000,
+    });
+    const widgetData = viewUpdate.viewOptions.widgetData;
+    if ("positive" in widgetData) {
+        assert.fail("Expected single metric network view.");
+    }
+
+    return widgetData;
 }

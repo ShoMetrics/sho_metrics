@@ -47,6 +47,26 @@ type DiskThroughputReading = Extract<ResolvedDiskMetricTarget["reading"], { read
 
 const SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL = "DISK";
 
+/**
+ * Throughput direction labels by length tier, mirroring NETWORK_DIRECTION_LABELS;
+ * the render slot's width picks the tier:
+ * - full:  single-direction title and the single bar's secondary row.
+ * - short: dual and aggregate channel labels (four characters).
+ * - tiny:  dual circle/gauge channel labels (two characters).
+ *
+ * The aggregate SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL ("DISK") carries no direction
+ * and stays separate.
+ */
+const DISK_THROUGHPUT_DIRECTION_LABELS = {
+    read: { full: "Read", short: "READ", tiny: "RD" },
+    write: { full: "Write", short: "WRIT", tiny: "WR" },
+} as const;
+
+/** Returns the label tiers for a single throughput direction. */
+function diskThroughputDirectionLabels(direction: DiskThroughputMetricDirection) {
+    return DISK_THROUGHPUT_DIRECTION_LABELS[direction];
+}
+
 type DiskMetricViewOptions = SingleMetricViewOptions | DualMetricViewOptions;
 
 export function buildDiskViewOptions(options: BuildDiskViewOptions): DiskMetricViewOptions {
@@ -169,8 +189,9 @@ function buildDiskThroughputViewOptions(
 
     const singleThroughputDirection: DiskThroughputMetricDirection = throughputDirection;
     const throughputMetricKey = getDiskThroughputMetricKey(singleThroughputDirection);
-    // Throughput is aggregate; volume selection is usage-only.
-    const throughputLabel = SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL;
+    // Throughput is volume-aggregate; the single-direction title names the
+    // direction so a read sparkline is not indistinguishable from a write one.
+    const throughputLabel = diskThroughputDirectionLabels(singleThroughputDirection).full;
     const bytesPerSecondWidgetData = options.metrics.getWidgetData(
         throughputMetricKey,
         throughputLabel,
@@ -231,22 +252,22 @@ function buildDualThroughputViewOptions(
     const readWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
             readMetricKey,
-            "READ",
+            diskThroughputDirectionLabels("read").short,
             "B/s",
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
-        label: "READ",
+        label: diskThroughputDirectionLabels("read").short,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
             writeMetricKey,
-            "WRIT",
+            diskThroughputDirectionLabels("write").short,
             "B/s",
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
-        label: "WRIT",
+        label: diskThroughputDirectionLabels("write").short,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
@@ -276,8 +297,8 @@ function buildDualThroughputViewOptions(
         negativeColor: writeColor,
         positiveColorConfig: readColorConfig,
         negativeColorConfig: writeColorConfig,
-        positiveLabelText: "RD",
-        negativeLabelText: "WR",
+        positiveLabelText: diskThroughputDirectionLabels("read").tiny,
+        negativeLabelText: diskThroughputDirectionLabels("write").tiny,
         positiveIconFragment: renderDiskThroughputDirectionIconFragment({
             direction: "read",
             color: readColor,
@@ -306,22 +327,22 @@ function buildDiskThroughputBarViewOptions(
     const readWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
             readMetricKey,
-            "READ",
+            diskThroughputDirectionLabels("read").short,
             "B/s",
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("read", options.reading, null),
-        label: "READ",
+        label: diskThroughputDirectionLabels("read").short,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
     const writeWidgetData = buildDiskThroughputWidgetData({
         bytesPerSecondWidgetData: options.metrics.getWidgetData(
             writeMetricKey,
-            "WRIT",
+            diskThroughputDirectionLabels("write").short,
             "B/s",
         ),
         maximumBytesPerSecond: resolveDiskMaximumThroughputBytesPerSecond("write", options.reading, null),
-        label: "WRIT",
+        label: diskThroughputDirectionLabels("write").short,
         currentTimestampMilliseconds: options.currentTimestampMilliseconds,
         pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
     });
@@ -343,7 +364,7 @@ function buildDiskThroughputBarViewOptions(
             barLabel: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
             barChannels: [
                 {
-                    label: "READ",
+                    label: diskThroughputDirectionLabels("read").short,
                     displayValue: readWidgetData.displayValue ?? readWidgetData.current.toFixed(0),
                     unit: readWidgetData.unit,
                     progress: readWidgetData.progress,
@@ -355,7 +376,7 @@ function buildDiskThroughputBarViewOptions(
                     sampleTimestampMilliseconds: readWidgetData.sampleTimestampMilliseconds,
                 },
                 {
-                    label: "WRIT",
+                    label: diskThroughputDirectionLabels("write").short,
                     displayValue: writeWidgetData.displayValue ?? writeWidgetData.current.toFixed(0),
                     unit: writeWidgetData.unit,
                     progress: writeWidgetData.progress,
@@ -420,6 +441,9 @@ function buildDiskThroughputSingleBarViewOptions(
         widgetData: {
             ...widgetData,
             barLabel: SYSTEM_TOTAL_DISK_THROUGHPUT_LABEL,
+            // Fill the bar's bottom row so a single-direction touch-strip bar does
+            // not read as an empty slot, mirroring the network single-direction bar.
+            secondaryDisplayValue: diskThroughputDirectionLabels(options.direction).full,
             barValueIconFragment: renderDiskThroughputDirectionIconFragment({
                 direction: options.direction,
                 size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,

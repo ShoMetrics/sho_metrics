@@ -204,7 +204,8 @@ test("disk throughput view ignores selected volume identity", () => {
     if ("positiveColor" in viewOptions) {
         assert.fail("Expected single metric disk view.");
     }
-    assert.equal(viewOptions.widgetData.label, "DISK");
+    // Single-direction throughput titles the direction, not the aggregate "DISK".
+    assert.equal(viewOptions.widgetData.label, "Read");
     assert.equal(viewOptions.widgetData.sampleTimestampMilliseconds, 1000);
 });
 
@@ -368,6 +369,19 @@ test("disk throughput bar single direction renders direction icon value row", ()
     assert.equal(widgetData.barValueIconColor, "#38bdf8");
 });
 
+for (const { direction, fullLabel } of [
+    { direction: "read", fullLabel: "Read" },
+    { direction: "write", fullLabel: "Write" },
+] as const) {
+    test(`disk single ${direction} throughput titles with the full direction word`, () => {
+        assert.equal(buildSingleDiskThroughputWidgetData("line", direction).label, fullLabel);
+    });
+
+    test(`disk single ${direction} throughput bar fills the secondary row with the full direction word`, () => {
+        assert.equal(buildSingleDiskThroughputWidgetData("bar", direction).secondaryDisplayValue, fullLabel);
+    });
+}
+
 function buildDiskVolumeOption(id: string): DiskVolumeOption {
     return {
         id,
@@ -380,4 +394,46 @@ function buildDiskVolumeOption(id: string): DiskVolumeOption {
         diskName: "Test Disk",
         volumeLabel: "Test",
     };
+}
+
+function buildSingleDiskThroughputWidgetData(view: "line" | "bar", direction: "read" | "write") {
+    const rawSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+        {
+            appearance: { view: { selectedView: view } },
+            disk: {
+                kind: "throughput",
+                throughputDirection: direction,
+            },
+        },
+    );
+    const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+    if (target.domain !== "disk") {
+        assert.fail("Expected disk target.");
+    }
+
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getDiskThroughputMetricKey(direction)]: buildScalarMetricValue(1024, {
+                unit: MetricUnit.BYTES_PER_SECOND,
+            }),
+        },
+    }));
+
+    const viewOptions = buildDiskViewOptions({
+        event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+        settings,
+        target,
+        metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+        volumeSelection: { kind: "available", volume: buildDiskVolumeOption("E:\\") },
+        currentTimestampMilliseconds: 1000,
+    });
+    if ("positiveColor" in viewOptions) {
+        assert.fail("Expected single metric disk view.");
+    }
+
+    return viewOptions.widgetData;
 }

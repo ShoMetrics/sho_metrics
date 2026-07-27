@@ -152,7 +152,7 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
     const networkMetricKey = resolveNetworkMetricKey(networkDirection, options.target.reading.interfaceId);
     const sourceWidgetData = options.metrics.getWidgetData(
         networkMetricKey,
-        getNetworkDirectionLabel(networkDirection),
+        networkDirectionLabels(networkDirection).short,
         "B/s",
     );
     const viewWidgetData = buildNetworkWidgetData({
@@ -166,7 +166,7 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
     const shouldRenderGaugeFooter = selectedView === "circle" && circleVariant === "gauge";
     const renderedWidgetData = shouldRenderGaugeFooter
         ? { ...viewWidgetData, label: PROGRESS_CIRCLE_LABELS.network }
-        : viewWidgetData;
+        : { ...viewWidgetData, label: networkDirectionLabels(networkDirection).full };
 
     return {
         viewOptions: {
@@ -291,7 +291,7 @@ function buildDualNetworkCircleOrTextViewOptions(
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
-            "UP",
+            networkDirectionLabels("upload").short,
             "B/s",
         ),
         direction: "upload",
@@ -302,7 +302,7 @@ function buildDualNetworkCircleOrTextViewOptions(
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             downloadMetricKey,
-            "DOWN",
+            networkDirectionLabels("download").short,
             "B/s",
         ),
         direction: "download",
@@ -341,8 +341,8 @@ function buildDualNetworkCircleOrTextViewOptions(
         negativeColor: downloadColor,
         positiveColorConfig: uploadColorConfig,
         negativeColorConfig: downloadColorConfig,
-        positiveLabelText: "UP",
-        negativeLabelText: "DN",
+        positiveLabelText: networkDirectionLabels("upload").tiny,
+        negativeLabelText: networkDirectionLabels("download").tiny,
         positiveIconFragment: renderNetworkDirectionIconFragment({
             direction: "upload",
             color: uploadColor,
@@ -377,7 +377,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
-            "UP",
+            networkDirectionLabels("upload").short,
             "B/s",
         ),
         direction: "upload",
@@ -388,7 +388,7 @@ function buildDualNetworkLineViewOptions(options: BuildTrafficNetworkViewOptions
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             downloadMetricKey,
-            "DOWN",
+            networkDirectionLabels("download").short,
             "B/s",
         ),
         direction: "download",
@@ -448,7 +448,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
     const uploadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             uploadMetricKey,
-            "UP",
+            networkDirectionLabels("upload").short,
             "B/s",
         ),
         direction: "upload",
@@ -459,7 +459,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
     const downloadWidgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             downloadMetricKey,
-            "DOWN",
+            networkDirectionLabels("download").short,
             "B/s",
         ),
         direction: "download",
@@ -485,7 +485,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
             barLabel: "Net Speed",
             barChannels: [
                 {
-                    label: "UP",
+                    label: networkDirectionLabels("upload").short,
                     displayValue: uploadWidgetData.displayValue ?? uploadWidgetData.current.toFixed(0),
                     unit: uploadWidgetData.unit,
                     progress: uploadWidgetData.progress,
@@ -497,7 +497,7 @@ function buildDualBarNetworkViewOptions(options: BuildTrafficNetworkViewOptions)
                     sampleTimestampMilliseconds: uploadWidgetData.sampleTimestampMilliseconds,
                 },
                 {
-                    label: "DOWN",
+                    label: networkDirectionLabels("download").short,
                     displayValue: downloadWidgetData.displayValue ?? downloadWidgetData.current.toFixed(0),
                     unit: downloadWidgetData.unit,
                     progress: downloadWidgetData.progress,
@@ -548,7 +548,7 @@ function buildSingleBarNetworkViewOptions(
     const widgetData = buildNetworkWidgetData({
         sourceWidgetData: options.metrics.getWidgetData(
             networkMetricKey,
-            getNetworkDirectionLabel(networkDirection),
+            networkDirectionLabels(networkDirection).short,
             "B/s",
         ),
         direction: networkDirection,
@@ -567,6 +567,9 @@ function buildSingleBarNetworkViewOptions(
         widgetData: {
             ...widgetData,
             barLabel: "Net Speed",
+            // Fill the bar's bottom row so a single-direction touch-strip bar does
+            // not read as an empty slot (no custom label yet).
+            secondaryDisplayValue: networkDirectionLabels(networkDirection).full,
             barValueIconFragment: renderNetworkDirectionIconFragment({
                 direction: networkDirection,
                 size: NETWORK_TOP_ICON_SIZE,
@@ -610,7 +613,7 @@ function buildNetworkWidgetData(options: {
         bytesPerSecond: options.sourceWidgetData.current,
         historyBytesPerSecond: options.sourceWidgetData.history,
         maximumBytesPerSecond: resolveNetworkMaximumBytesPerSecond(options.direction, options.target),
-        label: getNetworkDirectionLabel(options.direction),
+        label: networkDirectionLabels(options.direction).short,
         unitBase: options.target.reading.display.unitBase,
         maximumDisplayDigits: NETWORK_SPEED_MAXIMUM_DISPLAY_DIGITS,
         sampleTimestampMilliseconds: options.sourceWidgetData.sampleTimestampMilliseconds,
@@ -619,8 +622,27 @@ function buildNetworkWidgetData(options: {
     });
 }
 
-function getNetworkDirectionLabel(direction: NetworkMetricDirection): string {
-    return direction === "download" ? PROGRESS_CIRCLE_LABELS.download : PROGRESS_CIRCLE_LABELS.upload;
+/**
+ * Direction labels by length tier; the render slot's width picks the tier, so a
+ * cold-context editor selects by slot instead of hand-writing a string:
+ * - full:  single-direction sparkline/text and non-gauge circle titles, plus the
+ *          single bar's secondary row (roomy; the whole word). Gauge circles keep
+ *          the aggregate "NET" label instead.
+ * - short: dual bar channel labels and the base metric label (up to four
+ *          characters; shared with PROGRESS_CIRCLE_LABELS).
+ * - tiny:  dual circle/gauge channel labels (a narrow arc; two characters).
+ *
+ * "upload" is already two characters, so its short and tiny tiers coincide; only
+ * "download" narrows from "DOWN" to "DN".
+ */
+const NETWORK_DIRECTION_LABELS = {
+    upload: { full: "Upload", short: PROGRESS_CIRCLE_LABELS.upload, tiny: "UP" },
+    download: { full: "Download", short: PROGRESS_CIRCLE_LABELS.download, tiny: "DN" },
+} as const;
+
+/** Returns the label tiers for a single traffic direction. */
+function networkDirectionLabels(direction: NetworkMetricDirection) {
+    return NETWORK_DIRECTION_LABELS[direction];
 }
 
 function buildNetworkCenterIconFragment(options: {
