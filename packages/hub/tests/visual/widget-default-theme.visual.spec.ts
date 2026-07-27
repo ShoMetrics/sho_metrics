@@ -13,7 +13,7 @@ import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appe
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
-import { renderNetworkDirectionIconFragment } from "../../src/widgets/icons/catalog/network";
+import { renderNetworkDirectionIconFragment, renderNetworkInterfaceIconFragment } from "../../src/widgets/icons/catalog/network";
 
 const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const CPU_ICON_FRAGMENT = getHardwareIconFragment("cpu");
@@ -22,6 +22,18 @@ const NETWORK_UPLOAD_ICON_FRAGMENT = renderNetworkDirectionIconFragment({
     direction: "upload",
     color: "#F97316",
     size: 30,
+});
+// Matches prod: the single-direction bar's leading icon is the network interface
+// status icon (wired/wifi), not the upload arrow.
+const NETWORK_INTERFACE_ICON_FRAGMENT = renderNetworkInterfaceIconFragment({
+    networkInterface: {
+        id: "eth0",
+        name: "Ethernet",
+        type: "wired",
+        isDefault: true,
+        speedMegabitsPerSecond: 1000,
+    },
+    size: 58,
 });
 
 const CPU_USAGE_WIDGET_DATA: WidgetData = {
@@ -150,8 +162,8 @@ const DEFAULT_THEME_VISUAL_TEST_CASES: readonly DefaultThemeVisualWidgetTestCase
             sampleTimestampMilliseconds: 1,
         },
         keySize: TOUCH_STRIP_LOGICAL_SIZE,
-        centerIcon: CPU_ICON_FRAGMENT,
-        topIcon: CPU_ICON_FRAGMENT,
+        centerIcon: NETWORK_INTERFACE_ICON_FRAGMENT,
+        topIcon: NETWORK_INTERFACE_ICON_FRAGMENT,
     },
     {
         snapshotName: "default-theme-single-sparkline-cpu-usage-multi-color",

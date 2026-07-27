@@ -92,7 +92,7 @@ test("text metric forwards outline tokens to text helpers", () => {
     assert.match(svgFragment, /paint-order="stroke fill"/);
 });
 
-test("text metric uses a horizontal touch strip layout for wide keys", () => {
+test("text metric uses a centered three-row touch strip layout for wide keys", () => {
     const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
         label: "CPU",
@@ -100,25 +100,26 @@ test("text metric uses a horizontal touch strip layout for wide keys", () => {
         unit: "%",
     }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
 
-    assert.match(svgFragment, /id="text-metric-label"[\s\S]*x="12" y="52"/);
-    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
-    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*x="186" y="68"[\s\S]*text-anchor="end"/);
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*?x="100(?:\.00)?"[\s\S]*?text-anchor="middle"/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*?x="100(?:\.00)?"[\s\S]*?text-anchor="middle"/);
+    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*?x="100(?:\.00)?"[\s\S]*?text-anchor="middle"/);
+    assert.doesNotMatch(svgFragment, /id="text-metric-unit"[\s\S]*?text-anchor="end"/);
 });
 
-test("text metric wraps long touch strip labels without moving the value column", () => {
+test("text metric keeps long touch strip labels on one centered line", () => {
     const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
-        label: "888kk",
+        label: "GPU Package",
         displayValue: "N/A",
         unit: "",
     }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
 
-    assert.match(svgFragment, /id="text-metric-label-0"[\s\S]*x="12" y="42"[\s\S]*>888k<\/text>/);
-    assert.match(svgFragment, /id="text-metric-label-1"[\s\S]*x="12" y="63"[\s\S]*>k<\/text>/);
-    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*?x="100(?:\.00)?"[\s\S]*?text-anchor="middle"/);
+    assert.doesNotMatch(svgFragment, /id="text-metric-label-1"/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*?x="100(?:\.00)?"/);
 });
 
-test("text metric wraps very long touch strip labels to three lines", () => {
+test("text metric keeps very long touch strip labels on one line instead of wrapping", () => {
     const svgFragment = renderCenteredTextMetric({
         ...buildWidgetData(),
         label: "123456789012",
@@ -126,10 +127,9 @@ test("text metric wraps very long touch strip labels to three lines", () => {
         unit: "%",
     }, DEFAULT_TEXT_METRIC_CONFIG, { width: 200, height: 100 });
 
-    assert.match(svgFragment, /id="text-metric-label-0"[\s\S]*x="12" y="30"[\s\S]*>1234<\/text>/);
-    assert.match(svgFragment, /id="text-metric-label-1"[\s\S]*x="12" y="52"[\s\S]*>5678<\/text>/);
-    assert.match(svgFragment, /id="text-metric-label-2"[\s\S]*x="12" y="74"[\s\S]*>9012<\/text>/);
-    assert.match(svgFragment, /id="text-metric-value"[\s\S]*x="112(?:\.00)?" y="56(?:\.00)?"/);
+    assert.match(svgFragment, /id="text-metric-label"[\s\S]*?>123456789012<\/text>/);
+    assert.doesNotMatch(svgFragment, /id="text-metric-label-1"/);
+    assert.doesNotMatch(svgFragment, /id="text-metric-label-2"/);
 });
 
 test("title-card text metric renders supplied asymmetrical caption content", () => {
@@ -840,25 +840,35 @@ test("progress bar renders single value icon", () => {
     assert.match(svgFragment, /progress-bar-single-value/);
 });
 
-test("progress bar uses a single neutral leading icon for wide single-direction bars", () => {
-    const svgFragment = progressBar.render({
+test("progress bar colors the value icon beside the value only when one is supplied", () => {
+    const iconBarFragment = progressBar.render({
         ...buildWidgetData(),
         label: "Net Speed",
         displayValue: "126",
         unit: "KB/s",
-        barValueIconFragment: "<path id=\"direction-icon\" />",
+        barValueIconFragment: "<path id=\"value-icon\" />",
         barValueIconColor: "#f97316",
     }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
-    const directionIconMatches = svgFragment.match(/id="direction-icon"/gu) ?? [];
+    const valueIconMatches = iconBarFragment.match(/id="value-icon"/gu) ?? [];
 
-    assert.equal(directionIconMatches.length, 1);
-    assert.doesNotMatch(svgFragment, /color="#f97316"/);
-    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-bar-single-value"), 72);
-    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-bar-single-unit"), 28);
-    assert.match(svgFragment, /KB\/s/);
+    assert.equal(valueIconMatches.length, 1);
+    assert.match(iconBarFragment, /color="#f97316"/);
+    // Value and unit now co-fit under one clip (square-style), so there is no
+    // separate unit clip; the value clip carries both.
+    assert.equal(readConstrainedTextClipWidth(iconBarFragment, "progress-bar-single-value"), 150);
+    assert.match(iconBarFragment, /KB\/s/);
+
+    const plainBarFragment = progressBar.render({
+        ...buildWidgetData(),
+        label: "CPU",
+        displayValue: "67",
+        unit: "%",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
+
+    assert.doesNotMatch(plainBarFragment, /id="value-icon"/);
 });
 
-test("progress bar stacks the title icon above long wide single-bar labels", () => {
+test("progress bar gives wide single-bar titles the full-width top row", () => {
     const shortLabelFragment = progressBar.render({
         ...buildWidgetData(),
         label: "PING",
@@ -870,8 +880,8 @@ test("progress bar stacks the title icon above long wide single-bar labels", () 
         barValueIconFragment: "<path id=\"long-icon\" />",
     }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
 
-    assert.equal(readConstrainedTextClipWidth(shortLabelFragment, "progress-bar-single-title"), 43);
-    assert.equal(readConstrainedTextClipWidth(longLabelFragment, "progress-bar-single-title"), 68);
+    assert.equal(readConstrainedTextClipWidth(shortLabelFragment, "progress-bar-single-title"), 176);
+    assert.equal(readConstrainedTextClipWidth(longLabelFragment, "progress-bar-single-title"), 176);
 });
 
 test("progress bar emits filled shape backings without drawing a zero-fill cap", () => {

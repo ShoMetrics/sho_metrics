@@ -182,33 +182,10 @@ export function renderDualChannelSparkline(
             themeEffects: config.themeEffects,
         });
 
-    // Grid lines are rendered between channel fills and line strokes below.
-    return `
-        <defs>
-            ${config.colorConfig.isGradientEnabled ? `
-                ${renderLineGradient(positiveLineGradientId, config.positiveColor)}
-                ${renderAreaGradient(positiveAreaGradientId, config.positiveColor, config.fillOpacity)}
-                ${renderLineGradient(negativeLineGradientId, config.negativeColor)}
-                ${renderAreaGradient(negativeAreaGradientId, config.negativeColor, config.fillOpacity * 0.82)}
-            ` : ""}
-            <filter id="${glowFilterId}" x="-10%" y="-30%" width="120%" height="160%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blurredLine" />
-                <feColorMatrix in="blurredLine" type="matrix"
-                    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.48 0" />
-            </filter>
-        </defs>
-        ${renderTitle({
-            iconFragment: config.topIconFragment,
-            titleText: resolveTitleText(data, config),
-            layout: layoutPlan.title,
-            iconScale: layoutPlan.titleIconScale,
-            iconGap: layoutPlan.titleIconGap,
-            textColor: config.paints.secondaryText,
-            iconColor: config.paints.icon,
-            textStyles: config.textStyles,
-            themeEffects: config.themeEffects,
-            textOutline: config.textOutline,
-        })}
+    // Channel value rows are drawn last so the curves never paint over the
+    // text (mirrored mode places the values inside the chart halves). Their
+    // theme-adaptive text outline still carries legibility where a theme enables it.
+    const channelValueRowsSvg = `
         ${renderChannelRow({
             layout: resolveRowLayout(layoutPlan, chartLayout, config.chartMode, "positive"),
             iconFragment: config.positiveIconFragment,
@@ -233,6 +210,35 @@ export function renderDualChannelSparkline(
             showIcon: config.chartMode !== "mirrored",
             valueTextColor: config.paints.primaryText,
             unitTextColor: config.paints.supportingText,
+            textStyles: config.textStyles,
+            themeEffects: config.themeEffects,
+            textOutline: config.textOutline,
+        })}
+    `;
+
+    // Grid lines are rendered between channel fills and line strokes below.
+    return `
+        <defs>
+            ${config.colorConfig.isGradientEnabled ? `
+                ${renderLineGradient(positiveLineGradientId, config.positiveColor)}
+                ${renderAreaGradient(positiveAreaGradientId, config.positiveColor, config.fillOpacity)}
+                ${renderLineGradient(negativeLineGradientId, config.negativeColor)}
+                ${renderAreaGradient(negativeAreaGradientId, config.negativeColor, config.fillOpacity * 0.82)}
+            ` : ""}
+            <filter id="${glowFilterId}" x="-10%" y="-30%" width="120%" height="160%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blurredLine" />
+                <feColorMatrix in="blurredLine" type="matrix"
+                    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.48 0" />
+            </filter>
+        </defs>
+        ${renderTitle({
+            iconFragment: config.topIconFragment,
+            titleText: resolveTitleText(data, config),
+            layout: layoutPlan.title,
+            iconScale: layoutPlan.titleIconScale,
+            iconGap: layoutPlan.titleIconGap,
+            textColor: config.paints.secondaryText,
+            iconColor: config.paints.icon,
             textStyles: config.textStyles,
             themeEffects: config.themeEffects,
             textOutline: config.textOutline,
@@ -267,6 +273,7 @@ export function renderDualChannelSparkline(
             themeEffects: config.themeEffects,
             outline: config.shapeOutline,
         })}
+        ${channelValueRowsSvg}
     `;
 }
 

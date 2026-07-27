@@ -204,6 +204,37 @@ export const sparkline: Widget<SparklineConfig> = {
         const linePaint = config.colorConfig.isGradientEnabled ? `url(#${lineGradientId})` : currentColor;
         const areaPaint = config.colorConfig.isGradientEnabled ? `url(#${areaGradientId})` : currentColor;
         const areaOpacity = config.colorConfig.isGradientEnabled ? "" : ` opacity="${config.fillOpacity}"`;
+        // Drawn last so it stays legible on top of the chart (the wide layout
+        // places the value over the plot). Its theme text outline carries
+        // legibility where a theme enables it.
+        const currentValueRowSvg = renderMetricTextRow({
+            id: "sparkline-current-value",
+            layout: {
+                xCoordinate: layoutPlan.value.xCoordinate,
+                yCoordinate: layoutPlan.value.yCoordinate,
+                width: layoutPlan.value.maxWidth,
+                textAnchor: layoutPlan.value.textAnchor,
+            },
+            value: {
+                text: valueText,
+                baseFontSize: layoutPlan.value.fontSize,
+                textStyle: config.textStyles.value,
+                fill: config.paints.primaryText,
+                extraAttributes: [
+                    "font-variant-numeric=\"tabular-nums\"",
+                    ...buildSvgFilterAttributes(config.textStyles.value.filter),
+                ],
+            },
+            unit: {
+                text: data.unit,
+                baseFontSize: layoutPlan.value.unitFontSize,
+                textStyle: config.textStyles.unit,
+                fill: config.paints.supportingText,
+                baselineOffset: 2,
+                extraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
+            },
+            outline: config.textOutline,
+        });
 
         return `
             <defs>
@@ -238,34 +269,6 @@ export const sparkline: Widget<SparklineConfig> = {
                 themeEffects: config.themeEffects,
                 textOutline: config.textOutline,
             })}
-            ${renderMetricTextRow({
-                id: "sparkline-current-value",
-                layout: {
-                    xCoordinate: layoutPlan.value.xCoordinate,
-                    yCoordinate: layoutPlan.value.yCoordinate,
-                    width: layoutPlan.value.maxWidth,
-                    textAnchor: layoutPlan.value.textAnchor,
-                },
-                value: {
-                    text: valueText,
-                    baseFontSize: layoutPlan.value.fontSize,
-                    textStyle: config.textStyles.value,
-                    fill: config.paints.primaryText,
-                    extraAttributes: [
-                        "font-variant-numeric=\"tabular-nums\"",
-                        ...buildSvgFilterAttributes(config.textStyles.value.filter),
-                    ],
-                },
-                unit: {
-                    text: data.unit,
-                    baseFontSize: layoutPlan.value.unitFontSize,
-                    textStyle: config.textStyles.unit,
-                    fill: config.paints.supportingText,
-                    baselineOffset: 2,
-                    extraAttributes: buildSvgFilterAttributes(config.textStyles.unit.filter),
-                },
-                outline: config.textOutline,
-            })}
             <path d="${areaPath}" fill="${areaPaint}"${areaOpacity} ${buildSvgFilterAttributes(config.themeEffects.subtleFilter).join(" ")} />
             ${gridLineSvg}
             ${latestPointGlowSvg}
@@ -282,6 +285,7 @@ export const sparkline: Widget<SparklineConfig> = {
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
                 stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.themeEffects.metricFilter).join(" ")} />
             ${dotSvg}
+            ${currentValueRowSvg}
         `;
     },
 };
@@ -294,20 +298,23 @@ function buildSparklineLayoutPlan(keySize: KeySize): SparklineLayoutPlan {
     const contentWidth = keySize.width - padding * 2;
 
     if (isWide) {
+        // The value sits left-aligned over the chart (drawn on top), the same
+        // text-over-line pattern as the dual sparkline. This gives the value the
+        // full row width so a long value+unit ("112 ms") grows rightward with room
+        // to spare instead of colliding with the right edge like a top-right value.
         return {
             title: {
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.22),
-                maxWidth: Math.round(contentWidth * 0.52),
+                maxWidth: contentWidth,
                 fontSize: clamp(Math.round(keySize.height * 0.16), 13, 17),
             },
             value: {
-                xCoordinate: keySize.width - padding,
-                yCoordinate: Math.round(keySize.height * 0.24),
-                maxWidth: Math.round(contentWidth * 0.42),
+                xCoordinate: padding,
+                yCoordinate: Math.round(keySize.height * 0.48),
+                maxWidth: contentWidth,
                 fontSize: clamp(Math.round(keySize.height * 0.25), 22, 27),
                 unitFontSize: clamp(Math.round(keySize.height * 0.13), 12, 15),
-                textAnchor: "end",
             },
             chart: {
                 xCoordinate: padding,

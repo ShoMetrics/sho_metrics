@@ -63,19 +63,16 @@ const SINGLE_TEXT_SQUARE_LAYOUT = {
 } as const;
 
 const SINGLE_TEXT_WIDE_LAYOUT = {
-    labelWidth: 44,
-    labelXOffset: 12,
-    labelYRatio: 0.52,
-    labelWrapCharacterCount: 4,
-    labelWrapYRatios: [0.42, 0.63],
-    labelTripleWrapYRatios: [0.30, 0.52, 0.74],
-    valueXRatio: 0.56,
-    valueYRatio: 0.56,
-    valueWidthRatio: 0.50,
-    unitRightPadding: 14,
-    unitYRatio: 0.68,
+    // Touch-strip text uses the same three centered rows as the square layout
+    // (label / value / unit), just scaled for the shorter strip. Everything is
+    // centered so nothing shifts as the value width changes, at the cost of a
+    // smaller value than a side-by-side layout would allow.
+    horizontalPadding: 12,
+    labelYRatio: 0.19,
     labelFontSize: 17,
-    valueFontSize: 78,
+    valueYRatio: 0.53,
+    valueFontSize: 46,
+    unitYRatio: 0.86,
     unitFontSize: 18,
 } as const;
 
@@ -98,6 +95,7 @@ const DUAL_TEXT_SQUARE_LAYOUT = {
 const DUAL_TEXT_WIDE_LAYOUT = {
     titleXOffset: 14,
     titleYRatio: 0.52,
+    titleWidth: 44,
     firstRowYRatio: 0.36,
     secondRowYRatio: 0.68,
     labelXRatio: 0.27,
@@ -196,31 +194,34 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
 }
 
 function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig, keySize: KeySize): string {
+    const centerXCoordinate = keySize.width / 2;
+    const contentWidth = keySize.width - SINGLE_TEXT_WIDE_LAYOUT.horizontalPadding * 2;
     const valueText = data.displayValue ?? data.current.toFixed(0);
     const valueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
     const labelTextStyle = config.textStyles.label;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
-    const valueWidth = Math.max(
-        48,
-        keySize.width * SINGLE_TEXT_WIDE_LAYOUT.valueWidthRatio,
-    );
-    const valueXCoordinate = keySize.width * SINGLE_TEXT_WIDE_LAYOUT.valueXRatio;
 
     return `
-        ${renderWideLabelText({
+        ${renderStyledSvgText({
             id: "text-metric-label",
-            labelText: data.label,
-            keySize,
-            config,
+            text: data.label,
+            xCoordinate: centerXCoordinate,
+            yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
+            maxWidth: contentWidth,
+            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
             textStyle: labelTextStyle,
+            fill: config.labelTextColor,
+            textAnchor: "middle",
+            outline: config.textOutline,
+            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
             id: "text-metric-value",
             text: valueText,
-            xCoordinate: valueXCoordinate,
+            xCoordinate: centerXCoordinate,
             yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.valueYRatio,
-            maxWidth: valueWidth,
+            maxWidth: contentWidth,
             baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.valueFontSize,
             textStyle: valueTextStyle,
             fill: valueTextColor,
@@ -235,78 +236,15 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
         ${renderUnitText({
             id: "text-metric-unit",
             unitText: data.unit,
-            xCoordinate: keySize.width - SINGLE_TEXT_WIDE_LAYOUT.unitRightPadding,
+            xCoordinate: centerXCoordinate,
             yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.unitYRatio,
-            textWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
+            textWidth: contentWidth,
             fontSize: SINGLE_TEXT_WIDE_LAYOUT.unitFontSize,
             config,
             textStyle: unitTextStyle,
-            textAnchor: "end",
+            textAnchor: "middle",
         })}
     `;
-}
-
-function renderWideLabelText(options: {
-    id: string;
-    labelText: string;
-    keySize: KeySize;
-    config: TextMetricConfig;
-    textStyle: RenderTextStyles["label"];
-}): string {
-    const characters = Array.from(options.labelText);
-
-    if (characters.length <= SINGLE_TEXT_WIDE_LAYOUT.labelWrapCharacterCount) {
-        return renderStyledSvgText({
-            id: options.id,
-            text: options.labelText,
-            xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
-            yCoordinate: options.keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
-            maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
-            baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
-            textStyle: options.textStyle,
-            fill: options.config.labelTextColor,
-            textAnchor: "start",
-            outline: options.config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
-        });
-    }
-
-    const wrappedLineTexts = buildWrappedWideLabelLines(
-        characters,
-        SINGLE_TEXT_WIDE_LAYOUT.labelWrapCharacterCount,
-    );
-    const yRatios = wrappedLineTexts.length > 2
-        ? SINGLE_TEXT_WIDE_LAYOUT.labelTripleWrapYRatios
-        : SINGLE_TEXT_WIDE_LAYOUT.labelWrapYRatios;
-
-    // Wide touch-strip text shares the row with a large value. Wrapping after
-    // four and eight characters gives the left label breathing room without
-    // moving the value column, which users visually anchor on.
-    return wrappedLineTexts.map((lineText, lineIndex) => renderStyledSvgText({
-        id: `${options.id}-${lineIndex}`,
-        text: lineText,
-        xCoordinate: SINGLE_TEXT_WIDE_LAYOUT.labelXOffset,
-        yCoordinate: options.keySize.height * (yRatios[lineIndex] ?? yRatios[yRatios.length - 1]),
-        maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
-        baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
-        textStyle: options.textStyle,
-        fill: options.config.labelTextColor,
-        textAnchor: "start",
-        outline: options.config.textOutline,
-        extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
-    })).join("");
-}
-
-function buildWrappedWideLabelLines(
-    characters: readonly string[],
-    lineCharacterCount: number,
-): readonly string[] {
-    const lines: string[] = [];
-    for (let startIndex = 0; startIndex < characters.length; startIndex += lineCharacterCount) {
-        lines.push(characters.slice(startIndex, startIndex + lineCharacterCount).join(""));
-    }
-
-    return lines;
 }
 
 function renderSquareCenteredDualTextMetric(
@@ -386,7 +324,7 @@ function renderWideCenteredDualTextMetric(
             text: content.titleText,
             xCoordinate: DUAL_TEXT_WIDE_LAYOUT.titleXOffset,
             yCoordinate: keySize.height * DUAL_TEXT_WIDE_LAYOUT.titleYRatio,
-            maxWidth: SINGLE_TEXT_WIDE_LAYOUT.labelWidth,
+            maxWidth: DUAL_TEXT_WIDE_LAYOUT.titleWidth,
             baseFontSize: DUAL_TEXT_WIDE_LAYOUT.titleFontSize,
             textStyle: labelTextStyle,
             fill: config.labelTextColor,

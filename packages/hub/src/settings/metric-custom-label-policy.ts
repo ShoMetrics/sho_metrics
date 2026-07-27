@@ -59,7 +59,7 @@ function resolveBaseMetricCustomLabelDisplayMaximumCharacters(options: {
         case "bar":
             return options.keyShape === "touchStrip" ? 24 : 12;
         case "text":
-            return 12;
+            return options.keyShape === "touchStrip" ? 16 : 12;
         case "circle":
         case "line":
             return options.keyShape === "touchStrip" ? 16 : 8;
@@ -80,7 +80,7 @@ function resolvePixelWindowMetricCustomLabelDisplayMaximumCharacters(options: {
                 return 8;
             }
 
-            return options.keyShape === "touchStrip" ? 9 : 8;
+            return options.keyShape === "touchStrip" ? 12 : 8;
         case "bar":
             return options.keyShape === "touchStrip" ? 18 : 10;
         case "line":

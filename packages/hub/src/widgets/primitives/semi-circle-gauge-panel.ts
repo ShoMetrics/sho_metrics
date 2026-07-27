@@ -207,24 +207,29 @@ function buildSemiCircleGaugePanelLayout(keySize: KeySize): SemiCircleGaugePanel
 
         return scaleSemiCircleGaugePanelLayout({
             mode: "wide",
+            // The gauge sits below geometric center so the title row lines up with
+            // the neighbouring bar/sparkline slots instead of being squeezed into a
+            // small high-up label. The trade is a tighter bottom margin under the
+            // gauge, acceptable while the triple is fixed (the unit still tells you
+            // which reading the gauge tracks).
             title: {
                 iconXCoordinate: 17,
-                iconYCoordinate: 13,
-                xCoordinate: 27,
-                yCoordinate: 14,
-                textWidth: 34,
-                fontSize: 11,
-                iconSize: 13,
+                iconYCoordinate: 21,
+                xCoordinate: 30,
+                yCoordinate: 22,
+                textWidth: 44,
+                fontSize: 16,
+                iconSize: 15,
             },
             gauge: {
                 centerXCoordinate: 56,
-                centerYCoordinate: 72,
+                centerYCoordinate: 80,
                 radius: 43,
                 strokeWidth: 8,
             },
             primaryValue: {
                 xCoordinate: 56,
-                yCoordinate: 65,
+                yCoordinate: 73,
                 width: 70,
                 fontSize: 30,
                 unitFontSize: 14,

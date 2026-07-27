@@ -35,7 +35,7 @@ test("metric custom label policy uses measured Pixel Window caps", () => {
         }),
         keyShape: "touchStrip",
         selectedTheme: "pixel-window",
-    }), 9);
+    }), 12);
     assert.equal(resolveMetricCustomLabelDisplayMaximumCharacters({
         viewSettings: createViewSettings({
             selectedView: "text",
@@ -51,6 +51,25 @@ test("metric custom label policy uses measured Pixel Window caps", () => {
         keyShape: "touchStrip",
         selectedTheme: "pixel-window",
     }), 18);
+});
+
+test("metric custom label policy widens base theme touch strip text labels", () => {
+    assert.equal(resolveMetricCustomLabelDisplayMaximumCharacters({
+        viewSettings: createViewSettings({
+            selectedView: "text",
+            textVariant: "centered",
+        }),
+        keyShape: "touchStrip",
+        selectedTheme: "flat",
+    }), 16);
+    assert.equal(resolveMetricCustomLabelDisplayMaximumCharacters({
+        viewSettings: createViewSettings({
+            selectedView: "text",
+            textVariant: "centered",
+        }),
+        keyShape: "square",
+        selectedTheme: "flat",
+    }), 12);
 });
 
 function createViewSettings(
