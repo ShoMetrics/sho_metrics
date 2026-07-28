@@ -4,5 +4,13 @@
     <title>ShoMetrics Helper Windows Updates</title>
     <link>https://shometrics.github.io/update/windows-appcast.xml</link>
     <description>Production update feed for ShoMetrics Helper on Windows.</description>
+    <item>
+      <title>ShoMetrics Helper 0.2.0</title>
+      <sparkle:version>0.2.0</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:releaseNotesLink>https://github.com/ShoMetrics/sho_metrics/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <link>https://github.com/ShoMetrics/sho_metrics/releases/tag/v0.2.0</link>
+      <enclosure url="https://github.com/ShoMetrics/sho_metrics/releases/download/v0.2.0/ShoMetrics-Helper-Setup-win-x64.exe" type="application/octet-stream" />
+    </item>
   </channel>
 </rss>

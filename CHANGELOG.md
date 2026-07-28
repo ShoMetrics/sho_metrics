@@ -12,10 +12,10 @@ All notable changes to ShoMetrics will be documented in this file.
 - Single-direction network and disk views now show the full word (Upload, Download, Read, Write) instead of short codes.
 - Threshold colors now follow the metric's progress consistently.
 - The Property Inspector now flags when the Helper needs updating and can open the Helper Control Panel directly.
+- Keeps a healthy battery reading on screen across sleep and wake.
 
 ### Windows Helper
 
-- Keeps a healthy battery reading on screen across sleep and wake.
 - More accurate hardware sensor health on machines using PawnIO.
 - The Control Panel now stays a single window and brings itself to the front.
 - The installer's finished page now recommends a restart.
