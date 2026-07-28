@@ -227,6 +227,10 @@ jobs:
           {
             echo "This release is for Stream Deck plugin version ${STREAMDECK_PLUGIN_VERSION} and Windows helper version ${WINDOWS_VERSION}."
             echo
+            echo "It's **highly recommended** to install the Stream Deck plugin from [Elgato Marketplace](https://marketplace.elgato.com/product/sho-metrics-69957750-4b71-489f-a329-358d27ae67e6) to get automatic update."
+            echo
+            echo "The helper is **optional**. Most users should start with **just the [Stream Deck plugin](https://marketplace.elgato.com/product/sho-metrics-69957750-4b71-489f-a329-358d27ae67e6)** and decide later. Without the helper, on Windows, the plugin can already show CPU, memory, disk, battery, network usage, and on NVIDIA cards: GPU usage, temperature, power, and voltage. That covers most Stream Deck keys people set up first."
+            echo
             echo "If you want to install the helper, most users should download the self-contained Windows helper installer, **ShoMetrics-Helper-Setup-win-x64.exe**. It includes the required runtime dependencies. If you strongly care about installer size and already have the required .NET and WinUI runtime dependencies installed, you can use the framework-dependent installer instead."
             echo
             awk -v heading="${TAG_NAME}" '
