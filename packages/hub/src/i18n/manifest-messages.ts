@@ -3,9 +3,9 @@ import type { ManifestMessagesCatalog } from "./manifest-localization";
 export const manifestMessages = {
     root: {
         name: {
-            en: "Sho Metrics",
-            zh_CN: "Sho Metrics",
-            ja: "Sho Metrics",
+            en: "Sho Metrics - System Monitoring",
+            zh_CN: "Sho Metrics - System Monitoring",
+            ja: "Sho Metrics - System Monitoring",
         },
         description: {
             en: "Display live System metrics such as CPU, GPU, memory, disk, network, battery, sensor metrics, and HTTP metrics.",

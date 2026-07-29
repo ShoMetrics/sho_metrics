@@ -1,5 +1,5 @@
 {
-	"Name": "Sho Metrics",
+	"Name": "Sho Metrics - System Monitoring",
 	"Description": "Display live System metrics such as CPU, GPU, memory, disk, network, battery, sensor metrics, and HTTP metrics.",
 	"com.ez.sho-metrics.catalog-metric": {
 		"Name": "Advanced Sensor",

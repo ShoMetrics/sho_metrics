@@ -1,5 +1,5 @@
 {
-	"Name": "Sho Metrics",
+	"Name": "Sho Metrics - System Monitoring",
 	"Description": "CPU、GPU、メモリ、ディスク、ネットワーク、バッテリー、センサーメトリクス、HTTP メトリクスなどのライブシステムメトリクスを表示します。",
 	"com.ez.sho-metrics.catalog-metric": {
 		"Name": "高度なセンサー",
