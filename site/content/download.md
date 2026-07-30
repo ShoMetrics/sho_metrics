@@ -19,8 +19,8 @@ AMD/Intel GPU metrics, temperatures, fan speeds, and voltages:
 
 {{< download-button
     href="https://github.com/ShoMetrics/sho_metrics/releases/latest/download/ShoMetrics-Helper-Setup-win-x64.exe"
-    title="Download the Windows helper installer"
-    note="Self-contained, includes the required runtime dependencies" >}}
+    title="Download Windows helper"
+    note="Optional, no extra setup required" >}}
 
 If you strongly care about installer size and already have the required .NET and
 WinUI runtime dependencies installed, you can grab the framework-dependent

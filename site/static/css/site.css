@@ -276,11 +276,18 @@ a {
   margin: 1.25rem 0 1.75rem;
 }
 
-/* Official Elgato Marketplace badge; height matches the .action-button rows. */
+/* Keep download actions flat; the helper button width follows its content. */
+.download-cta .action-button {
+  width: auto;
+  max-width: 100%;
+  padding-inline: 0.875rem;
+  box-shadow: none;
+}
+
 .marketplace-badge {
   display: inline-block;
-  height: 3.25rem;
-  width: auto;
+  width: min(14.5625rem, 100%);
+  height: auto;
 }
 
 .deck-stage {
