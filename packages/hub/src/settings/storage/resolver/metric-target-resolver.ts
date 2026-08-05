@@ -64,6 +64,8 @@ import {
     catalogMetricReadingKindByProto,
     diskThroughputDirectionByProto,
     diskUsageDisplayModeByProto,
+    gpuVramDisplayModeByProto,
+    memoryUsageDisplayModeByProto,
     networkDirectionByProto,
     networkTrafficDisplayModeByProto,
     sourceFailureModeByProto,
@@ -323,10 +325,24 @@ function resolveMemoryMetricTarget(storedTarget: StoredMemoryMetricTarget): Reso
 
     switch (readingCase) {
         case "usage":
+            return {
+                domain: "memory",
+                reading: {
+                    kind: "usage",
+                    displayMode: resolveProtoEnum(
+                        reading.value.displayMode,
+                        memoryUsageDisplayModeByProto,
+                        "usedPercentage",
+                    ),
+                } satisfies ResolvedMemoryReading,
+            };
         case undefined:
             return {
                 domain: "memory",
-                reading: { kind: "usage" } satisfies ResolvedMemoryReading,
+                reading: {
+                    kind: "usage",
+                    displayMode: "usedPercentage",
+                } satisfies ResolvedMemoryReading,
             };
     }
 
@@ -426,7 +442,7 @@ function resolveDiskReading(
                 displayMode: resolveProtoEnum(
                     usage?.displayMode,
                     diskUsageDisplayModeByProto,
-                    "percentage",
+                    "usedPercentage",
                 ),
                 barLabel: usage?.barLabel ?? "",
             };
@@ -461,7 +477,14 @@ function resolveGpuReading(
                 reading.value.temperatureUnit,
             );
         case "vram":
-            return { kind: "vram" };
+            return {
+                kind: "vram",
+                displayMode: resolveProtoEnum(
+                    reading.value.displayMode,
+                    gpuVramDisplayModeByProto,
+                    "usedPercentage",
+                ),
+            };
         case "power":
             return resolveGpuPowerReading(reading.value.maximumPowerWatts, runtime);
         case "usage":
@@ -509,7 +532,7 @@ export function resolveGpuHardwareSummaryReading(
                 storedReading.reading.value.temperatureUnit,
             );
         case "vram":
-            return { kind: "vram" };
+            return { kind: "vram", displayMode: "usedPercentage" };
         case "power":
             return resolveGpuPowerReading(storedReading.reading.value.maximumPowerWatts, runtime);
         case undefined:
@@ -529,7 +552,7 @@ export function resolveDefaultGpuHardwareSummaryReading(
         case "temperature":
             return resolveGpuTemperatureReading(undefined, undefined);
         case "vram":
-            return { kind: "vram" };
+            return { kind: "vram", displayMode: "usedPercentage" };
         case "power":
             return resolveGpuPowerReading(undefined, runtime);
     }

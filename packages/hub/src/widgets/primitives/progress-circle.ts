@@ -11,15 +11,17 @@ import {
 } from "../../view-rendering/rasterize/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
+    resolveRenderTextStyleFontSize,
     type RenderTextStyles,
 } from "../../view-rendering/rasterize/render-text-style";
 import {
     clamp,
+    estimateSvgTextRunWidth,
     formatSvgShapeOutlineStrokeAttributes,
     isSvgOutlineEnabled,
     renderStyledSvgText,
+    resolveSvgTextFit,
     resolveSvgShapeOutlineStrokeWidth,
-    type SvgTextAnchor,
 } from "../../view-rendering/rasterize/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import {
@@ -50,6 +52,14 @@ export interface ProgressCircleStatusIcon {
     opticalYOffsetRatio?: number;
 }
 
+/** Supplies a centered footer icon together with its source-canvas size. */
+export interface ProgressCircleFooterIcon {
+    fragment: string;
+    nominalSize: number;
+    /** Optical vertical correction relative to the rendered nominal size. */
+    opticalYOffsetRatio?: number;
+}
+
 export interface ProgressCircleConfig extends WidgetBaseConfig {
     trackColor: string;
     strokeWidth: number;
@@ -65,7 +75,7 @@ export interface ProgressCircleConfig extends WidgetBaseConfig {
     circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
-    footerIconFragment?: string;
+    footerIcon?: ProgressCircleFooterIcon;
     statusIcon?: ProgressCircleStatusIcon;
 }
 
@@ -107,26 +117,10 @@ const ARC_LAYOUT = {
     gaugeMarkerGapScale: 1.5,
     gaugeValueYOffset: 2,
     gaugeValueRow: {
-        shortUnitValueEndXOffset: 20,
-        shortUnitStartXOffset: 25,
-        shortUnitTwoDigitOpticalXOffset: -6,
-        shortUnitValueMaxWidth: 74,
-        shortUnitMaxWidth: 28,
-        shortUnitDigitFontSizes: {
+        digitFontSizes: {
             one: 48,
             two: 48,
             three: 31,
-            many: 21,
-        },
-        longUnitValueEndXOffset: 2,
-        longUnitStartXOffset: 13,
-        longUnitFontSize: 13,
-        longUnitValueMaxWidth: 52,
-        longUnitMaxWidth: 46,
-        longUnitDigitFontSizes: {
-            one: 43,
-            two: 37,
-            three: 25,
             many: 21,
         },
     },
@@ -135,23 +129,23 @@ const ARC_LAYOUT = {
         yOffset: 45,
         iconScale: 0.54,
         iconGap: 5,
+        horizontalPadding: 2,
     },
     placeholderValueScale: 0.68,
     value: {
         fontSize: 48,
         yOffset: 12,
     },
-    footerIcon: {
-        yOffset: 39,
-        valueRowXOffset: 6,
-    },
     unit: {
         fontSize: 19,
         yOffset: 40,
     },
+    qualifier: {
+        iconScale: 0.4,
+        yOffset: 43,
+        maximumRadiusOffsetRatio: 0.72,
+    },
 } as const;
-
-const GAUGE_INLINE_ICON_ASSUMED_SIZE = 30;
 
 interface StatusNotchGeometry {
     gapLength: number;
@@ -205,6 +199,13 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
             ? buildGaugeNotchGeometry(geometry)
             : null;
         const ringNotchGeometry = statusNotchGeometry ?? gaugeNotchGeometry;
+        const gaugeFooterMaxWidth = gaugeNotchGeometry === null
+            ? 0
+            : resolveGaugeFooterMaxWidth({
+                radius,
+                gapAngleDegrees: gaugeNotchGeometry.gapAngleDegrees,
+                strokeWidth: config.strokeWidth,
+            });
 
         const innerTextScale = config.innerTextScale;
         const labelFontSize = ARC_LAYOUT.label.fontSize * innerTextScale;
@@ -222,7 +223,7 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
         const centerContentFragment = renderCenterContent({
             circleVariant,
             centerIconFragment: config.centerIconFragment,
-            footerIconFragment: config.footerIconFragment,
+            footerIcon: config.footerIcon,
             statusIcon: config.statusIcon,
             statusNotchGeometry,
             centerXCoordinate,
@@ -236,7 +237,13 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
             valueText,
             unitFontSize,
             unitText,
+            valueQualifierIconFragment: data.valueQualifierIconFragment,
+            qualifierYCoordinate: centerYCoordinate + Math.min(
+                ARC_LAYOUT.qualifier.yOffset,
+                radius * ARC_LAYOUT.qualifier.maximumRadiusOffsetRatio,
+            ),
             centerTextMaxWidth,
+            gaugeFooterMaxWidth,
             config,
         });
 
@@ -277,7 +284,7 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
 function renderCenterContent(options: {
     circleVariant: CircleVariant;
     centerIconFragment: string | undefined;
-    footerIconFragment: string | undefined;
+    footerIcon: ProgressCircleFooterIcon | undefined;
     statusIcon: ProgressCircleStatusIcon | undefined;
     statusNotchGeometry: StatusNotchGeometry | null;
     centerXCoordinate: number;
@@ -291,7 +298,10 @@ function renderCenterContent(options: {
     valueText: string;
     unitFontSize: number;
     unitText: string;
+    valueQualifierIconFragment: string | undefined;
+    qualifierYCoordinate: number;
     centerTextMaxWidth: number;
+    gaugeFooterMaxWidth: number;
     config: ProgressCircleConfig;
 }): string {
     if (options.circleVariant === "minimal") {
@@ -317,10 +327,7 @@ function renderCenterContent(options: {
         return renderGaugeValueContent(options);
     }
 
-    return renderCenterValue({
-        ...options,
-        footerIconFragment: undefined,
-    });
+    return renderCenterValue(options);
 }
 
 function renderStatusIcon(
@@ -380,6 +387,20 @@ function buildGaugeNotchGeometry(geometry: ProgressCircleGeometry): RingNotchGeo
         startRotationDegrees: 90 + gapAngleDegrees / 2,
         gapAngleDegrees,
     };
+}
+
+function resolveGaugeFooterMaxWidth(options: {
+    radius: number;
+    gapAngleDegrees: number;
+    strokeWidth: number;
+}): number {
+    const halfGapAngleRadians = options.gapAngleDegrees * Math.PI / 360;
+    const halfGapChordWidth = options.radius * Math.sin(halfGapAngleRadians);
+    const halfSafeWidth = halfGapChordWidth
+        - options.strokeWidth / 2
+        - ARC_LAYOUT.gaugeBottomLabel.horizontalPadding;
+
+    return Math.max(24, halfSafeWidth * 2);
 }
 
 function renderRing(options: {
@@ -522,10 +543,11 @@ function renderCenterIcon(
     return `<g color="${iconColor}" transform="translate(${centerXCoordinate} ${centerYCoordinate})" ${buildSvgFilterAttributes(iconFilter).join(" ")}>${centerIconFragment}</g>`;
 }
 
-function renderGaugeInlineIcon(options: {
+function renderInlineIcon(options: {
     iconFragment: string | undefined;
     xCoordinate: number;
     yCoordinate: number;
+    iconScale: number;
     iconColor: string;
     iconFilter: string | undefined;
 }): string {
@@ -533,20 +555,20 @@ function renderGaugeInlineIcon(options: {
         return "";
     }
 
-    return `<g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(ARC_LAYOUT.gaugeBottomLabel.iconScale)})" ${buildSvgFilterAttributes(options.iconFilter).join(" ")}>${options.iconFragment}</g>`;
+    return `<g color="${options.iconColor}" transform="translate(${formatSvgNumber(options.xCoordinate)} ${formatSvgNumber(options.yCoordinate)}) scale(${formatSvgNumber(options.iconScale)})" ${buildSvgFilterAttributes(options.iconFilter).join(" ")}>${options.iconFragment}</g>`;
 }
 
 function renderGaugeValueContent(options: {
     centerXCoordinate: number;
     centerYCoordinate: number;
     labelText: string;
-    labelMaxWidth: number;
     valueFontSize: number;
     valueText: string;
     unitFontSize: number;
     unitText: string;
     centerTextMaxWidth: number;
-    footerIconFragment: string | undefined;
+    footerIcon: ProgressCircleFooterIcon | undefined;
+    gaugeFooterMaxWidth: number;
     config: ProgressCircleConfig;
 }): string {
     const bottomLabelYCoordinate = options.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabel.yOffset;
@@ -555,10 +577,10 @@ function renderGaugeValueContent(options: {
         ${renderGaugeValueRow(options)}
         ${renderGaugeBottomLabel({
             labelText: options.labelText,
-            iconFragment: options.footerIconFragment,
+            icon: options.footerIcon,
             centerXCoordinate: options.centerXCoordinate,
             yCoordinate: bottomLabelYCoordinate,
-            maxWidth: options.labelMaxWidth,
+            maxWidth: options.gaugeFooterMaxWidth,
             config: options.config,
         })}
     `;
@@ -597,100 +619,41 @@ function renderGaugeValueRow(options: {
         });
     }
 
-    const unitLayoutCharacterCount = countGaugeUnitLayoutCharacters(options.unitText);
-    const layout = ARC_LAYOUT.gaugeValueRow;
-    const usesShortUnitLayout = unitLayoutCharacterCount === 1;
-    const valuePlacement = resolveGaugeValuePlacement({
-        centerXCoordinate: options.centerXCoordinate,
-        usesShortUnitLayout,
-        valueText: options.valueText,
-        fallbackFontSize: options.valueFontSize,
-    });
-    const unitXCoordinate = options.centerXCoordinate + (
-        usesShortUnitLayout ? layout.shortUnitStartXOffset : layout.longUnitStartXOffset
-    );
-    const unitFontSize = usesShortUnitLayout ? options.unitFontSize : layout.longUnitFontSize;
-
-    return `
-        ${renderStyledSvgText({
-            id: "progress-circle-value",
-            text: options.valueText,
-            xCoordinate: valuePlacement.xCoordinate,
+    return renderMetricTextRow({
+        id: "progress-circle-value-unit",
+        layout: {
+            xCoordinate: options.centerXCoordinate,
             yCoordinate,
-            maxWidth: valuePlacement.maxWidth,
-            baseFontSize: valuePlacement.fontSize,
+            width: options.centerTextMaxWidth,
+            textAnchor: "middle",
+        },
+        value: {
+            text: options.valueText,
+            baseFontSize: resolveGaugeValueFontSize({
+                digitCount: countGaugeValueDigits(options.valueText),
+                fallbackFontSize: options.valueFontSize,
+                digitFontSizes: ARC_LAYOUT.gaugeValueRow.digitFontSizes,
+            }),
             textStyle: valueTextStyle,
             fill: options.config.valueTextColor,
-            textAnchor: valuePlacement.textAnchor,
-            outline: options.config.textOutline,
             extraAttributes: [
+                "id=\"progress-circle-value\"",
                 "font-variant-numeric=\"tabular-nums\"",
                 ...buildSvgFilterAttributes(valueTextStyle.filter),
             ],
-        })}
-        ${renderStyledSvgText({
-            id: "progress-circle-unit",
+        },
+        unit: {
             text: options.unitText,
-            xCoordinate: unitXCoordinate,
-            yCoordinate,
-            maxWidth: usesShortUnitLayout ? layout.shortUnitMaxWidth : layout.longUnitMaxWidth,
-            baseFontSize: unitFontSize,
+            baseFontSize: options.unitFontSize,
             textStyle: unitTextStyle,
             fill: options.config.unitTextColor,
-            textAnchor: "start",
-            outline: options.config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
-        })}
-    `;
-}
-
-function resolveGaugeValuePlacement(options: {
-    centerXCoordinate: number;
-    usesShortUnitLayout: boolean;
-    valueText: string;
-    fallbackFontSize: number;
-}): {
-    xCoordinate: number;
-    maxWidth: number;
-    fontSize: number;
-    textAnchor: SvgTextAnchor;
-} {
-    const layout = ARC_LAYOUT.gaugeValueRow;
-    const valueDigitCount = countGaugeValueDigits(options.valueText);
-
-    if (options.usesShortUnitLayout && valueDigitCount > 0 && valueDigitCount <= 2) {
-        const opticalXOffset = valueDigitCount === 2
-            ? layout.shortUnitTwoDigitOpticalXOffset
-            : 0;
-
-        return {
-            xCoordinate: options.centerXCoordinate + opticalXOffset,
-            maxWidth: layout.shortUnitValueMaxWidth,
-            fontSize: resolveGaugeValueFontSize({
-                digitCount: valueDigitCount,
-                fallbackFontSize: options.fallbackFontSize,
-                digitFontSizes: layout.shortUnitDigitFontSizes,
-            }),
-            textAnchor: "middle",
-        };
-    }
-
-    const valueXOffset = options.usesShortUnitLayout
-        ? layout.shortUnitValueEndXOffset
-        : layout.longUnitValueEndXOffset;
-
-    return {
-        xCoordinate: options.centerXCoordinate + valueXOffset,
-        maxWidth: options.usesShortUnitLayout ? layout.shortUnitValueMaxWidth : layout.longUnitValueMaxWidth,
-        fontSize: resolveGaugeValueFontSize({
-            digitCount: valueDigitCount,
-            fallbackFontSize: options.fallbackFontSize,
-            digitFontSizes: options.usesShortUnitLayout
-                ? layout.shortUnitDigitFontSizes
-                : layout.longUnitDigitFontSizes,
-        }),
-        textAnchor: "end",
-    };
+            extraAttributes: [
+                "id=\"progress-circle-unit\"",
+                ...buildSvgFilterAttributes(unitTextStyle.filter),
+            ],
+        },
+        outline: options.config.textOutline,
+    });
 }
 
 function resolveGaugeValueFontSize(options: {
@@ -726,57 +689,87 @@ function countGaugeValueDigits(value: string): number {
     return Array.from(value).filter(character => /\d/u.test(character)).length;
 }
 
-function countGaugeUnitLayoutCharacters(unit: string): number {
-    const trimmedUnit = unit.trim();
-
-    if (/^°[CF]$/u.test(trimmedUnit)) {
-        return 1;
-    }
-
-    return Array.from(trimmedUnit).length;
-}
-
 function renderGaugeBottomLabel(options: {
     labelText: string;
-    iconFragment: string | undefined;
+    icon: ProgressCircleFooterIcon | undefined;
     centerXCoordinate: number;
     yCoordinate: number;
     maxWidth: number;
     config: ProgressCircleConfig;
 }): string {
     const labelTextStyle = options.config.textStyles.smallLabel;
-    const fontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
-    const estimatedLabelWidth = Math.min(options.maxWidth, options.labelText.length * fontSize * 0.62);
-    const iconSize = options.iconFragment
-        ? GAUGE_INLINE_ICON_ASSUMED_SIZE * ARC_LAYOUT.gaugeBottomLabel.iconScale
-        : 0;
-    const iconGap = options.iconFragment ? ARC_LAYOUT.gaugeBottomLabel.iconGap : 0;
-    const labelXCoordinate = options.iconFragment
-        ? options.centerXCoordinate - (iconSize + iconGap) / 2
-        : options.centerXCoordinate;
+    const baseFontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
+    const resolvedFontSize = resolveRenderTextStyleFontSize(baseFontSize, labelTextStyle);
+    const iconBaseSize = options.icon === undefined
+        ? 0
+        : options.icon.nominalSize * ARC_LAYOUT.gaugeBottomLabel.iconScale;
+    const iconBaseGap = options.icon === undefined ? 0 : ARC_LAYOUT.gaugeBottomLabel.iconGap;
+    const contentFit = resolveSvgTextFit({
+        runs: [{
+            text: options.labelText,
+            fontSize: resolvedFontSize,
+            fontWeight: labelTextStyle.fontWeight,
+            letterSpacing: resolvedFontSize * labelTextStyle.letterSpacingEm,
+        }],
+        maxWidth: options.maxWidth,
+        extraWidth: iconBaseSize + iconBaseGap,
+        fitOptions: {
+            minimumFontScale: 0.35,
+            widthScale: labelTextStyle.widthScale,
+        },
+    });
+    const contentScale = contentFit.fontScale;
+    const labelFontSize = resolvedFontSize * contentScale;
+    const iconSize = iconBaseSize * contentScale;
+    const iconGap = iconBaseGap * contentScale;
+    const iconYCoordinate = options.yCoordinate + iconSize * (options.icon?.opticalYOffsetRatio ?? 0);
+    const labelMaxWidth = Math.max(12, options.maxWidth - iconSize - iconGap);
+    const estimatedLabelWidth = Math.min(labelMaxWidth, estimateSvgTextRunWidth({
+        text: options.labelText,
+        fontSize: labelFontSize,
+        fontWeight: labelTextStyle.fontWeight,
+        letterSpacing: labelFontSize * labelTextStyle.letterSpacingEm,
+    }));
+    const labelXCoordinate = options.icon === undefined
+        ? options.centerXCoordinate
+        : options.centerXCoordinate - (iconSize + iconGap) / 2;
     const iconXCoordinate = labelXCoordinate + estimatedLabelWidth / 2 + iconGap + iconSize / 2;
+    const contentClipHeight = resolvedFontSize * labelTextStyle.clipHeightEm;
+    const contentClipXCoordinate = options.centerXCoordinate - options.maxWidth / 2;
+    const contentClipYCoordinate = options.yCoordinate - contentClipHeight / 2;
 
     return `
-        ${renderStyledSvgText({
-            id: "progress-circle-bottom-label",
-            text: options.labelText,
-            xCoordinate: labelXCoordinate,
-            yCoordinate: options.yCoordinate,
-            maxWidth: Math.max(12, options.maxWidth - iconSize - iconGap),
-            baseFontSize: fontSize,
-            textStyle: labelTextStyle,
-            fill: options.config.labelTextColor,
-            textAnchor: "middle",
-            outline: options.config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
-        })}
-        ${renderGaugeInlineIcon({
-            iconFragment: options.iconFragment,
-            xCoordinate: iconXCoordinate,
-            yCoordinate: options.yCoordinate,
-            iconColor: options.config.iconColor,
-            iconFilter: options.config.themeEffects.iconFilter,
-        })}
+        <defs>
+            <clipPath id="progress-circle-bottom-content">
+                <rect x="${formatSvgNumber(contentClipXCoordinate)}"
+                    y="${formatSvgNumber(contentClipYCoordinate)}"
+                    width="${formatSvgNumber(options.maxWidth)}"
+                    height="${formatSvgNumber(contentClipHeight)}" />
+            </clipPath>
+        </defs>
+        <g clip-path="url(#progress-circle-bottom-content)">
+            ${renderStyledSvgText({
+                id: "progress-circle-bottom-label",
+                text: options.labelText,
+                xCoordinate: labelXCoordinate,
+                yCoordinate: options.yCoordinate,
+                maxWidth: labelMaxWidth,
+                baseFontSize: baseFontSize * contentScale,
+                textStyle: labelTextStyle,
+                fill: options.config.labelTextColor,
+                textAnchor: "middle",
+                outline: options.config.textOutline,
+                extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            })}
+            ${renderInlineIcon({
+                iconFragment: options.icon?.fragment,
+                xCoordinate: iconXCoordinate,
+                yCoordinate: iconYCoordinate,
+                iconScale: ARC_LAYOUT.gaugeBottomLabel.iconScale * contentScale,
+                iconColor: options.config.iconColor,
+                iconFilter: options.config.themeEffects.iconFilter,
+            })}
+        </g>
     `;
 }
 
@@ -792,8 +785,9 @@ function renderCenterValue(options: {
     valueText: string;
     unitFontSize: number;
     unitText: string;
+    valueQualifierIconFragment: string | undefined;
+    qualifierYCoordinate: number;
     centerTextMaxWidth: number;
-    footerIconFragment: string | undefined;
     config: ProgressCircleConfig;
 }): string {
     const labelTextStyle = options.config.textStyles.label;
@@ -817,7 +811,7 @@ function renderCenterValue(options: {
         ${renderMetricTextRow({
             id: "arc-value-unit",
             layout: {
-                xCoordinate: resolveValueRowXCoordinate(options.centerXCoordinate, options.footerIconFragment),
+                xCoordinate: options.centerXCoordinate,
                 yCoordinate: options.valueCenterYCoordinate,
                 width: options.centerTextMaxWidth,
                 textAnchor: "middle",
@@ -839,23 +833,18 @@ function renderCenterValue(options: {
                 fill: options.config.unitTextColor,
                 extraAttributes: buildSvgFilterAttributes(unitTextStyle.filter),
             },
-            fitOptions: options.unitText.length > 1
+            fitOptions: options.unitText.length > 2
                 ? { minimumFontScale: 0.42, widthGuardRatio: 1.45 }
                 : undefined,
             outline: options.config.textOutline,
         })}
-        ${renderCenterIcon(
-            options.footerIconFragment,
-            options.centerXCoordinate,
-            options.centerYCoordinate + ARC_LAYOUT.footerIcon.yOffset,
-            options.config.iconColor,
-            options.config.themeEffects.iconFilter,
-        )}
+        ${options.valueQualifierIconFragment === undefined ? "" : renderInlineIcon({
+            iconFragment: options.valueQualifierIconFragment,
+            xCoordinate: options.centerXCoordinate,
+            yCoordinate: options.qualifierYCoordinate,
+            iconScale: ARC_LAYOUT.qualifier.iconScale,
+            iconColor: options.config.iconColor,
+            iconFilter: options.config.themeEffects.iconFilter,
+        })}
     `;
-}
-
-function resolveValueRowXCoordinate(centerXCoordinate: number, footerIconFragment: string | undefined): number {
-    return footerIconFragment
-        ? centerXCoordinate + ARC_LAYOUT.footerIcon.valueRowXOffset
-        : centerXCoordinate;
 }

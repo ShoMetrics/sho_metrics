@@ -28,6 +28,7 @@ test("percentage metric builders expose integer display values for compact widge
                 usedBytesWidgetData: buildWidgetData({ current: 1, history: [0, 1], label: "RAM", unit: "B" }),
                 totalBytes: 100,
                 label: "RAM",
+                displayMode: "usedPercentage",
             }),
         },
         {
@@ -36,7 +37,7 @@ test("percentage metric builders expose integer display values for compact widge
                 usedBytesWidgetData: buildWidgetData({ current: 1, history: [0, 1], label: "DISK", unit: "B" }),
                 totalBytes: 100,
                 availableBytes: 99,
-                displayMode: "percentage",
+                displayMode: "usedPercentage",
                 label: "DISK",
             }),
         },
@@ -45,6 +46,9 @@ test("percentage metric builders expose integer display values for compact widge
             widgetData: buildGpuVramWidgetData(
                 buildWidgetData({ current: 1, history: [0, 1], label: "VRAM", unit: "B" }),
                 100,
+                {
+                    displayMode: "usedPercentage",
+                },
             ),
         },
     ];

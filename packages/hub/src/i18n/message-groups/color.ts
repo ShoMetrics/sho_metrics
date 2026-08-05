@@ -16,6 +16,11 @@ export const colorMessages = {
         zh_CN: "设置用于低、中、高颜色切换的百分比范围。",
         ja: "低・中・高の色を選ぶパーセント範囲を設定します。",
     },
+    freeCapacityRangeColorsNote: {
+        en: "Ranges follow how full the metric is, even when the key shows free capacity.",
+        zh_CN: "即使按键显示可用容量，颜色范围仍按指标的已用程度计算。",
+        ja: "キーに空き容量を表示している場合も、色の範囲は使用率に従います。",
+    },
     colorUploadHeading: {
         en: "Color - Upload",
         zh_CN: "颜色 - 上传",

@@ -301,10 +301,35 @@ export const optionMessages = {
         zh_CN: "百分比",
         ja: "パーセント",
     },
+    usedMemoryOption: {
+        en: "Used Memory",
+        zh_CN: "已用内存量",
+        ja: "使用メモリ量",
+    },
+    freeMemoryOption: {
+        en: "Free Memory",
+        zh_CN: "可用内存量",
+        ja: "空きメモリ量",
+    },
+    usedVramOption: {
+        en: "Used VRAM",
+        zh_CN: "已用显存量",
+        ja: "使用VRAM量",
+    },
+    freeVramOption: {
+        en: "Free VRAM",
+        zh_CN: "可用显存量",
+        ja: "空きVRAM量",
+    },
     freeSpaceOption: {
-        en: "Free Space",
-        zh_CN: "可用空间",
-        ja: "空き容量",
+        en: "Free Disk Space",
+        zh_CN: "可用磁盘空间",
+        ja: "空きディスク容量",
+    },
+    usedSpaceOption: {
+        en: "Used Disk Space",
+        zh_CN: "已用磁盘空间",
+        ja: "使用済みディスク容量",
     },
     memoryOption: {
         en: "Memory",

@@ -3,10 +3,10 @@ import { CUSTOM_HTTP_SINGLE_CONSUMER_SLUG } from "../../../runtime/sources/custo
 import { CatalogMetricWidgetSettings } from "../metric-targets/CatalogMetricWidgetSettings";
 import { CpuWidgetSettings } from "../metric-targets/CpuWidgetSettings";
 import { CustomMetricWidgetSettings } from "../metric-targets/CustomMetricWidgetSettings";
-import { DefaultWidgetSettings } from "./DefaultWidgetSettings";
 import { DiskWidgetSettings } from "../metric-targets/DiskWidgetSettings";
 import { GpuWidgetSettings } from "../metric-targets/GpuWidgetSettings";
 import { NetworkWidgetSettings } from "../metric-targets/NetworkWidgetSettings";
+import { MemoryWidgetSettings } from "../metric-targets/MemoryWidgetSettings";
 import { SystemWidgetSettings } from "../metric-targets/SystemWidgetSettings";
 import type { WidgetSettingsPanelProps } from "../panel-props";
 
@@ -34,7 +34,7 @@ export function SingleMetricWidgetSettings(props: WidgetSettingsPanelProps & {
                 />
             );
         case "memory":
-            return <DefaultWidgetSettings {...props} />;
+            return <MemoryWidgetSettings {...props} target={props.target} />;
         case "system":
             return <SystemWidgetSettings {...props} target={props.target} />;
     }

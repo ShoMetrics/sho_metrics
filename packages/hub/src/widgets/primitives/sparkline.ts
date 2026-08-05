@@ -27,6 +27,9 @@ import {
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
 import {
+    resolveSingleMetricTitleFontSize,
+} from "./metric-title-layout";
+import {
     resolveSparklineGridLineOpacity,
     type SparklineGridLineType,
     type SparklineGridLineVisibility,
@@ -110,12 +113,26 @@ const TIME_GUIDE_LINE_WIDTH = 1.15;
 const TIME_GUIDE_TICK_HEIGHT = 5;
 
 interface SparklineLayoutPlan {
+    mode: "wide" | "square";
     title: TextLineLayout;
     value: ValueLineLayout;
     chart: ChartLayout;
     iconScale: number;
     iconGap: number;
 }
+
+const SPARKLINE_TITLE_FONT_SIZE_CONFIG = {
+    wide: {
+        heightRatio: 0.16,
+        minimum: 13,
+        maximum: 17,
+    },
+    square: {
+        heightRatio: 0.12,
+        minimum: 14,
+        maximum: 17,
+    },
+} as const;
 
 interface TextLineLayout {
     xCoordinate: number;
@@ -204,16 +221,19 @@ export const sparkline: Widget<SparklineConfig> = {
         const linePaint = config.colorConfig.isGradientEnabled ? `url(#${lineGradientId})` : currentColor;
         const areaPaint = config.colorConfig.isGradientEnabled ? `url(#${areaGradientId})` : currentColor;
         const areaOpacity = config.colorConfig.isGradientEnabled ? "" : ` opacity="${config.fillOpacity}"`;
+        const valueLayout = data.valueQualifierIconFragment
+            ? buildValueLayoutWithIcon(layoutPlan.value, layoutPlan.mode)
+            : layoutPlan.value;
         // Drawn last so it stays legible on top of the chart (the wide layout
         // places the value over the plot). Its theme text outline carries
         // legibility where a theme enables it.
         const currentValueRowSvg = renderMetricTextRow({
             id: "sparkline-current-value",
             layout: {
-                xCoordinate: layoutPlan.value.xCoordinate,
-                yCoordinate: layoutPlan.value.yCoordinate,
-                width: layoutPlan.value.maxWidth,
-                textAnchor: layoutPlan.value.textAnchor,
+                xCoordinate: valueLayout.xCoordinate,
+                yCoordinate: valueLayout.yCoordinate,
+                width: valueLayout.maxWidth,
+                textAnchor: valueLayout.textAnchor,
             },
             value: {
                 text: valueText,
@@ -285,6 +305,13 @@ export const sparkline: Widget<SparklineConfig> = {
                 stroke-width="${config.lineWidth}" stroke-linejoin="round" stroke-linecap="round"
                 stroke-dasharray="${config.dashPattern}" ${buildSvgFilterAttributes(config.themeEffects.metricFilter).join(" ")} />
             ${dotSvg}
+            ${data.valueQualifierIconFragment ? renderValueIcon({
+                iconFragment: data.valueQualifierIconFragment,
+                iconColor: config.paints.primaryText,
+                layout: layoutPlan.value,
+                layoutMode: layoutPlan.mode,
+                themeEffects: config.themeEffects,
+            }) : ""}
             ${currentValueRowSvg}
         `;
     },
@@ -293,6 +320,7 @@ export const sparkline: Widget<SparklineConfig> = {
 function buildSparklineLayoutPlan(keySize: KeySize): SparklineLayoutPlan {
     const aspectRatio = keySize.width / keySize.height;
     const isWide = aspectRatio >= 1.45;
+    const mode = isWide ? "wide" : "square";
     const minimumSize = Math.min(keySize.width, keySize.height);
     const padding = Math.round(minimumSize * (isWide ? 0.1 : 0.105));
     const contentWidth = keySize.width - padding * 2;
@@ -303,11 +331,16 @@ function buildSparklineLayoutPlan(keySize: KeySize): SparklineLayoutPlan {
         // full row width so a long value+unit ("112 ms") grows rightward with room
         // to spare instead of colliding with the right edge like a top-right value.
         return {
+            mode,
             title: {
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.22),
                 maxWidth: contentWidth,
-                fontSize: clamp(Math.round(keySize.height * 0.16), 13, 17),
+                fontSize: resolveSingleMetricTitleFontSize(
+                    mode,
+                    keySize.height,
+                    SPARKLINE_TITLE_FONT_SIZE_CONFIG,
+                ),
             },
             value: {
                 xCoordinate: padding,
@@ -328,11 +361,16 @@ function buildSparklineLayoutPlan(keySize: KeySize): SparklineLayoutPlan {
     }
 
     return {
+        mode,
         title: {
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.18),
             maxWidth: contentWidth,
-            fontSize: clamp(Math.round(keySize.height * 0.12), 14, 17),
+            fontSize: resolveSingleMetricTitleFontSize(
+                mode,
+                keySize.height,
+                SPARKLINE_TITLE_FONT_SIZE_CONFIG,
+            ),
         },
         value: {
             xCoordinate: padding,
@@ -372,7 +410,6 @@ function renderTitle(options: {
     const iconSvg = options.iconFragment
         ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 9} ${options.layout.yCoordinate - 1}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
-
     return `
         ${iconSvg}
         ${renderStyledSvgText({
@@ -388,6 +425,35 @@ function renderTitle(options: {
             extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
         })}
     `;
+}
+
+function buildValueLayoutWithIcon(
+    valueLayout: ValueLineLayout,
+    layoutMode: SparklineLayoutPlan["mode"],
+): ValueLineLayout {
+    const iconOffset = layoutMode === "wide" ? 23 : 28;
+
+    return {
+        ...valueLayout,
+        xCoordinate: valueLayout.xCoordinate + iconOffset,
+        maxWidth: Math.max(1, valueLayout.maxWidth - iconOffset),
+    };
+}
+
+function renderValueIcon(options: {
+    iconFragment: string;
+    iconColor: string;
+    layout: ValueLineLayout;
+    layoutMode: SparklineLayoutPlan["mode"];
+    themeEffects: RenderThemeEffectTokens;
+}): string {
+    const isWide = options.layoutMode === "wide";
+    const iconCenterXCoordinate = options.layout.xCoordinate + (isWide ? 7 : 9);
+    const iconScale = isWide ? 0.42 : 0.5;
+
+    return `<g color="${options.iconColor}" transform="translate(${iconCenterXCoordinate} ${options.layout.yCoordinate}) scale(${iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>
+        ${options.iconFragment}
+    </g>`;
 }
 
 function buildRenderableValues(data: WidgetData): readonly number[] {

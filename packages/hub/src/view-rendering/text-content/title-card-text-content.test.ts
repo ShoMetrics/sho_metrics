@@ -36,6 +36,21 @@ test("title-card single metric content maps known metric display labels outside 
     }
 });
 
+test.each([
+    { qualifierText: "Used", expectedCaptionText: "使用量" },
+    { qualifierText: "Free", expectedCaptionText: "残容量" },
+] as const)("title-card capacity qualifier $qualifierText owns its caption in text content", ({
+    qualifierText,
+    expectedCaptionText,
+}) => {
+    const content = buildTitleCardSingleMetricContent({
+        ...buildWidgetData({ label: "RAM", unit: "GB" }),
+        valueQualifierText: qualifierText,
+    });
+
+    assert.equal(content.threeCharacterCaptionText, expectedCaptionText);
+});
+
 test("title-card dual metric content maps known dual titles and channel labels outside the primitive", () => {
     const testCases = [
         { name: "network throughput", titleText: "NET", captionText: "転送速", codeText: "NET", compactCodeText: "NET" },

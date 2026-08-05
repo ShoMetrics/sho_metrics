@@ -26,6 +26,8 @@ import {
     isGpuHardwareSummarySupportedOnPlatform,
     isSummaryMetricKind,
     resolveGpuMetricKindMetricKeys,
+    gpuVramDisplayModeOptionList,
+    isCapacityDisplayModeVisible,
     summaryMetricKindOption,
     temperatureUnitOptionList,
 } from "../setting-options";
@@ -77,6 +79,9 @@ function GpuMetricSettings({
         context.isWindows,
         context.runtimeCache.displayedMetricReadTrace,
     );
+    const view = requireResolvedSingleMetricWidget(context.resolved).slot.appearance.view;
+    const shouldShowVramDisplayMode = target.reading.kind === "vram"
+        && isCapacityDisplayModeVisible(view);
 
     return (
         <SettingsSection title={t(commonMessages.metricSection)}>
@@ -102,6 +107,20 @@ function GpuMetricSettings({
                     });
                 }}
             />
+            {shouldShowVramDisplayMode && (
+                <SelectSetting
+                    label={t(commonMessages.usageDisplayLabel)}
+                    value={target.reading.displayMode}
+                    optionList={localizeOptionList(
+                        t,
+                        gpuVramDisplayModeOptionList,
+                        gpuVramDisplayModeMessageByValue,
+                    )}
+                    onValueChange={(vramDisplayMode) => onSettingsPatch({
+                        gpu: { vramDisplayMode },
+                    })}
+                />
+            )}
             {!isSelectedReadingSupported && (
                 <InspectorItem className="note-item note-item-caption">
                     <p className="section-note">
@@ -176,6 +195,12 @@ const gpuMetricKindMessageByValue = {
     vram: optionMessages.vramOption,
     power: optionMessages.powerOption,
     summary: optionMessages.gpuHardwareSummaryOption,
+} as const;
+
+const gpuVramDisplayModeMessageByValue = {
+    usedPercentage: optionMessages.percentageOption,
+    usedCapacity: optionMessages.usedVramOption,
+    freeCapacity: optionMessages.freeVramOption,
 } as const;
 
 const temperatureUnitMessageByValue = {

@@ -2,9 +2,13 @@ import type { SelectOption, SelectOptionValue } from "../inspector/types";
 import { optionMessages } from "../../i18n/message-groups/options";
 import type { LocalizedMessage, PlaceholderValues } from "../../i18n/types";
 import type {
+    DiskUsageDisplayMode,
+    ResolvedAppearanceSettings,
     ResolvedCpuReading,
     ResolvedGpuReading,
     ResolvedNetworkReading,
+    GpuVramDisplayMode,
+    MemoryUsageDisplayMode,
     TerminalPalettePreset,
     TerminalThemeVariant,
 } from "../../settings/resolved-settings";
@@ -152,9 +156,27 @@ export const diskMetricKindOptionList = [
 ] as const satisfies readonly SelectOption[];
 
 export const diskUsageDisplayModeOptionList = [
-    { value: "percentage", label: "Percentage" },
-    { value: "space", label: "Free Space" },
-] as const satisfies readonly SelectOption[];
+    { value: "usedPercentage", label: "Percentage" },
+    { value: "usedCapacity", label: "Used Disk Space" },
+    { value: "freeCapacity", label: "Free Disk Space" },
+] as const satisfies readonly SelectOption<DiskUsageDisplayMode>[];
+
+export const memoryUsageDisplayModeOptionList = [
+    { value: "usedPercentage", label: "Percentage" },
+    { value: "usedCapacity", label: "Used Memory" },
+    { value: "freeCapacity", label: "Free Memory" },
+] as const satisfies readonly SelectOption<MemoryUsageDisplayMode>[];
+
+export const gpuVramDisplayModeOptionList = [
+    { value: "usedPercentage", label: "Percentage" },
+    { value: "usedCapacity", label: "Used VRAM" },
+    { value: "freeCapacity", label: "Free VRAM" },
+] as const satisfies readonly SelectOption<GpuVramDisplayMode>[];
+
+/** Reports whether the selected view can display a used/free capacity choice. */
+export function isCapacityDisplayModeVisible(view: ResolvedAppearanceSettings["view"]): boolean {
+    return view.selectedView !== "circle" || view.circleVariant !== "minimal";
+}
 
 export const diskThroughputDirectionOptionList = [
     { value: "both", label: "Read & Write" },

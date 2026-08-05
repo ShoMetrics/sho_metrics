@@ -9,6 +9,7 @@ import type { KeySize, WidgetData } from "../widget-data";
 import {
     progressCircle,
     DEFAULT_PROGRESS_CIRCLE_CONFIG,
+    type ProgressCircleFooterIcon,
     type ProgressCircleStatusIcon,
     type CircleVariant,
 } from "../../widgets/primitives/progress-circle";
@@ -47,7 +48,7 @@ export interface SingleMetricBodyViewProps {
     };
     renderSize: KeySize;
     centerIcon: string;
-    footerIcon?: string;
+    footerIcon?: ProgressCircleFooterIcon;
     topIcon?: string;
     statusIcon?: ProgressCircleStatusIcon;
     circleVariant: CircleVariant;
@@ -86,7 +87,7 @@ function renderSingleCircularMetric(options: SingleMetricBodyViewProps): string 
         shapeOutline: options.visual.transparentSurface.shapeOutline,
         circleVariant: options.circleVariant,
         centerIconFragment: options.centerIcon,
-        footerIconFragment: options.footerIcon,
+        footerIcon: options.footerIcon,
         statusIcon: options.statusIcon,
     }, options.renderSize);
 }

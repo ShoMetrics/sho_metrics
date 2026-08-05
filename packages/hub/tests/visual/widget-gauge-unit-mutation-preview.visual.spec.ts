@@ -46,7 +46,8 @@ for (const valueCase of VALUE_CASES) {
             const pngBuffer = renderSingleGaugeWidgetPng(svg);
 
             expect(Array.from(unitCase.renderedUnit).length).toBeLessThanOrEqual(2);
-            expect(svg).toContain(`>${unitCase.renderedUnit}</text>`);
+            expect(svg).toContain(`>${valueCase.value}</tspan>`);
+            expect(svg).toContain(`>${unitCase.renderedUnit}</tspan>`);
             expect(pngBuffer).toMatchSnapshot(
                 `single-gauge-${valueCase.snapshotSegment}-${unitCase.snapshotSegment}.png`,
             );

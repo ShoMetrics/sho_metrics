@@ -1,8 +1,12 @@
 import type { WidgetData } from "../view-rendering/widget-data";
+import type { DiskUsageDisplayMode, MemoryUsageDisplayMode } from "../settings/resolved-settings";
 import { formatByteCount, formatBytesPerSecond } from "./byte-format";
+import {
+    buildCapacityDisplayFields,
+    formatCapacityUsingTotalUnit,
+    formatUsedAndTotalBytes,
+} from "./capacity-display-fields";
 import { isPollingBackedRateSampleFresh } from "./rate-sample-freshness";
-
-export type DiskUsageDisplayMode = "percentage" | "space";
 
 const BINARY_BASE = 1024;
 const MAXIMUM_SPACE_DISPLAY_DIGITS = 3;
@@ -19,25 +23,32 @@ export function buildMemoryUsageWidgetData(options: {
     usedBytesWidgetData: WidgetData;
     totalBytes: number;
     label: string;
+    displayMode: MemoryUsageDisplayMode;
 }): WidgetData {
     const safeTotalBytes = Math.max(options.totalBytes, 1);
-    const usedAndTotalText = formatUsedAndTotalBytes({
-        usedBytes: options.usedBytesWidgetData.current,
+    const percentageWidgetData = buildUsedCapacityPercentageWidgetData({
+        usedBytesWidgetData: options.usedBytesWidgetData,
         totalBytes: safeTotalBytes,
+        label: options.label,
     });
-    const usageHistory = options.usedBytesWidgetData.history.map(historyValue => (historyValue / safeTotalBytes) * 100);
-    const currentUsagePercent = (options.usedBytesWidgetData.current / safeTotalBytes) * 100;
+
+    if (options.displayMode === "usedPercentage") {
+        return percentageWidgetData;
+    }
+
+    const displayedBytes = options.displayMode === "freeCapacity"
+        ? Math.max(safeTotalBytes - options.usedBytesWidgetData.current, 0)
+        : options.usedBytesWidgetData.current;
+    const capacityDisplayFields = buildCapacityDisplayFields({
+        displayMode: options.displayMode,
+        formattedCapacity: formatCapacityUsingTotalUnit(displayedBytes, safeTotalBytes),
+        usedAndTotalText: percentageWidgetData.secondaryDisplayValue,
+        usedPercentageText: percentageWidgetData.displayValue,
+    });
 
     return {
-        current: currentUsagePercent,
-        progress: Math.min(Math.max(options.usedBytesWidgetData.current / safeTotalBytes, 0), 1),
-        history: usageHistory,
-        unit: "%",
-        label: options.label,
-        displayValue: currentUsagePercent.toFixed(0),
-        secondaryDisplayValue: usedAndTotalText,
-        sparklineScale: PERCENTAGE_SPARKLINE_SCALE,
-        sampleTimestampMilliseconds: options.usedBytesWidgetData.sampleTimestampMilliseconds,
+        ...percentageWidgetData,
+        ...capacityDisplayFields,
     };
 }
 
@@ -49,31 +60,58 @@ export function buildDiskUsageWidgetData(options: {
     label: string;
     barLabel?: string;
 }): WidgetData {
-    const percentageWidgetData = buildMemoryUsageWidgetData({
+    const percentageWidgetData = buildUsedCapacityPercentageWidgetData({
         usedBytesWidgetData: options.usedBytesWidgetData,
         totalBytes: options.totalBytes,
         label: options.label,
     });
 
-    if (options.displayMode === "percentage") {
+    if (options.displayMode === "usedPercentage") {
         return {
             ...percentageWidgetData,
             barLabel: options.barLabel,
         };
     }
 
-    const formattedAvailableSpace = formatDiskAvailableSpace({
-        availableBytes: options.availableBytes,
+    const displayedBytes = options.displayMode === "freeCapacity"
+        ? Math.max(options.availableBytes, 0)
+        : Math.max(options.usedBytesWidgetData.current, 0);
+    const formattedCapacity = formatDiskCapacity({
+        capacityBytes: displayedBytes,
         totalBytes: options.totalBytes,
+    });
+    const capacityDisplayFields = buildCapacityDisplayFields({
+        displayMode: options.displayMode,
+        formattedCapacity,
+        usedAndTotalText: percentageWidgetData.secondaryDisplayValue,
+        usedPercentageText: percentageWidgetData.displayValue,
     });
 
     return {
         ...percentageWidgetData,
-        displayValue: formattedAvailableSpace.value,
-        unit: formattedAvailableSpace.unit,
+        ...capacityDisplayFields,
         barLabel: options.barLabel,
-        barDisplayValue: percentageWidgetData.current.toFixed(0),
-        barUnit: "%",
+    };
+}
+
+function buildUsedCapacityPercentageWidgetData(options: {
+    usedBytesWidgetData: WidgetData;
+    totalBytes: number;
+    label: string;
+}): WidgetData & { readonly displayValue: string; readonly secondaryDisplayValue: string } {
+    const safeTotalBytes = Math.max(options.totalBytes, 1);
+    const currentUsagePercent = (options.usedBytesWidgetData.current / safeTotalBytes) * 100;
+
+    return {
+        current: currentUsagePercent,
+        progress: Math.min(Math.max(options.usedBytesWidgetData.current / safeTotalBytes, 0), 1),
+        history: options.usedBytesWidgetData.history.map(historyValue => (historyValue / safeTotalBytes) * 100),
+        unit: "%",
+        label: options.label,
+        displayValue: currentUsagePercent.toFixed(0),
+        secondaryDisplayValue: formatUsedAndTotalBytes(options.usedBytesWidgetData.current, safeTotalBytes),
+        sparklineScale: PERCENTAGE_SPARKLINE_SCALE,
+        sampleTimestampMilliseconds: options.usedBytesWidgetData.sampleTimestampMilliseconds,
     };
 }
 
@@ -148,48 +186,21 @@ function buildUnavailableDiskThroughputWidgetData(label: string, configuredMaxim
     };
 }
 
-function formatDiskAvailableSpace(options: {
-    availableBytes: number;
+function formatDiskCapacity(options: {
+    capacityBytes: number;
     totalBytes: number;
 }): { value: string; unit: string } {
     const tebibyte = BINARY_BASE ** 4;
     const gibibyte = BINARY_BASE ** 3;
-    const minimumUnitIndex = options.totalBytes >= tebibyte && options.availableBytes < tebibyte
+    const minimumUnitIndex = options.totalBytes >= tebibyte && options.capacityBytes < tebibyte
         ? 2
         : 3;
     const formattedSpace = formatByteCount({
-        bytes: options.availableBytes,
+        bytes: options.capacityBytes,
         base: BINARY_BASE,
         maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
-        minimumUnitIndex: options.availableBytes < gibibyte ? 2 : minimumUnitIndex,
+        minimumUnitIndex: options.capacityBytes < gibibyte ? 2 : minimumUnitIndex,
     });
 
     return formattedSpace;
-}
-
-function formatUsedAndTotalBytes(options: {
-    usedBytes: number;
-    totalBytes: number;
-}): string {
-    const formattedUsedBytes = formatByteCount({
-        bytes: options.usedBytes,
-        base: BINARY_BASE,
-        maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
-        minimumUnitIndex: resolveMinimumSpaceUnitIndex(options.totalBytes),
-    });
-    const formattedTotalBytes = formatByteCount({
-        bytes: options.totalBytes,
-        base: BINARY_BASE,
-        maximumDisplayDigits: MAXIMUM_SPACE_DISPLAY_DIGITS,
-        minimumUnitIndex: resolveMinimumSpaceUnitIndex(options.totalBytes),
-    });
-    const usedText = formattedUsedBytes.unit === formattedTotalBytes.unit
-        ? formattedUsedBytes.value
-        : `${formattedUsedBytes.value} ${formattedUsedBytes.unit}`;
-
-    return `${usedText} / ${formattedTotalBytes.value} ${formattedTotalBytes.unit}`;
-}
-
-function resolveMinimumSpaceUnitIndex(totalBytes: number): number {
-    return totalBytes >= BINARY_BASE ** 4 ? 4 : 3;
 }

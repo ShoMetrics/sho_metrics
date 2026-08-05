@@ -11,7 +11,9 @@ import {
     ColorMode as StoredColorMode,
     DiskMetricTarget_Throughput_Direction as StoredDiskThroughputDirection,
     DiskMetricTarget_Usage_DisplayMode as StoredDiskUsageDisplayMode,
+    GpuMetricTarget_Vram_DisplayMode as StoredGpuVramDisplayMode,
     MetricTheme as StoredMetricTheme,
+    MemoryMetricTarget_Usage_DisplayMode as StoredMemoryUsageDisplayMode,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
@@ -34,9 +36,11 @@ import type {
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
+    GpuVramDisplayMode,
     GridLineType,
     GridLineVisibility,
     MetricTheme,
+    MemoryUsageDisplayMode,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
@@ -161,9 +165,22 @@ export const storedDiskThroughputDirectionByResolved = {
 } satisfies Record<DiskThroughputDirection, StoredDiskThroughputDirection>;
 
 export const storedDiskUsageDisplayModeByResolved = {
-    percentage: StoredDiskUsageDisplayMode.PERCENTAGE,
-    space: StoredDiskUsageDisplayMode.SPACE,
+    usedPercentage: StoredDiskUsageDisplayMode.PERCENTAGE,
+    usedCapacity: StoredDiskUsageDisplayMode.USED_CAPACITY,
+    freeCapacity: StoredDiskUsageDisplayMode.SPACE,
 } satisfies Record<DiskUsageDisplayMode, StoredDiskUsageDisplayMode>;
+
+export const storedMemoryUsageDisplayModeByResolved = {
+    usedPercentage: StoredMemoryUsageDisplayMode.USED_PERCENTAGE,
+    usedCapacity: StoredMemoryUsageDisplayMode.USED_CAPACITY,
+    freeCapacity: StoredMemoryUsageDisplayMode.FREE_CAPACITY,
+} satisfies Record<MemoryUsageDisplayMode, StoredMemoryUsageDisplayMode>;
+
+export const storedGpuVramDisplayModeByResolved = {
+    usedPercentage: StoredGpuVramDisplayMode.USED_PERCENTAGE,
+    usedCapacity: StoredGpuVramDisplayMode.USED_CAPACITY,
+    freeCapacity: StoredGpuVramDisplayMode.FREE_CAPACITY,
+} satisfies Record<GpuVramDisplayMode, StoredGpuVramDisplayMode>;
 
 export const storedTemperatureUnitByResolved = {
     celsius: StoredTemperatureUnit.CELSIUS,

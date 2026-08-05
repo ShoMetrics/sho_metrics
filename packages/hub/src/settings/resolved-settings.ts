@@ -32,7 +32,9 @@ export type TemperatureUnit = "celsius" | "fahrenheit";
 export type NetworkDirection = "both" | "download" | "upload";
 export type NetworkTrafficDisplayMode = "mirrored" | "overlay";
 export type NetworkUnitBase = "byte" | "bit";
-export type DiskUsageDisplayMode = "percentage" | "space";
+export type DiskUsageDisplayMode = "usedPercentage" | "usedCapacity" | "freeCapacity";
+export type MemoryUsageDisplayMode = "usedPercentage" | "usedCapacity" | "freeCapacity";
+export type GpuVramDisplayMode = "usedPercentage" | "usedCapacity" | "freeCapacity";
 export type DiskThroughputDirection = "both" | "read" | "write";
 export type CatalogMetricCategory = "unspecified" | "cpu" | "gpu" | "memory" | "disk" | "network" | "other";
 export type CatalogMetricReadingKind =
@@ -232,7 +234,10 @@ export interface ResolvedMemoryMetricTarget {
 }
 
 export type ResolvedMemoryReading =
-    | { readonly kind: "usage" };
+    | {
+        readonly kind: "usage";
+        readonly displayMode: MemoryUsageDisplayMode;
+    };
 
 export interface ResolvedNetworkMetricTarget {
     readonly domain: "network";
@@ -282,7 +287,7 @@ export interface ResolvedGpuMetricTarget {
 export type ResolvedGpuReading =
     | { readonly kind: "usage" }
     | { readonly kind: "temperature"; readonly maximumCelsius: number; readonly unit: TemperatureUnit }
-    | { readonly kind: "vram" }
+    | { readonly kind: "vram"; readonly displayMode: GpuVramDisplayMode }
     | { readonly kind: "power"; readonly maximumWatts: number };
 
 export interface ResolvedSystemMetricTarget {

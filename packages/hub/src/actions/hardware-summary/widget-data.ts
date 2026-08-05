@@ -217,7 +217,9 @@ function readGpuHardwareSummaryWidgetData(options: {
                 sampleFreshnessBudgetMilliseconds: options.sampleFreshnessBudgetMilliseconds,
             });
 
-            return buildGpuVramWidgetData(usedWidgetData, totalWidgetData.current);
+            return buildGpuVramWidgetData(usedWidgetData, totalWidgetData.current, {
+                displayMode: "usedPercentage",
+            });
         }
         case "power": {
             const powerWidgetData = readHelperBackedWidgetData({

@@ -46,6 +46,59 @@ test("progress circle fits eight-character labels inside the arc", () => {
     assert.match(svgFragment, /id="arc-label"[\s\S]*textLength=/);
 });
 
+test("full-ring circle replaces a capacity qualifier with its value icon", () => {
+    const data: WidgetData = {
+        ...buildWidgetData(),
+        displayValue: "14",
+        unit: "GB",
+        valueQualifierText: "Free",
+        valueQualifierIconFragment: "<path id=\"free-value-marker\" />",
+    };
+    const iconFragment = progressCircle.render(data, DEFAULT_PROGRESS_CIRCLE_CONFIG, keySize);
+
+    assert.match(iconFragment, /free-value-marker/);
+    assert.doesNotMatch(iconFragment, /arc-value-qualifier|>Free<\/text>/);
+});
+
+test("full-ring circle does not render a text-only capacity qualifier", () => {
+    const svgFragment = progressCircle.render({
+        ...buildWidgetData(),
+        displayValue: "18",
+        unit: "GB",
+        valueQualifierText: "Used",
+    }, DEFAULT_PROGRESS_CIRCLE_CONFIG, keySize);
+
+    assert.doesNotMatch(svgFragment, /arc-value-qualifier|>Used<\/text>/);
+});
+
+test.each<WidgetData["valueQualifierText"]>([
+    undefined,
+    "Used",
+    "Free",
+])("minimal circle emits no text when qualifier is %s", (valueQualifierText) => {
+    const svgFragment = progressCircle.render({
+        ...buildWidgetData(),
+        valueQualifierText,
+    }, {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "minimal",
+    }, keySize);
+
+    assert.doesNotMatch(svgFragment, /<text\b/);
+});
+
+test("gauge circle ignores capacity qualifiers", () => {
+    const svgFragment = progressCircle.render({
+        ...buildWidgetData(),
+        valueQualifierText: "Free",
+    }, {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+    }, keySize);
+
+    assert.doesNotMatch(svgFragment, /arc-value-qualifier|>Free<\/text>/);
+});
+
 test("progress bar clamps fill width and renders secondary text safely", () => {
     const svgFragment = progressBar.render({
         ...buildWidgetData(),
@@ -58,6 +111,29 @@ test("progress bar clamps fill width and renders secondary text safely", () => {
     assert.match(svgFragment, /progress-bar-750-144-144/);
     assert.match(svgFragment, /width="114"/);
     assert.match(svgFragment, /C:\\ &lt;System&gt;/);
+});
+
+test("progress bar renders a supplied value icon without repeating the capacity qualifier", () => {
+    const svgFragment = progressBar.render({
+        ...buildWidgetData(),
+        valueQualifierText: "Free",
+        valueQualifierIconFragment: "<path id=\"free-value-marker\" />",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, keySize);
+
+    assert.match(svgFragment, /id="progress-bar-single-title"[\s\S]*>CPU<\/text>/);
+    assert.match(svgFragment, /free-value-marker/);
+    assert.doesNotMatch(svgFragment, />Free<\/text>/);
+});
+
+test("wide progress bar uses its wide-only secondary text", () => {
+    const svgFragment = progressBar.render({
+        ...buildWidgetData(),
+        secondaryDisplayValue: "28 / 64 GB",
+        barWideSecondaryDisplayValue: "28 / 64 GB, 44% Used",
+    }, DEFAULT_PROGRESS_BAR_CONFIG, { width: 200, height: 100 });
+
+    assert.match(svgFragment, /28 \/ 64 GB, 44% Used/);
+    assert.doesNotMatch(svgFragment, />28 \/ 64 GB<\/text>/);
 });
 
 test("text metric renders a pure text layout without a ring", () => {
@@ -79,6 +155,29 @@ test("text metric renders a pure text layout without a ring", () => {
     assert.doesNotMatch(svgFragment, /Ryzen &amp; Threadripper/);
     assert.doesNotMatch(svgFragment, /text-metric-secondary/);
     assert.doesNotMatch(svgFragment, /Arc Gauge: track/);
+});
+
+test("text metric keeps the three-row layout for capacity values", () => {
+    const svgFragment = renderCenteredTextMetric({
+        ...buildWidgetData(),
+        displayValue: "14",
+        unit: "GB",
+        valueQualifierText: "Free",
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize);
+
+    assert.match(svgFragment, /id="text-metric-label-name"[\s\S]*>CPU<\/text>/);
+    assert.match(svgFragment, /id="text-metric-label-qualifier"[\s\S]*>Free<\/text>/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*>14<\/text>/);
+    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*>GB<\/text>/);
+    assert.doesNotMatch(readClippedTextElement(svgFragment, "text-metric-label-name"), /skewX/);
+    assert.match(readClippedTextElement(svgFragment, "text-metric-label-qualifier"), /skewX\(-10\)/);
+    assert.equal(
+        readClippedTextFontSize(svgFragment, "text-metric-label-name"),
+        readClippedTextFontSize(svgFragment, "text-metric-label-qualifier"),
+    );
+    assert.match(svgFragment, /id="text-metric-label-name"[\s\S]*y="23\.04"/);
+    assert.match(svgFragment, /id="text-metric-value"[\s\S]*y="77\.76"/);
+    assert.match(svgFragment, /id="text-metric-unit"[\s\S]*y="125\.28"/);
 });
 
 test("text metric forwards outline tokens to text helpers", () => {
@@ -167,6 +266,71 @@ test("title-card text metric renders supplied asymmetrical caption content", () 
     assert.doesNotMatch(svgFragment, /text-metric-label/);
 });
 
+test("title-card text metric ignores the standalone capacity qualifier", () => {
+    const svgFragment = renderTitleCardTextMetric({
+        ...buildWidgetData(),
+        valueQualifierText: "Free",
+    }, DEFAULT_TEXT_METRIC_CONFIG, keySize, {
+        codeText: "RAM",
+        compactCodeText: "RAM",
+        threeCharacterCaptionText: "残容量",
+        unitText: "GB",
+    }, "white");
+
+    assert.doesNotMatch(svgFragment, />Free<\/text>/);
+});
+
+test("sparkline renders a supplied value icon without repeating the capacity qualifier", () => {
+    const qualifierFragment = sparkline.render({
+        ...buildWidgetData(),
+        valueQualifierText: "Free",
+        valueQualifierIconFragment: "<path id=\"free-value-marker\" />",
+    }, DEFAULT_SPARKLINE_CONFIG, keySize);
+    const percentageFragment = sparkline.render(buildWidgetData(), DEFAULT_SPARKLINE_CONFIG, keySize);
+
+    assert.match(qualifierFragment, /id="sparkline-title"[\s\S]*>CPU<\/text>/);
+    assert.match(qualifierFragment, /free-value-marker/);
+    assert.doesNotMatch(qualifierFragment, />Free<\/text>/);
+    assert.doesNotMatch(percentageFragment, /free-value-marker/);
+});
+
+test.each([
+    {
+        keySize: { width: 144, height: 144 },
+        expectedProgressBarFontSize: 18,
+        expectedSparklineFontSize: 17,
+    },
+    {
+        keySize: { width: 200, height: 100 },
+        expectedProgressBarFontSize: 16,
+        expectedSparklineFontSize: 16,
+    },
+])("bar and sparkline retain their title sizes at $keySize.width x $keySize.height", ({
+    keySize: sampleKeySize,
+    expectedProgressBarFontSize,
+    expectedSparklineFontSize,
+}) => {
+    const progressBarFragment = progressBar.render(
+        buildWidgetData(),
+        DEFAULT_PROGRESS_BAR_CONFIG,
+        sampleKeySize,
+    );
+    const sparklineFragment = sparkline.render(
+        buildWidgetData(),
+        DEFAULT_SPARKLINE_CONFIG,
+        sampleKeySize,
+    );
+
+    assert.equal(
+        readClippedTextFontSize(progressBarFragment, "progress-bar-single-title"),
+        expectedProgressBarFontSize,
+    );
+    assert.equal(
+        readClippedTextFontSize(sparklineFragment, "sparkline-title"),
+        expectedSparklineFontSize,
+    );
+});
+
 test("title-card text metric gives square edge values a left clip guard", () => {
     for (const displayValue of ["9", "91", "999", "N/A"]) {
         const svgFragment = renderTitleCardTextMetric({
@@ -247,62 +411,66 @@ test("gauge circle variant puts the label and direction icon at the bottom", () 
     }, {
         ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
-        footerIconFragment: "<path id=\"direction-icon\" />",
+        footerIcon: {
+            fragment: "<path id=\"direction-icon\" />",
+            nominalSize: 30,
+        },
     }, keySize);
 
     assert.match(svgFragment, /progress-circle-bottom-label/);
     assert.match(svgFragment, /NET/);
     assert.match(svgFragment, /direction-icon/);
     assert.doesNotMatch(svgFragment, /id="arc-label"/);
+    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-circle-bottom-content"), 70.6);
 });
 
-test("gauge circle variant keeps value and unit in fixed regions", () => {
-    const singleDigitFragment = renderGaugeValueSample("3", "°C");
-    const doubleDigitFragment = renderGaugeValueSample("70", "°C");
-    const tripleDigitFragment = renderGaugeValueSample("552", "°C");
-    const shortUnitSingleDigitFragment = renderGaugeValueSample("3", "%");
-    const shortUnitDoubleDigitFragment = renderGaugeValueSample("38", "%");
-    const shortUnitTripleDigitFragment = renderGaugeValueSample("301", "W");
-    const decimalValueShortUnitFragment = renderGaugeValueSample("87.4", "M");
-    const longUnitManyDigitFragment = renderGaugeValueSample("1234", "ms");
+test("gauge footer co-fits long labels and inline icons inside the arc gap", () => {
+    const ramFooterFragment = renderGaugeFooterSample("RAM", true);
+    const vramFooterFragment = renderGaugeFooterSample("VRAM", true);
+    const longLabelFooterFragment = renderGaugeFooterSample("MEMORY", false);
+    const ramFontSize = readClippedTextFontSize(ramFooterFragment, "progress-circle-bottom-label");
 
-    assert.match(singleDigitFragment, /id="progress-circle-value"/);
-    assert.match(singleDigitFragment, /id="progress-circle-unit"/);
-    assert.match(singleDigitFragment, /x="72"/);
-    assert.match(singleDigitFragment, /x="97"/);
-    assert.match(singleDigitFragment, /font-size="48"/);
-    assert.match(singleDigitFragment, /font-size="19"/);
-    assert.match(doubleDigitFragment, /x="66"/);
-    assert.match(doubleDigitFragment, /x="97"/);
-    assert.match(doubleDigitFragment, /font-size="48"/);
-    assert.match(doubleDigitFragment, /font-size="19"/);
-    assert.match(tripleDigitFragment, /x="92"/);
-    assert.match(tripleDigitFragment, /x="97"/);
-    assert.match(tripleDigitFragment, /font-size="31"/);
-    assert.match(tripleDigitFragment, /font-size="19"/);
-    assert.match(shortUnitSingleDigitFragment, /x="72"/);
-    assert.match(shortUnitSingleDigitFragment, /x="97"/);
-    assert.match(shortUnitSingleDigitFragment, /font-size="48"/);
-    assert.match(shortUnitDoubleDigitFragment, /x="66"/);
-    assert.match(shortUnitDoubleDigitFragment, /x="97"/);
-    assert.match(shortUnitDoubleDigitFragment, /font-size="48"/);
-    assert.match(shortUnitTripleDigitFragment, /x="92"/);
-    assert.match(shortUnitTripleDigitFragment, /x="97"/);
-    assert.match(shortUnitTripleDigitFragment, /font-size="31"/);
-    assert.match(decimalValueShortUnitFragment, /x="92"/);
-    assert.match(decimalValueShortUnitFragment, /x="97"/);
-    assert.match(decimalValueShortUnitFragment, /font-size="31"/);
-    assert.match(longUnitManyDigitFragment, /x="74"/);
-    assert.match(longUnitManyDigitFragment, /x="85"/);
-    assert.match(longUnitManyDigitFragment, /font-size="21"/);
-    assert.doesNotMatch(singleDigitFragment, /progress-circle-value-unit/);
-    assert.doesNotMatch(singleDigitFragment, /textLength=/);
-    assert.doesNotMatch(doubleDigitFragment, /textLength=/);
-    assert.doesNotMatch(tripleDigitFragment, /textLength=/);
-    assert.doesNotMatch(shortUnitSingleDigitFragment, /textLength=/);
-    assert.doesNotMatch(shortUnitDoubleDigitFragment, /textLength=/);
-    assert.doesNotMatch(shortUnitTripleDigitFragment, /textLength=/);
-    assert.doesNotMatch(decimalValueShortUnitFragment, /textLength=/);
+    assert.equal(ramFontSize, 20);
+    assert.ok(readClippedTextFontSize(vramFooterFragment, "progress-circle-bottom-label") < ramFontSize);
+    assert.ok(readClippedTextFontSize(longLabelFooterFragment, "progress-circle-bottom-label") < ramFontSize);
+    assert.equal(readConstrainedTextClipWidth(vramFooterFragment, "progress-circle-bottom-content"), 70.6);
+    assert.match(vramFooterFragment, /direction-icon/);
+});
+
+test("gauge footer applies the caller-provided icon optical offset after fitting", () => {
+    const centeredFooterFragment = renderGaugeFooterSample("RAM", true);
+    const adjustedFooterFragment = renderGaugeFooterSample("RAM", true, -0.1);
+    const centeredYCoordinate = readInlineIconYCoordinate(centeredFooterFragment, "direction-icon");
+    const adjustedYCoordinate = readInlineIconYCoordinate(adjustedFooterFragment, "direction-icon");
+
+    assert.ok(Math.abs(centeredYCoordinate - adjustedYCoordinate - 1.62) < 0.01);
+});
+
+test.each([
+    { value: "1", unit: "°C", minimumValueFontSize: 47 },
+    { value: "26", unit: "GB", minimumValueFontSize: 40 },
+    { value: "123", unit: "MB", minimumValueFontSize: 25 },
+    { value: "1234", unit: "ms", minimumValueFontSize: 18 },
+    { value: "87.4", unit: "KB/s", minimumValueFontSize: 20 },
+    { value: "100", unit: "%", minimumValueFontSize: 28 },
+    { value: "N/A", unit: "°C", minimumValueFontSize: 25 },
+])("gauge co-fits $value $unit as one centered value row", ({
+    value,
+    unit,
+    minimumValueFontSize,
+}) => {
+    const svgFragment = renderGaugeValueSample(value, unit);
+    const valueRowElement = readGaugeValueRowElement(svgFragment);
+
+    assert.match(valueRowElement, /x="72"/);
+    assert.match(valueRowElement, /text-anchor="middle"/);
+    assert.match(valueRowElement, /id="progress-circle-value"/);
+    assert.match(valueRowElement, /id="progress-circle-unit"/);
+    assert.ok(
+        valueRowElement.indexOf(`>${value}</tspan>`) < valueRowElement.indexOf(`>${unit}</tspan>`),
+    );
+    assert.ok(readTspanFontSize(valueRowElement, "progress-circle-value") >= minimumValueFontSize);
+    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-circle-value-unit"), 89.25);
 });
 
 test("gauge circle variant uses semantic range bands for range colors", () => {
@@ -1307,6 +1475,48 @@ function readConstrainedTextClipWidth(svgFragment: string, textId: string): numb
     return Number(match[1]);
 }
 
+function readClippedTextFontSize(svgFragment: string, textId: string): number {
+    const match = new RegExp(
+        `<clipPath id="${textId}">[\\s\\S]*?</clipPath>[\\s\\S]*?<text\\b[^>]*font-size="([^"]+)"`,
+        "u",
+    ).exec(svgFragment);
+
+    assert.ok(match?.[1], `missing font size for ${textId}`);
+
+    return Number(match[1]);
+}
+
+function readClippedTextElement(svgFragment: string, textId: string): string {
+    const match = new RegExp(
+        `<clipPath id="${textId}">[\\s\\S]*?</clipPath>[\\s\\S]*?(<text\\b[^>]*>[\\s\\S]*?</text>)`,
+        "u",
+    ).exec(svgFragment);
+
+    assert.ok(match?.[1], `missing text element for ${textId}`);
+
+    return match[1];
+}
+
+function readGaugeValueRowElement(svgFragment: string): string {
+    const match = /(<text x="72"[^>]*text-anchor="middle"[^>]*>[\s\S]*?id="progress-circle-value"[\s\S]*?id="progress-circle-unit"[\s\S]*?<\/text>)/u
+        .exec(svgFragment);
+
+    assert.ok(match?.[1], "missing centered gauge value row");
+
+    return match[1];
+}
+
+function readTspanFontSize(textElement: string, tspanId: string): number {
+    const match = new RegExp(
+        `<tspan\\b(?=[^>]*\\bid="${tspanId}")[^>]*\\bfont-size="([^"]+)"`,
+        "u",
+    ).exec(textElement);
+
+    assert.ok(match?.[1], `missing font size for ${tspanId}`);
+
+    return Number(match[1]);
+}
+
 function renderGaugeValueSample(displayValue: string, unit: string): string {
     return progressCircle.render({
         ...buildWidgetData(),
@@ -1316,6 +1526,38 @@ function renderGaugeValueSample(displayValue: string, unit: string): string {
         ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
         circleVariant: "gauge",
     }, keySize);
+}
+
+function renderGaugeFooterSample(
+    label: string,
+    hasIcon: boolean,
+    opticalYOffsetRatio?: number,
+): string {
+    return progressCircle.render({
+        ...buildWidgetData(),
+        label,
+    }, {
+        ...DEFAULT_PROGRESS_CIRCLE_CONFIG,
+        circleVariant: "gauge",
+        footerIcon: hasIcon
+            ? {
+                fragment: "<path id=\"direction-icon\" />",
+                nominalSize: 30,
+                opticalYOffsetRatio,
+            }
+            : undefined,
+    }, keySize);
+}
+
+function readInlineIconYCoordinate(svgFragment: string, iconId: string): number {
+    const match = new RegExp(
+        `transform="translate\\([^ ]+ ([^)]+)\\)[^"]*"[^>]*>[\\s\\S]*?id="${iconId}"`,
+        "u",
+    ).exec(svgFragment);
+
+    assert.ok(match?.[1], `missing inline icon transform for ${iconId}`);
+
+    return Number(match[1]);
 }
 
 function roundMarkerProgress(progress: number): number {

@@ -13,6 +13,7 @@ import {
     GpuMetricTarget_TemperatureSchema,
     GpuMetricTarget_UsageSchema,
     GpuMetricTarget_VramSchema,
+    MemoryMetricTarget_UsageSchema,
     MetricIconSettingsSchema,
     MetricSourcePolicySchema,
     NetworkDisplaySettingsSchema,
@@ -24,7 +25,10 @@ import {
     type CpuMetricTarget as StoredCpuMetricTarget,
     type DiskMetricTarget as StoredDiskMetricTarget,
     type GpuMetricTarget as StoredGpuMetricTarget,
+    type GpuMetricTarget_Vram as StoredGpuVramTarget,
     type MetricSelection as StoredMetricSelection,
+    type MemoryMetricTarget as StoredMemoryMetricTarget,
+    type MemoryMetricTarget_Usage as StoredMemoryUsageTarget,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
     type NetworkMetricTarget_Ping as StoredNetworkPingTarget,
     type NetworkMetricTarget_Traffic as StoredNetworkTrafficTarget,
@@ -42,6 +46,8 @@ import {
     storedCatalogMetricReadingKindByResolved,
     storedDiskThroughputDirectionByResolved,
     storedDiskUsageDisplayModeByResolved,
+    storedGpuVramDisplayModeByResolved,
+    storedMemoryUsageDisplayModeByResolved,
     storedNetworkDirectionByResolved,
     storedNetworkTrafficDisplayModeByResolved,
     storedNetworkUnitBaseByResolved,
@@ -253,6 +259,16 @@ export function applyCpuPatch(
     }
 }
 
+export function applyMemoryPatch(
+    target: StoredMemoryMetricTarget,
+    patch: NonNullable<StoredWidgetSettingsPatch["memory"]>,
+): void {
+    if (patch.usageDisplayMode !== undefined) {
+        ensureMemoryUsageTarget(target).displayMode =
+            storedMemoryUsageDisplayModeByResolved[patch.usageDisplayMode];
+    }
+}
+
 export function applyGpuPatch(
     target: StoredGpuMetricTarget,
     patch: NonNullable<StoredWidgetSettingsPatch["gpu"]>,
@@ -270,6 +286,9 @@ export function applyGpuPatch(
     }
     if ("maximumPowerWatts" in patch) {
         ensureGpuPowerTarget(target).maximumPowerWatts = patch.maximumPowerWatts;
+    }
+    if (patch.vramDisplayMode !== undefined) {
+        ensureGpuVramTarget(target).displayMode = storedGpuVramDisplayModeByResolved[patch.vramDisplayMode];
     }
 }
 
@@ -417,6 +436,30 @@ function ensureGpuPowerTarget(
 
     const value = create(GpuMetricTarget_PowerSchema);
     target.reading = { case: "power", value };
+    return value;
+}
+
+function ensureGpuVramTarget(
+    target: StoredGpuMetricTarget,
+): StoredGpuVramTarget {
+    if (target.reading.case === "vram") {
+        return target.reading.value;
+    }
+
+    const value = create(GpuMetricTarget_VramSchema);
+    target.reading = { case: "vram", value };
+    return value;
+}
+
+function ensureMemoryUsageTarget(
+    target: StoredMemoryMetricTarget,
+): StoredMemoryUsageTarget {
+    if (target.reading.case === "usage") {
+        return target.reading.value;
+    }
+
+    const value = create(MemoryMetricTarget_UsageSchema);
+    target.reading = { case: "usage", value };
     return value;
 }
 

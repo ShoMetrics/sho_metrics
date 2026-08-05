@@ -154,7 +154,6 @@ function renderSingleFinalSvg(options: {
     gridLineType?: TestGridLineType;
     data?: WidgetData;
     centerIcon?: string;
-    footerIcon?: string;
     topIcon?: string;
     statusIcon?: ProgressCircleStatusIcon;
 }): string {
@@ -169,7 +168,6 @@ function renderSingleFinalSvg(options: {
         visual: visualSettings,
         renderSize: WIDGET_LOGICAL_SIZE,
         centerIcon: options.centerIcon ?? "",
-        footerIcon: options.footerIcon,
         topIcon: options.topIcon,
         statusIcon: options.statusIcon,
         circleVariant: visualSettings.circleVariant,

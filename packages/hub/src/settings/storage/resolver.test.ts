@@ -9,10 +9,13 @@ import {
     resolveStoredGlobalSettings,
     resolveStoredWidgetSettings,
 } from "./resolver";
+import { resolveQuickStartStoredWidgetSettings } from "./quick-start-widget-settings";
+import { writeStoredWidgetSettingsPatch } from "./patch/widget-settings-patch";
 import { MetricUnit } from "../../runtime/sources/metric-source";
 import {
     CpuHardwareSummaryReadingSchema,
     GpuHardwareSummaryReadingSchema,
+    GpuMetricTarget_Vram_DisplayMode as StoredGpuVramDisplayMode,
     DenseMultiMetricWidgetSchema,
     HardwareSummaryWidgetSchema,
     SingleMetricWidgetSchema,
@@ -27,6 +30,38 @@ import type {
 } from "../resolved-settings";
 
 describe("stored settings proto resolver", () => {
+    it("defaults unset memory and VRAM display modes to used percentage", () => {
+        const memorySettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: resolveQuickStartStoredWidgetSettings(undefined, "memory").storedSettings,
+        });
+        const storedGpuSettings = writeStoredWidgetSettingsPatch(
+            resolveQuickStartStoredWidgetSettings(undefined, "gpu").rawSettings,
+            {
+                gpu: {
+                    kind: "vram",
+                },
+            },
+        );
+        const gpuSettings = resolveSingleMetricWidgetSettings({
+            storedWidgetSettings: readStoredWidgetSettings(storedGpuSettings).settings,
+        });
+
+        assert.deepEqual(memorySettings.widget.slot.metric.target, {
+            domain: "memory",
+            reading: {
+                kind: "usage",
+                displayMode: "usedPercentage",
+            },
+        });
+        assert.equal(gpuSettings.widget.slot.metric.target.domain, "gpu");
+        if (gpuSettings.widget.slot.metric.target.domain === "gpu") {
+            assert.deepEqual(gpuSettings.widget.slot.metric.target.reading, {
+                kind: "vram",
+                displayMode: "usedPercentage",
+            });
+        }
+    });
+
     it("resolves empty stored settings to a complete single CPU widget", () => {
         const settings = resolveSingleMetricWidgetSettings({
             storedWidgetSettings: readStoredWidgetSettings(undefined).settings,
@@ -1813,7 +1848,12 @@ describe("stored settings proto resolver", () => {
                                     reading: { case: "temperature", value: {} },
                                 }),
                                 create(GpuHardwareSummaryReadingSchema, {
-                                    reading: { case: "vram", value: {} },
+                                    reading: {
+                                        case: "vram",
+                                        value: {
+                                            displayMode: StoredGpuVramDisplayMode.FREE_CAPACITY,
+                                        },
+                                    },
                                 }),
                             ],
                         },
@@ -1835,7 +1875,7 @@ describe("stored settings proto resolver", () => {
             assert.deepEqual(settings.widget.target.orderedReadings, [
                 { kind: "power", maximumWatts: 450 },
                 { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
-                { kind: "vram" },
+                { kind: "vram", displayMode: "usedPercentage" },
             ]);
         }
     });

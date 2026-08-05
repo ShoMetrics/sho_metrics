@@ -278,7 +278,27 @@ message MemoryMetricTarget {
     Usage usage = 1;
   }
 
-  message Usage {}
+  message Usage {
+    // Selects which text the key renders. Ring/bar fill, history, and range
+    // colors always track the used share regardless of mode, so absence and
+    // DISPLAY_MODE_USED_PERCENTAGE render identically (pre-display-mode
+    // behavior). There is deliberately no free-percentage mode; do not
+    // complete the matrix.
+    enum DisplayMode {
+      DISPLAY_MODE_UNSPECIFIED = 0;
+      DISPLAY_MODE_USED_PERCENTAGE = 1;
+      DISPLAY_MODE_USED_CAPACITY = 2;
+      // Free means the memory still available to allocate; the metric store's
+      // used reading already excludes reclaimable memory where the platform
+      // reports it.
+      DISPLAY_MODE_FREE_CAPACITY = 3;
+    }
+
+    optional DisplayMode display_mode = 1 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+  }
 }
 
 message NetworkMetricTarget {
@@ -325,10 +345,19 @@ message DiskMetricTarget {
   }
 
   message Usage {
+    // Selects which usage text the key renders. Ring/bar fill, history, and
+    // range colors always track the used share regardless of mode. Existing
+    // enum names and numbers are retained because settings are stored as
+    // ProtoJSON in exported Stream Deck profiles.
     enum DisplayMode {
       DISPLAY_MODE_UNSPECIFIED = 0;
+      // Renders the used share as a percentage.
       DISPLAY_MODE_PERCENTAGE = 1;
+      // Renders available capacity. The legacy SPACE name is retained for
+      // compatibility with stored settings.
       DISPLAY_MODE_SPACE = 2;
+      // Renders used capacity.
+      DISPLAY_MODE_USED_CAPACITY = 3;
     }
 
     optional string volume_id = 1 [(buf.validate.field).string.max_len = 1024];
@@ -377,7 +406,23 @@ message GpuMetricTarget {
     }];
   }
 
-  message Vram {}
+  message Vram {
+    // Mirrors MemoryMetricTarget.Usage.DisplayMode. Display-mode enums stay
+    // per-domain on purpose; do not extract a shared enum.
+    enum DisplayMode {
+      DISPLAY_MODE_UNSPECIFIED = 0;
+      DISPLAY_MODE_USED_PERCENTAGE = 1;
+      DISPLAY_MODE_USED_CAPACITY = 2;
+      DISPLAY_MODE_FREE_CAPACITY = 3;
+    }
+
+    // GpuHardwareSummaryReading reuses this message; the fixed 3-reading
+    // summary ignores display_mode in v1 and always renders the percentage.
+    optional DisplayMode display_mode = 1 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+  }
 
   message Power {
     optional uint32 maximum_power_watts = 1 [(buf.validate.field).uint32 = {

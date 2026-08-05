@@ -48,7 +48,7 @@ import {
     WINDOWS_HELPER_SOURCE_ID,
 } from "../../../runtime/sources/source-ids";
 
-test("disk usage bar view settings render label controls without usage-mode controls", () => {
+test("disk usage bar view settings render display-mode and label controls", () => {
     const markup = renderWidgetSettings({
         actionKind: "disk",
         settings: buildWidgetSettings("disk", {
@@ -64,7 +64,9 @@ test("disk usage bar view settings render label controls without usage-mode cont
     assert.match(markup, /Volume:/);
     assert.match(markup, /Custom Label:/);
     assert.match(markup, /Detected Label/);
-    assert.doesNotMatch(markup, /Usage Display:/);
+    assert.match(markup, /Usage Display:/);
+    assertTextOrder(markup, "Volume:", "Usage Display:");
+    assertTextOrder(markup, "Usage Display:", "View:");
 });
 
 test("disk usage circle view settings render usage display controls", () => {
@@ -83,8 +85,9 @@ test("disk usage circle view settings render usage display controls", () => {
     assert.match(markup, /Usage Display:/);
     assert.doesNotMatch(markup, /Custom Label:/);
     assertTextOrder(markup, "Disk Metric:", "View:");
+    assertTextOrder(markup, "Volume:", "Usage Display:");
+    assertTextOrder(markup, "Usage Display:", "View:");
     assertTextOrder(markup, "View:", "Theme:");
-    assertTextOrder(markup, "Theme:", "Usage Display:");
 });
 
 test("disk usage settings preserve selected unavailable volume", () => {

@@ -23,6 +23,9 @@ import {
 } from "../../view-rendering/rasterize/svg-utils";
 import type { Widget, WidgetBaseConfig } from "../widget-contract";
 import { renderMetricTextRow } from "./metric-text-row";
+import {
+    resolveSingleMetricTitleFontSize,
+} from "./metric-title-layout";
 
 export interface ProgressBarConfig extends WidgetBaseConfig {
     barHeight: number;
@@ -82,6 +85,19 @@ interface ProgressBarLayoutPlan {
     channelIconScale: number;
     channelBarHeight: number;
 }
+
+const PROGRESS_BAR_TITLE_FONT_SIZE_CONFIG = {
+    wide: {
+        heightRatio: 0.16,
+        minimum: 15,
+        maximum: 18,
+    },
+    square: {
+        heightRatio: 0.125,
+        minimum: 15,
+        maximum: 18,
+    },
+} as const;
 
 interface TextLineLayout {
     xCoordinate: number;
@@ -158,7 +174,11 @@ function buildProgressBarLayoutPlan(keySize: KeySize, config: ProgressBarConfig)
             singleTitle: {
                 xCoordinate: padding,
                 yCoordinate: Math.round(keySize.height * 0.22),
-                fontSize: clamp(Math.round(keySize.height * 0.16), 15, 18),
+                fontSize: resolveSingleMetricTitleFontSize(
+                    mode,
+                    keySize.height,
+                    PROGRESS_BAR_TITLE_FONT_SIZE_CONFIG,
+                ),
                 maxWidth: contentWidth,
             },
             singleValue: {
@@ -203,7 +223,11 @@ function buildProgressBarLayoutPlan(keySize: KeySize, config: ProgressBarConfig)
         singleTitle: {
             xCoordinate: padding,
             yCoordinate: Math.round(keySize.height * 0.21),
-            fontSize: clamp(Math.round(keySize.height * 0.125), 15, 18),
+            fontSize: resolveSingleMetricTitleFontSize(
+                mode,
+                keySize.height,
+                PROGRESS_BAR_TITLE_FONT_SIZE_CONFIG,
+            ),
             maxWidth: contentWidth,
         },
         singleValue: {
@@ -247,9 +271,10 @@ function renderSingleBar(
     const valueText = data.barDisplayValue ?? data.displayValue ?? data.current.toFixed(0);
     const unitText = data.barUnit ?? data.unit;
     const titleText = data.barLabel ?? data.label;
+    const resolvedValueIconFragment = data.barValueIconFragment ?? data.valueQualifierIconFragment;
     // The value's optional icon leads the value like the square layout; the
     // title always shows the widget's top icon inline.
-    const valueLayout = data.barValueIconFragment
+    const valueLayout = resolvedValueIconFragment
         ? buildSingleValueLayoutWithIcon(layoutPlan.singleValue, layoutPlan)
         : layoutPlan.singleValue;
     const singleTitleIconFragment = config.topIconFragment;
@@ -274,9 +299,11 @@ function renderSingleBar(
             themeEffects: config.themeEffects,
             textOutline: config.textOutline,
         })}
-        ${data.barValueIconFragment ? renderSingleValueIcon({
-            iconFragment: data.barValueIconFragment,
-            iconColor: data.barValueIconColor ?? barColor,
+        ${resolvedValueIconFragment ? renderSingleValueIcon({
+            iconFragment: resolvedValueIconFragment,
+            iconColor: data.barValueIconFragment
+                ? data.barValueIconColor ?? barColor
+                : config.paints.primaryText,
             yCoordinate: layoutPlan.singleValue.yCoordinate,
             layoutPlan,
             themeEffects: config.themeEffects,
@@ -295,7 +322,9 @@ function renderSingleBar(
         ${renderTrack(layoutPlan.singleBar, config.paints.track, config.themeEffects.subtleFilter, config.shapeOutline)}
         ${renderFill(layoutPlan.singleBar, fillWidth, fillPaint, config.themeEffects.metricFilter, config.shapeOutline)}
         ${renderSecondaryText({
-            text: data.secondaryDisplayValue,
+            text: layoutPlan.mode === "wide"
+                ? data.barWideSecondaryDisplayValue ?? data.secondaryDisplayValue
+                : data.secondaryDisplayValue,
             layout: layoutPlan.singleSecondaryText,
             clipId: "progress-bar-single-secondary",
             textColor: config.paints.mutedText,
@@ -484,7 +513,6 @@ function renderTitle(options: {
     const iconSvg = options.iconFragment
         ? `<g color="${options.iconColor}" transform="translate(${options.layout.xCoordinate + 10} ${iconYCoordinate}) scale(${options.iconScale})" ${buildSvgFilterAttributes(options.themeEffects.iconFilter).join(" ")}>${options.iconFragment}</g>`
         : "";
-
     return `
         ${iconSvg}
         ${renderStyledSvgText({

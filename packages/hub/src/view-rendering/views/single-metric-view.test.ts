@@ -117,7 +117,10 @@ test("single gauge view preserves raw data-rate units", () => {
         circleVariant: "gauge",
     });
 
-    assert.match(svg, /id="progress-circle-unit"[\s\S]*>MB\/s<\/text>/);
+    assert.match(
+        svg,
+        /<text x="72"[\s\S]*text-anchor="middle"[\s\S]*id="progress-circle-value"[\s\S]*id="progress-circle-unit">MB\/s<\/tspan><\/text>/,
+    );
 });
 
 function buildMetricRenderAppearance(): MetricRenderAppearance {

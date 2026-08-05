@@ -12,6 +12,7 @@ import {
     type GpuMetricTarget as StoredGpuMetricTarget,
     type HardwareSummaryWidget as StoredHardwareSummaryWidget,
     type MetricSelection as StoredMetricSelection,
+    type MemoryMetricTarget as StoredMemoryMetricTarget,
     type MetricSlot as StoredMetricSlot,
     type NetworkMetricTarget as StoredNetworkMetricTarget,
     type SingleMetricWidget as StoredSingleMetricWidget,
@@ -131,6 +132,14 @@ export function requireDiskTarget(metric: StoredMetricSelection): StoredDiskMetr
 export function requireCpuTarget(metric: StoredMetricSelection): StoredCpuMetricTarget {
     if (metric.target.case !== "cpu") {
         return throwPatchTargetMismatch("Cannot apply a CPU settings patch to a non-CPU metric.");
+    }
+
+    return metric.target.value;
+}
+
+export function requireMemoryTarget(metric: StoredMetricSelection): StoredMemoryMetricTarget {
+    if (metric.target.case !== "memory") {
+        return throwPatchTargetMismatch("Cannot apply a memory settings patch to a non-memory metric.");
     }
 
     return metric.target.value;

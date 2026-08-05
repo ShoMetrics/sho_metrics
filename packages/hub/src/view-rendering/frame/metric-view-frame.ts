@@ -39,12 +39,19 @@ import type {
     HardwareSummarySecondaryReadingWidgetData,
     HardwareSummaryWidgetData,
 } from "../../actions/hardware-summary/widget-data";
-import type { ProgressCircleStatusIcon } from "../../widgets/primitives/progress-circle";
+import type {
+    ProgressCircleFooterIcon,
+    ProgressCircleStatusIcon,
+} from "../../widgets/primitives/progress-circle";
 import type { ThemeBodyViewport } from "../../widgets/styles/theme-style";
+
+// Split-dual footer icons historically use a 30-unit authoring canvas.
+// Keep that nominal size explicit so their established geometry does not drift.
+const SPLIT_DUAL_FOOTER_ICON_NOMINAL_SIZE = 30;
 
 interface BaseMetricRenderOptions {
     centerIconFragment: string;
-    footerIconFragment?: string;
+    footerIcon?: ProgressCircleFooterIcon;
     topIconFragment?: string;
     statusIcon: ProgressCircleStatusIcon;
     circleVariantOverride?: MetricRenderAppearance["circleVariant"];
@@ -644,7 +651,7 @@ function composeSingleMetricBody(
                     visual: renderPlan.renderAppearance,
                     renderSize: renderPlan.bodyRenderSize,
                     centerIcon: options.centerIconFragment,
-                    footerIcon: options.footerIconFragment,
+                    footerIcon: options.footerIcon,
                     topIcon: options.topIconFragment,
                     statusIcon: options.statusIcon,
                     circleVariant: renderPlan.circleVariant,
@@ -838,7 +845,12 @@ function renderSplitDualTouchStripCircleBody(options: {
         ),
         renderSize: options.renderPlan.bodyRenderSize,
         centerIcon: options.iconFragment ?? options.fallbackIconFragment,
-        footerIcon: options.iconFragment,
+        footerIcon: options.iconFragment === undefined
+            ? undefined
+            : {
+                fragment: options.iconFragment,
+                nominalSize: SPLIT_DUAL_FOOTER_ICON_NOMINAL_SIZE,
+            },
         statusIcon: options.statusIcon ?? options.fallbackStatusIcon,
         circleVariant: options.renderPlan.circleVariant,
     });

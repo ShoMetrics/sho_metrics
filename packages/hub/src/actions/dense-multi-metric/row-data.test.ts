@@ -497,7 +497,7 @@ function buildGpuUsageTarget(): ResolvedMetricTarget {
 function buildMemoryUsageTarget(): ResolvedMetricTarget {
     return {
         domain: "memory",
-        reading: { kind: "usage" },
+        reading: { kind: "usage", displayMode: "usedPercentage" },
     };
 }
 
@@ -535,7 +535,7 @@ function buildDiskUsageTarget(volumeId: string | undefined): ResolvedMetricTarge
         volumeId,
         reading: {
             kind: "usage",
-            displayMode: "percentage",
+            displayMode: "usedPercentage",
             barLabel: "",
         },
     };

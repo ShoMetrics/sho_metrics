@@ -109,7 +109,7 @@ test("widget patch rejects VRAM in CPU hardware summary reading order", () => {
             orderedReadings: [
                 { kind: "usage" },
                 { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
-                { kind: "vram" },
+                { kind: "vram", displayMode: "usedPercentage" },
             ],
         },
     }), /CPU hardware summary cannot use VRAM/);

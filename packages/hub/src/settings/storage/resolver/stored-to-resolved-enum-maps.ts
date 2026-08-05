@@ -10,11 +10,13 @@ import {
     ColorMode as StoredColorMode,
     DiskMetricTarget_Throughput_Direction as StoredDiskThroughputDirection,
     DiskMetricTarget_Usage_DisplayMode as StoredDiskUsageDisplayMode,
+    GpuMetricTarget_Vram_DisplayMode as StoredGpuVramDisplayMode,
     LineAppearanceSettings_GridLineType as StoredGridLineType,
     LineAppearanceSettings_GridLineVisibility as StoredGridLineVisibility,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
     MetricView as StoredMetricView,
+    MemoryMetricTarget_Usage_DisplayMode as StoredMemoryUsageDisplayMode,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     NetworkMetricTarget_Traffic_TrafficDisplayMode as StoredNetworkTrafficDisplayMode,
@@ -33,10 +35,12 @@ import type {
     ColorMode,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
+    GpuVramDisplayMode,
     GridLineType,
     GridLineVisibility,
     MetricTheme,
     MetricView,
+    MemoryUsageDisplayMode,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
@@ -180,9 +184,24 @@ export const catalogMetricReadingKindByProto = {
 
 export const diskUsageDisplayModeByProto = {
     [StoredDiskUsageDisplayMode.UNSPECIFIED]: undefined,
-    [StoredDiskUsageDisplayMode.PERCENTAGE]: "percentage",
-    [StoredDiskUsageDisplayMode.SPACE]: "space",
+    [StoredDiskUsageDisplayMode.PERCENTAGE]: "usedPercentage",
+    [StoredDiskUsageDisplayMode.SPACE]: "freeCapacity",
+    [StoredDiskUsageDisplayMode.USED_CAPACITY]: "usedCapacity",
 } satisfies Record<StoredDiskUsageDisplayMode, DiskUsageDisplayMode | undefined>;
+
+export const memoryUsageDisplayModeByProto = {
+    [StoredMemoryUsageDisplayMode.UNSPECIFIED]: undefined,
+    [StoredMemoryUsageDisplayMode.USED_PERCENTAGE]: "usedPercentage",
+    [StoredMemoryUsageDisplayMode.USED_CAPACITY]: "usedCapacity",
+    [StoredMemoryUsageDisplayMode.FREE_CAPACITY]: "freeCapacity",
+} satisfies Record<StoredMemoryUsageDisplayMode, MemoryUsageDisplayMode | undefined>;
+
+export const gpuVramDisplayModeByProto = {
+    [StoredGpuVramDisplayMode.UNSPECIFIED]: undefined,
+    [StoredGpuVramDisplayMode.USED_PERCENTAGE]: "usedPercentage",
+    [StoredGpuVramDisplayMode.USED_CAPACITY]: "usedCapacity",
+    [StoredGpuVramDisplayMode.FREE_CAPACITY]: "freeCapacity",
+} satisfies Record<StoredGpuVramDisplayMode, GpuVramDisplayMode | undefined>;
 
 export const diskThroughputDirectionByProto = {
     [StoredDiskThroughputDirection.UNSPECIFIED]: undefined,

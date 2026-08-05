@@ -17,9 +17,24 @@ export function buildTitleCardSingleMetricContent(data: WidgetData): TitleCardSi
         compactCodeText: resolveTitleCardCompactCodeText(codeText),
         // TODO: Carry metric target context into title-card content so custom labels
         // cannot mask target-specific captions such as battery.
-        threeCharacterCaptionText: data.titleCardCaptionText ?? resolveTitleCardSingleCaptionText(codeText, data.unit),
+        threeCharacterCaptionText: data.titleCardCaptionText
+            ?? resolveTitleCardQualifierCaptionText(data.valueQualifierText)
+            ?? resolveTitleCardSingleCaptionText(codeText, data.unit),
         unitText: formatTitleCardUnitText(data.unit),
     };
+}
+
+function resolveTitleCardQualifierCaptionText(
+    qualifierText: WidgetData["valueQualifierText"],
+): string | undefined {
+    switch (qualifierText) {
+        case undefined:
+            return undefined;
+        case "Used":
+            return "使用量";
+        case "Free":
+            return "残容量";
+    }
 }
 
 /** Builds title-card text content for paired positive/negative metric values. */

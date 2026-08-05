@@ -330,7 +330,7 @@ function buildGpuVramPrimaryHardwareSummarySettings(): InspectorTestSettings {
                     domain: "gpu",
                 },
                 orderedReadings: [
-                    { kind: "vram" },
+                    { kind: "vram", displayMode: "usedPercentage" },
                     { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
                     { kind: "usage" },
                 ],

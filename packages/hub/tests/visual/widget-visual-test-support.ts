@@ -25,6 +25,7 @@ import { buildColorConfigFromAppearance } from "../../src/settings/render-paint-
 import type { DenseMetricWidgetData } from "../../src/actions/dense-multi-metric/row-data";
 import type { HardwareSummaryWidgetData } from "../../src/actions/hardware-summary/widget-data";
 import type { StackedMetricIndicator } from "../../src/view-rendering/frame/stacked-metric-indicator";
+import type { ProgressCircleFooterIcon } from "../../src/widgets/primitives/progress-circle";
 import { getDiskIconFragment, getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import {
     getNetworkDirectionStatusIcon,
@@ -191,7 +192,7 @@ export interface SingleMetricVisualTestCase {
     readonly renderTarget?: MetricRenderTarget;
     readonly keySize?: KeySize;
     readonly centerIcon?: string;
-    readonly footerIcon?: string;
+    readonly footerIcon?: ProgressCircleFooterIcon;
     readonly topIcon?: string;
     readonly statusIcon?: ProgressCircleStatusIcon;
     readonly muted?: boolean;
@@ -485,7 +486,7 @@ function renderSingleMetricFramePngBuffer(testCase: SingleMetricVisualTestCase):
             resolvedSettings,
             widgetData: testCase.data,
             centerIconFragment: testCase.centerIcon ?? "",
-            footerIconFragment: testCase.footerIcon,
+            footerIcon: testCase.footerIcon,
             topIconFragment: testCase.topIcon,
             statusIcon: testCase.statusIcon ?? getMetricStatusIcon("percentage"),
             circleVariantOverride: resolvedSettings.view.circleVariant,

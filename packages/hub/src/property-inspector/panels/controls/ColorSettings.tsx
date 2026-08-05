@@ -155,6 +155,7 @@ export function StandardColorSettings(props: WidgetSettingsPanelProps): React.JS
                 onMultiColorGradientChange={(isGradientEnabled) => patchMetricPaintSettings(props.onSettingsPatch, selectedTheme, {
                     multiColor: { isGradientEnabled },
                 })}
+                showFreeCapacityRangeNote={isFreeCapacityDisplaySelected(context.resolved)}
                 disabled={props.colorDisabled ?? false}
             />
         </SettingsSection>
@@ -175,6 +176,7 @@ interface MetricColorControlsProps {
     readonly onThresholdPatch: (patch: ThresholdPercentPatch) => void;
     readonly onSolidGradientChange: (isGradientEnabled: boolean) => void;
     readonly onMultiColorGradientChange: (isGradientEnabled: boolean) => void;
+    readonly showFreeCapacityRangeNote?: boolean | undefined;
     readonly disabled?: boolean | undefined;
 }
 
@@ -192,6 +194,7 @@ export function MetricColorControls({
     onThresholdPatch,
     onSolidGradientChange,
     onMultiColorGradientChange,
+    showFreeCapacityRangeNote = false,
     disabled = false,
 }: MetricColorControlsProps): React.JSX.Element {
     const { t } = useI18n();
@@ -224,6 +227,7 @@ export function MetricColorControls({
                     highThresholdPercent={highThresholdPercent}
                     onMultiColorPatch={onMultiColorPatch}
                     onThresholdPatch={onThresholdPatch}
+                    showFreeCapacityRangeNote={showFreeCapacityRangeNote}
                     disabled={disabled}
                 />
                 <GradientSetting
@@ -360,6 +364,7 @@ function MultiColorSettings({
     highThresholdPercent,
     onMultiColorPatch,
     onThresholdPatch,
+    showFreeCapacityRangeNote = false,
     disabled = false,
 }: {
     readonly colors: ResolvedMultiColorSet;
@@ -367,6 +372,7 @@ function MultiColorSettings({
     readonly highThresholdPercent: number;
     readonly onMultiColorPatch: (patch: ResolvedMultiColorSetOverride) => void;
     readonly onThresholdPatch: (patch: ThresholdPercentPatch) => void;
+    readonly showFreeCapacityRangeNote?: boolean | undefined;
     readonly disabled?: boolean | undefined;
 }): React.JSX.Element {
     const { t } = useI18n();
@@ -375,7 +381,12 @@ function MultiColorSettings({
         <>
             <SectionHeading text={t(colorMessages.rangeColorsHeading)} />
             <InspectorItem className="note-item note-item-default">
-                <p className="section-note">{t(colorMessages.rangeColorsNote)}</p>
+                <p className="section-note">
+                    {t(colorMessages.rangeColorsNote)}
+                    {showFreeCapacityRangeNote
+                        ? ` ${t(colorMessages.freeCapacityRangeColorsNote)}`
+                        : ""}
+                </p>
             </InspectorItem>
             <ThresholdRangeSettings
                 lowThresholdPercent={lowThresholdPercent}
@@ -849,4 +860,21 @@ const terminalPaletteMessageByValue = {
 
 function readSingleMetricAppearance(settings: ResolvedWidgetSettings): ResolvedAppearanceSettings {
     return requireResolvedSingleMetricWidget(settings).slot.appearance;
+}
+
+function isFreeCapacityDisplaySelected(settings: ResolvedWidgetSettings): boolean {
+    const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+
+    switch (target.domain) {
+        case "memory":
+            return target.reading.displayMode === "freeCapacity";
+        case "disk":
+            return target.reading.kind === "usage"
+                && target.reading.displayMode === "freeCapacity";
+        case "gpu":
+            return target.reading.kind === "vram"
+                && target.reading.displayMode === "freeCapacity";
+        default:
+            return false;
+    }
 }

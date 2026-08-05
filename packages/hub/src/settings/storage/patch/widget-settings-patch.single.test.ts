@@ -4,8 +4,11 @@ import {
     CatalogMetricCategory as StoredCatalogMetricCategory,
     CatalogMetricReadingKind as StoredCatalogMetricReadingKind,
     ColorMode as StoredColorMode,
+    DiskMetricTarget_Usage_DisplayMode as StoredDiskUsageDisplayMode,
+    GpuMetricTarget_Vram_DisplayMode as StoredGpuVramDisplayMode,
     MetricSourcePolicy_FailureMode as StoredSourceFailureMode,
     MetricTheme as StoredMetricTheme,
+    MemoryMetricTarget_Usage_DisplayMode as StoredMemoryUsageDisplayMode,
     NetworkDisplaySettings_UnitBase as StoredNetworkUnitBase,
     NetworkMetricTarget_Traffic_Direction as StoredNetworkDirection,
     SystemPeripheralBindingTransport as StoredSystemPeripheralBindingTransport,
@@ -59,6 +62,68 @@ test("widget patch fails when a catalog patch targets a non-catalog metric", () 
         }),
         /non-catalog metric/,
     );
+});
+
+test("widget patch writes memory usage display mode", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "memory").rawSettings,
+        {
+            memory: {
+                usageDisplayMode: "freeCapacity",
+            },
+        },
+    );
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+
+    assert.equal(target?.case, "memory");
+    if (target?.case === "memory") {
+        assert.equal(target.value.reading.case, "usage");
+        if (target.value.reading.case === "usage") {
+            assert.equal(target.value.reading.value?.displayMode, StoredMemoryUsageDisplayMode.FREE_CAPACITY);
+        }
+    }
+});
+
+test("widget patch preserves the legacy disk free-capacity enum and writes used capacity", () => {
+    const diskSettings = resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings;
+    const freeCapacitySettings = writeStoredWidgetSettingsPatch(diskSettings, {
+        disk: { usageDisplayMode: "freeCapacity" },
+    });
+    const usedCapacitySettings = writeStoredWidgetSettingsPatch(diskSettings, {
+        disk: { usageDisplayMode: "usedCapacity" },
+    });
+    const freeCapacityTarget = readSingleMetricSlot(freeCapacitySettings)?.metric?.target;
+    const usedCapacityTarget = readSingleMetricSlot(usedCapacitySettings)?.metric?.target;
+
+    assert.equal(freeCapacityTarget?.case, "disk");
+    assert.equal(usedCapacityTarget?.case, "disk");
+    if (freeCapacityTarget?.case === "disk" && freeCapacityTarget.value.reading.case === "usage") {
+        assert.equal(freeCapacityTarget.value.reading.value.displayMode, StoredDiskUsageDisplayMode.SPACE);
+    }
+    if (usedCapacityTarget?.case === "disk" && usedCapacityTarget.value.reading.case === "usage") {
+        assert.equal(usedCapacityTarget.value.reading.value.displayMode, StoredDiskUsageDisplayMode.USED_CAPACITY);
+    }
+});
+
+test("widget patch writes GPU VRAM display mode", () => {
+    const nextSettings = writeStoredWidgetSettingsPatch(
+        resolveQuickStartStoredWidgetSettings(undefined, "gpu").rawSettings,
+        {
+            gpu: {
+                kind: "vram",
+                vramDisplayMode: "usedCapacity",
+            },
+        },
+    );
+    const target = readSingleMetricSlot(nextSettings)?.metric?.target;
+
+    assert.equal(target?.case, "gpu");
+    if (target?.case === "gpu") {
+        assert.equal(target.value.reading.case, "vram");
+        if (target.value.reading.case === "vram") {
+            assert.equal(target.value.reading.value?.displayMode, StoredGpuVramDisplayMode.USED_CAPACITY);
+        }
+    }
 });
 
 test("widget patch updates catalog metric target", () => {

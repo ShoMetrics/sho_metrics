@@ -126,6 +126,61 @@ test("disk usage display keeps explicit unavailable volume instead of falling ba
     assert.equal(renderWidgetData.displayValue, "N/A");
 });
 
+test("disk usage adds the free-capacity marker only when the displayed value is free", () => {
+    const metricStore = new MetricStore();
+    metricStore.ingest(LOCAL_SOURCE_SCOPE_ID, buildMetricSnapshot({
+        timestampMilliseconds: 1000,
+        metrics: {
+            [getDefaultDiskUsageMetricKey("used")]: buildScalarMetricValue(18 * 1024 ** 3, {
+                unit: MetricUnit.BYTES,
+            }),
+            [getDefaultDiskUsageMetricKey("total")]: buildScalarMetricValue(32 * 1024 ** 3, {
+                unit: MetricUnit.BYTES,
+            }),
+            [getDefaultDiskUsageMetricKey("available")]: buildScalarMetricValue(14 * 1024 ** 3, {
+                unit: MetricUnit.BYTES,
+            }),
+        },
+    }));
+
+    for (const displayMode of ["usedPercentage", "usedCapacity", "freeCapacity"] as const) {
+        const rawSettings = writeStoredWidgetSettingsPatch(
+            resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,
+            {
+                appearance: {
+                    view: { selectedView: "circle", circleVariant: "gauge" },
+                },
+                disk: { kind: "usage", usageDisplayMode: displayMode },
+            },
+        );
+        const settings = resolveInitialActionSettings(rawSettings, "disk").resolvedSettings;
+        const target = requireResolvedSingleMetricWidget(settings).slot.metric.target;
+        if (target.domain !== "disk") {
+            assert.fail("Expected disk target.");
+        }
+
+        const viewOptions = buildDiskViewOptions({
+            event: { action: { id: "action-1" } } as unknown as WillAppearEvent,
+            settings,
+            target,
+            metrics: metricStore.forScope(LOCAL_SOURCE_SCOPE_ID),
+            volumeSelection: { kind: "available", volume: buildDiskVolumeOption("C:") },
+            currentTimestampMilliseconds: 1000,
+        });
+        if ("positiveColor" in viewOptions) {
+            assert.fail("Expected single metric disk view.");
+        }
+
+        assert.equal(
+            viewOptions.widgetData.valueQualifierIconFragment !== undefined,
+            displayMode === "freeCapacity",
+            displayMode,
+        );
+        assert.equal(viewOptions.footerIcon !== undefined, displayMode === "freeCapacity", displayMode);
+        assert.equal(viewOptions.widgetData.secondaryDisplayValue, "18 / 32 GB");
+    }
+});
+
 test("disk compact center icon label uses theme label font family", () => {
     const rawSettings = writeStoredWidgetSettingsPatch(
         resolveQuickStartStoredWidgetSettings(undefined, "disk").rawSettings,

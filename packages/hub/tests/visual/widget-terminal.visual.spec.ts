@@ -5,6 +5,7 @@ import { resolveResvgFontOptions } from "../../src/view-rendering/rasterize/resv
 import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
 import { WIDGET_LOGICAL_SIZE, type KeySize, type WidgetData } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
+import type { ProgressCircleFooterIcon } from "../../src/widgets/primitives/progress-circle";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
@@ -26,7 +27,7 @@ interface TerminalVisualWidgetTestCase {
     readonly appearance: ResolvedAppearanceSettingsOverride;
     readonly data: WidgetData;
     readonly centerIcon?: string;
-    readonly footerIcon?: string;
+    readonly footerIcon?: ProgressCircleFooterIcon;
     readonly topIcon?: string;
 }
 
@@ -188,7 +189,7 @@ function renderSingleMetricWidgetSvg(options: {
     appearance: ResolvedAppearanceSettingsOverride;
     data: WidgetData;
     centerIcon: string;
-    footerIcon?: string;
+    footerIcon?: ProgressCircleFooterIcon;
     topIcon?: string;
     keySize: KeySize;
 }): string {

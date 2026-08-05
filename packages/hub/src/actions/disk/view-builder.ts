@@ -17,6 +17,7 @@ import { resolveThresholdColorForProgress, type ColorConfig } from "../../view-r
 import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } from "../../widgets/icons/hardware-icons";
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
+import type { ProgressCircleFooterIcon } from "../../widgets/primitives/progress-circle";
 import { escapeSvgText } from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
@@ -32,6 +33,7 @@ import {
 } from "../../settings/render-paint-resolver";
 import { resolveRenderTextStyles } from "../../settings/render-text-style-resolver";
 import { buildMetricAccentPaintAppearanceOverride } from "../../settings/appearance-overrides";
+import { buildCapacityRenderHints } from "../shared/capacity-render-hints";
 
 interface BuildDiskViewOptions {
     event: WillAppearEvent;
@@ -121,28 +123,33 @@ function buildDiskUsageViewOptions(
         "B",
     );
     const appearance = readSingleMetricAppearance(options.settings);
-    const selectedView = appearance.view.selectedView;
     const circleVariant = appearance.view.circleVariant;
-    const shouldRenderGauge = selectedView === "circle" && circleVariant === "gauge";
+
+    const widgetData = buildDiskUsageWidgetData({
+        usedBytesWidgetData,
+        totalBytes: totalBytesWidgetData.current,
+        availableBytes: availableBytesWidgetData.current,
+        displayMode: options.reading.displayMode,
+        label,
+        barLabel: resolveDiskBarLabel(options.reading.barLabel, selectedVolume, label),
+    });
+    const renderHints = buildCapacityRenderHints({
+        widgetData,
+        displayMode: options.reading.displayMode,
+        view: appearance.view,
+    });
 
     return {
         event: options.event,
         metricRenderKind: "singleMetric",
         resolvedSettings: appearance,
         metricKey: usedMetricKey,
-        widgetData: buildDiskUsageWidgetData({
-            usedBytesWidgetData,
-            totalBytes: totalBytesWidgetData.current,
-            availableBytes: availableBytesWidgetData.current,
-            displayMode: options.reading.displayMode,
-            label,
-            barLabel: resolveDiskBarLabel(options.reading.barLabel, selectedVolume, label),
-        }),
+        widgetData: renderHints.widgetData,
         centerIconFragment: buildDiskCenterIconFragment(
             options.volumeSelection,
             resolveRenderTextStyles(appearance).label.fontFamily,
         ),
-        footerIconFragment: shouldRenderGauge ? undefined : buildDiskGaugeFooterIconFragment(selectedVolume),
+        footerIcon: renderHints.footerIcon,
         topIconFragment: getDiskIconFragment(selectedVolume?.storageKind ?? "unknown"),
         statusIcon: getMetricStatusIcon("percentage"),
         circleVariantOverride: circleVariant,
@@ -217,8 +224,8 @@ function buildDiskThroughputViewOptions(
             pollingFrequencySeconds: options.settings.preferences.pollingFrequencySeconds,
         }),
         centerIconFragment: getDiskIconFragment("unknown"),
-        footerIconFragment: shouldRenderGaugeFooter
-            ? buildDiskThroughputFooterIconFragment(singleThroughputDirection)
+        footerIcon: shouldRenderGaugeFooter
+            ? buildDiskThroughputFooterIcon(singleThroughputDirection)
             : undefined,
         statusIcon: getMetricStatusIcon("percentage"),
         circleVariantOverride: circleVariant,
@@ -524,18 +531,14 @@ function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection, label
     `;
 }
 
-function buildDiskGaugeFooterIconFragment(diskVolume: DiskVolumeOption | null): string {
-    return renderCenteredHardwareIconFragment(
-        getDiskIcon(diskVolume?.storageKind ?? "unknown"),
-        DISK_GAUGE_FOOTER_ICON_SIZE,
-    );
-}
-
-function buildDiskThroughputFooterIconFragment(direction: DiskThroughputMetricDirection): string {
-    return renderDiskThroughputDirectionIconFragment({
-        direction,
-        size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
-    });
+function buildDiskThroughputFooterIcon(direction: DiskThroughputMetricDirection): ProgressCircleFooterIcon {
+    return {
+        fragment: renderDiskThroughputDirectionIconFragment({
+            direction,
+            size: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+        }),
+        nominalSize: DISK_THROUGHPUT_DIRECTION_ICON_SIZE,
+    };
 }
 
 function resolveDiskMaximumThroughputBytesPerSecond(
@@ -612,4 +615,3 @@ const DEFAULT_NETWORK_DISK_THROUGHPUT_MEBIBYTES_PER_SECOND = 125;
 const DEFAULT_UNKNOWN_READ_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DEFAULT_UNKNOWN_WRITE_THROUGHPUT_MEBIBYTES_PER_SECOND = 1000;
 const DISK_THROUGHPUT_DIRECTION_ICON_SIZE = 30;
-const DISK_GAUGE_FOOTER_ICON_SIZE = 25;

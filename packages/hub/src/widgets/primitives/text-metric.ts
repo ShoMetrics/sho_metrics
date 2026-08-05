@@ -11,12 +11,14 @@ import {
 } from "../../view-rendering/rasterize/render-svg-effects";
 import {
     DEFAULT_RENDER_TEXT_STYLES,
+    type RenderTextStyle,
     type RenderTextStyles,
 } from "../../view-rendering/rasterize/render-text-style";
 import {
     renderStyledSvgText,
 } from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetBaseConfig } from "../widget-contract";
+import { renderTitleWithQualifier } from "./metric-title-layout";
 
 export interface TextMetricConfig extends WidgetBaseConfig {
     labelTextColor: string;
@@ -147,20 +149,18 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
     const labelTextStyle = config.textStyles.label;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
+    const labelYCoordinate = keySize.height * SINGLE_TEXT_SQUARE_LAYOUT.labelYRatio;
 
     return `
-        ${renderStyledSvgText({
-            id: "text-metric-label",
-            text: data.label,
+        ${renderTextMetricLabel({
+            data,
             xCoordinate: centerXCoordinate,
-            yCoordinate: keySize.height * SINGLE_TEXT_SQUARE_LAYOUT.labelYRatio,
+            yCoordinate: labelYCoordinate,
             maxWidth: textWidth,
             baseFontSize: SINGLE_TEXT_SQUARE_LAYOUT.labelFontSize,
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
-            textAnchor: "middle",
             outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
             id: "text-metric-value",
@@ -201,20 +201,18 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
     const labelTextStyle = config.textStyles.label;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
+    const labelYCoordinate = keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio;
 
     return `
-        ${renderStyledSvgText({
-            id: "text-metric-label",
-            text: data.label,
+        ${renderTextMetricLabel({
+            data,
             xCoordinate: centerXCoordinate,
-            yCoordinate: keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio,
+            yCoordinate: labelYCoordinate,
             maxWidth: contentWidth,
             baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
             textStyle: labelTextStyle,
             fill: config.labelTextColor,
-            textAnchor: "middle",
             outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
         })}
         ${renderStyledSvgText({
             id: "text-metric-value",
@@ -473,6 +471,46 @@ function renderUnitText(options: {
         outline: options.config.textOutline,
         extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
         fitOptions: UNIT_TEXT_FIT_OPTIONS,
+    });
+}
+
+function renderTextMetricLabel(options: {
+    data: WidgetData;
+    xCoordinate: number;
+    yCoordinate: number;
+    maxWidth: number;
+    baseFontSize: number;
+    textStyle: RenderTextStyle;
+    fill: string;
+    outline?: RenderOutlineTokens;
+}): string {
+    if (options.data.valueQualifierText !== undefined) {
+        return renderTitleWithQualifier({
+            id: "text-metric-label",
+            labelText: options.data.label,
+            qualifierText: options.data.valueQualifierText,
+            xCoordinate: options.xCoordinate,
+            yCoordinate: options.yCoordinate,
+            maxWidth: options.maxWidth,
+            baseFontSize: options.baseFontSize,
+            textStyle: options.textStyle,
+            fill: options.fill,
+            outline: options.outline,
+        });
+    }
+
+    return renderStyledSvgText({
+        id: "text-metric-label",
+        text: options.data.label,
+        xCoordinate: options.xCoordinate,
+        yCoordinate: options.yCoordinate,
+        maxWidth: options.maxWidth,
+        baseFontSize: options.baseFontSize,
+        textStyle: options.textStyle,
+        fill: options.fill,
+        textAnchor: "middle",
+        outline: options.outline,
+        extraAttributes: buildSvgFilterAttributes(options.textStyle.filter),
     });
 }
 

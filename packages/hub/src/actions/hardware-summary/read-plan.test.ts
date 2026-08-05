@@ -73,8 +73,8 @@ test("GPU power selected as a secondary reading adds power and power limit keys"
 
 test("summary metric keys are deduplicated", () => {
     const widget = buildGpuHardwareSummaryWidgetWithReadings([
-        { kind: "vram" },
-        { kind: "vram" },
+        { kind: "vram", displayMode: "usedPercentage" },
+        { kind: "vram", displayMode: "usedPercentage" },
         { kind: "usage" },
     ]);
 

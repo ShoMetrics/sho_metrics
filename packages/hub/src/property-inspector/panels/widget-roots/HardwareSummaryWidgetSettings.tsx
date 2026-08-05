@@ -534,8 +534,9 @@ function buildDefaultCpuSummaryReading(kind: CpuSummaryReadingKind): ResolvedCpu
 function buildDefaultGpuSummaryReading(kind: GpuSummaryReadingKind): ResolvedGpuHardwareSummaryReading {
     switch (kind) {
         case "usage":
-        case "vram":
             return { kind };
+        case "vram":
+            return { kind, displayMode: "usedPercentage" };
         case "temperature":
             return { kind, maximumCelsius: DEFAULT_GPU_TEMPERATURE_CELSIUS, unit: "celsius" };
         case "power":

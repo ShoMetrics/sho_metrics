@@ -378,7 +378,8 @@ function resolveTextClipXCoordinate(xCoordinate: number, maxWidth: number, textA
     return xCoordinate;
 }
 
-function estimateSvgTextRunWidth(textRun: SvgTextFitRun): number {
+/** Estimates one SVG text run using the same model as resolveSvgTextFit. */
+export function estimateSvgTextRunWidth(textRun: SvgTextFitRun): number {
     const fontWeight = typeof textRun.fontWeight === "number" ? textRun.fontWeight : 400;
     const weightRatio = fontWeight >= 850 ? 1.03 : fontWeight >= 700 ? 1.015 : 1;
     const characterCount = Array.from(textRun.text).length;

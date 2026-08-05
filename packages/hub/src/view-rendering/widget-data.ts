@@ -9,11 +9,17 @@ export interface WidgetData {
     displayValue?: string;         // Optional preformatted value for compact metric-specific displays.
     unavailableDisplayValue?: string; // Optional short key copy for render-owned no-data states.
     secondaryDisplayValue?: string;
+    /** Stable Used/Free token displayed by renderers and mapped to compact title-card captions. */
+    valueQualifierText?: "Used" | "Free";
+    /** Optional icon that qualifies the semantic meaning of the primary value. */
+    valueQualifierIconFragment?: string;
     /** Renderer hint for title-card's fixed three-character caption column. */
     titleCardCaptionText?: string;
     barLabel?: string;
     barDisplayValue?: string;
     barUnit?: string;
+    /** Optional bottom-row copy used only by wide progress bars. */
+    barWideSecondaryDisplayValue?: string;
     barValueIconFragment?: string;
     barValueIconColor?: string;
     barChannels?: readonly BarChannelWidgetData[];

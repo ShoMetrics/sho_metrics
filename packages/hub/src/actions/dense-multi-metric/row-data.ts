@@ -386,6 +386,7 @@ function buildTargetWidgetData(
                 usedBytesWidgetData: metrics.getWidgetData(RAM_USED_METRIC_KEY, resolveDenseRowLabel(row), "B"),
                 totalBytes: metrics.getWidgetData(RAM_TOTAL_METRIC_KEY, resolveDenseRowLabel(row), "B").current,
                 label: resolveDenseRowLabel(row),
+                displayMode: "usedPercentage",
             });
         case "gpu":
             return buildGpuRowWidgetData(row, metrics);
@@ -488,6 +489,9 @@ function buildGpuRowWidgetData(row: DenseMetricConfiguredRow, metrics: MetricSto
                 ...buildGpuVramWidgetData(
                     metrics.getWidgetData(GPU_VRAM_USED_METRIC_KEY, label, "B"),
                     metrics.getWidgetData(GPU_VRAM_TOTAL_METRIC_KEY, label, "B").current,
+                    {
+                        displayMode: "usedPercentage",
+                    },
                 ),
                 label,
             };

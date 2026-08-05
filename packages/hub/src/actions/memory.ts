@@ -12,6 +12,7 @@ import {
     type ResolvedMemoryMetricTarget,
     type ResolvedWidgetSettings,
 } from "../settings/resolved-settings";
+import { buildCapacityRenderHints } from "./shared/capacity-render-hints";
 import { readResolvedMetricTarget } from "./shared/resolved-metric-target";
 import type { SingleMetricViewOptions } from "../view-updates/runner";
 
@@ -42,7 +43,6 @@ export function buildMemoryMetricViewOptions(options: {
     readonly target: ResolvedMemoryMetricTarget;
     readonly metrics: MetricStoreReader;
 }): SingleMetricViewOptions {
-    void options.target;
     const widget = requireResolvedSingleMetricWidget(options.settings);
     const usedBytesWidgetData = options.metrics.getWidgetData(
         RAM_USED_METRIC_KEY,
@@ -54,17 +54,25 @@ export function buildMemoryMetricViewOptions(options: {
         PROGRESS_CIRCLE_LABELS.ram,
         "B",
     );
+    const widgetData = buildMemoryUsageWidgetData({
+        usedBytesWidgetData,
+        totalBytes: totalBytesWidgetData.current,
+        label: PROGRESS_CIRCLE_LABELS.ram,
+        displayMode: options.target.reading.displayMode,
+    });
+    const renderHints = buildCapacityRenderHints({
+        widgetData,
+        displayMode: options.target.reading.displayMode,
+        view: widget.slot.appearance.view,
+    });
 
     return {
         event: options.event,
         metricRenderKind: "singleMetric",
         resolvedSettings: widget.slot.appearance,
         metricKey: RAM_USED_METRIC_KEY,
-        widgetData: buildMemoryUsageWidgetData({
-            usedBytesWidgetData,
-            totalBytes: totalBytesWidgetData.current,
-            label: PROGRESS_CIRCLE_LABELS.ram,
-        }),
+        widgetData: renderHints.widgetData,
         ...buildMetricViewIcons({ hardware: "memory", status: "percentage" }),
+        footerIcon: renderHints.footerIcon,
     };
 }

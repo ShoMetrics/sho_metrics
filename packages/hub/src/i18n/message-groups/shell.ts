@@ -29,6 +29,11 @@ export const commonMessages = {
         zh_CN: "指标",
         ja: "メトリクス",
     },
+    usageDisplayLabel: {
+        en: "Usage Display",
+        zh_CN: "用量显示",
+        ja: "使用量表示",
+    },
     appearanceViewSection: {
         en: "View",
         zh_CN: "视图",

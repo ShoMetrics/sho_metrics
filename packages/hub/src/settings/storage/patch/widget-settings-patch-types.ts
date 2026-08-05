@@ -5,6 +5,8 @@ import type {
     CatalogMetricReadingKind,
     DiskThroughputDirection,
     DiskUsageDisplayMode,
+    GpuVramDisplayMode,
+    MemoryUsageDisplayMode,
     NetworkDirection,
     NetworkTrafficDisplayMode,
     NetworkUnitBase,
@@ -54,6 +56,9 @@ export interface StoredWidgetSettingsPatch {
         readonly maximumReadThroughputMebibytesPerSecond: number | undefined;
         readonly maximumWriteThroughputMebibytesPerSecond: number | undefined;
     }>;
+    readonly memory?: Partial<{
+        readonly usageDisplayMode: MemoryUsageDisplayMode;
+    }>;
     readonly cpu?: Partial<{
         readonly kind: ResolvedCpuReading["kind"];
         readonly temperatureUnit: TemperatureUnit;
@@ -62,6 +67,7 @@ export interface StoredWidgetSettingsPatch {
     }>;
     readonly gpu?: Partial<{
         readonly kind: ResolvedGpuReading["kind"];
+        readonly vramDisplayMode: GpuVramDisplayMode;
         readonly temperatureUnit: TemperatureUnit;
         readonly maximumTemperatureCelsius: number;
         readonly maximumPowerWatts: number | undefined;

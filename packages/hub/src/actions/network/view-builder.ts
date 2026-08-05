@@ -180,11 +180,14 @@ function buildTrafficNetworkViewUpdate(options: BuildTrafficNetworkViewOptions):
                 direction: networkDirection,
                 selectedNetworkInterface: options.selectedNetworkInterface,
             }),
-            footerIconFragment: shouldRenderGaugeFooter
-                ? renderNetworkDirectionIconFragment({
-                    direction: networkDirection,
-                    size: NETWORK_FOOTER_ICON_SIZE,
-                })
+            footerIcon: shouldRenderGaugeFooter
+                ? {
+                    fragment: renderNetworkDirectionIconFragment({
+                        direction: networkDirection,
+                        size: NETWORK_FOOTER_ICON_SIZE,
+                    }),
+                    nominalSize: NETWORK_FOOTER_ICON_SIZE,
+                }
                 : undefined,
             statusIcon: getNetworkDirectionStatusIcon({
                 direction: networkDirection,

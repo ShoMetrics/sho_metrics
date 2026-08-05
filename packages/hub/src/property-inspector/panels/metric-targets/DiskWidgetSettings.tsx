@@ -32,6 +32,7 @@ import {
     diskThroughputDirectionOptionList,
     diskUsageDisplayModeOptionList,
     scaleModeOptionList,
+    isCapacityDisplayModeVisible,
 } from "../setting-options";
 
 type DiskUsageReading = Extract<ResolvedDiskMetricTarget["reading"], { readonly kind: "usage" }>;
@@ -47,6 +48,7 @@ const aggregateDiskVolumeOptionList = [
 
 export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.Element {
     const reading = props.target.reading;
+    const selectedView = requireResolvedSingleMetricWidget(props.context.resolved).slot.appearance.view.selectedView;
     const usesThroughputChannelColors = reading.kind === "throughput"
         && reading.direction === "both";
 
@@ -61,9 +63,9 @@ export function DiskWidgetSettings(props: DiskWidgetSettingsProps): React.JSX.El
             <LineSettings {...props} />
             {reading.kind === "throughput" ? (
                 <DiskThroughputScaleSettings {...props} reading={reading} />
-            ) : (
-                <DiskUsageExtraSettings {...props} reading={reading} />
-            )}
+            ) : selectedView === "bar" ? (
+                <DiskUsageBarLabelSettings {...props} reading={reading} />
+            ) : null}
             {usesThroughputChannelColors ? (
                 <DiskThroughputChannelColorSettings {...props} />
             ) : (
@@ -79,6 +81,8 @@ function DiskUsageMetricSettings(props: DiskWidgetSettingsProps & {
 }): React.JSX.Element {
     const i18n = useI18n();
     const { t } = i18n;
+    const view = requireResolvedSingleMetricWidget(props.context.resolved).slot.appearance.view;
+    const shouldShowDisplayMode = isCapacityDisplayModeVisible(view);
     const selectedDiskVolumeId = props.target.volumeId
         ?? resolveSelectedDiskVolume(props.context)?.id
         ?? "";
@@ -94,33 +98,21 @@ function DiskUsageMetricSettings(props: DiskWidgetSettingsProps & {
                     disk: { volumeId },
                 })}
             />
-        </SettingsSection>
-    );
-}
-
-function DiskUsageExtraSettings(props: DiskWidgetSettingsProps & {
-    reading: DiskUsageReading;
-}): React.JSX.Element {
-    const i18n = useI18n();
-    const { t } = i18n;
-    const selectedView = requireResolvedSingleMetricWidget(props.context.resolved).slot.appearance.view.selectedView;
-
-    return (
-        <>
-            {(selectedView === "circle" || selectedView === "text") && (
-                <SettingsSection title={t(commonMessages.scaleUnitsSection)}>
+            {shouldShowDisplayMode && (
                 <SelectSetting
-                        label={t(diskMessages.usageDisplayLabel)}
-                        value={props.reading.displayMode}
-                        optionList={localizeOptionList(t, diskUsageDisplayModeOptionList, diskUsageDisplayModeMessageByValue)}
-                        onValueChange={(usageDisplayMode) => props.onSettingsPatch({
-                            disk: { usageDisplayMode },
-                        })}
-                    />
-                </SettingsSection>
+                    label={t(commonMessages.usageDisplayLabel)}
+                    value={props.reading.displayMode}
+                    optionList={localizeOptionList(
+                        t,
+                        diskUsageDisplayModeOptionList,
+                        diskUsageDisplayModeMessageByValue,
+                    )}
+                    onValueChange={(usageDisplayMode) => props.onSettingsPatch({
+                        disk: { usageDisplayMode },
+                    })}
+                />
             )}
-            {selectedView === "bar" && <DiskUsageBarLabelSettings {...props} />}
-        </>
+        </SettingsSection>
     );
 }
 
@@ -291,8 +283,9 @@ const scaleModeMessageByValue = {
 } as const;
 
 const diskUsageDisplayModeMessageByValue = {
-    percentage: optionMessages.percentageOption,
-    space: optionMessages.freeSpaceOption,
+    usedPercentage: optionMessages.percentageOption,
+    usedCapacity: optionMessages.usedSpaceOption,
+    freeCapacity: optionMessages.freeSpaceOption,
 } as const;
 
 const aggregateDiskVolumeMessageByValue = {

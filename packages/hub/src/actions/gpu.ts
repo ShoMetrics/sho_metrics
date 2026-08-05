@@ -45,6 +45,7 @@ import {
     resolveHardwareSummaryMetricKeys,
 } from "./hardware-summary/read-plan";
 import { buildHardwareSummaryViewOptions } from "./hardware-summary/view-options";
+import { buildCapacityRenderHints } from "./shared/capacity-render-hints";
 
 const log = logger.for("Action:GPU");
 
@@ -249,19 +250,28 @@ export function buildGpuViewOptions(options: {
             const widgetData = buildGpuVramWidgetData(
                 usedWidgetData,
                 totalWidgetData.current,
+                {
+                    displayMode: options.target.reading.displayMode,
+                },
             );
+            const renderHints = buildCapacityRenderHints({
+                widgetData,
+                displayMode: options.target.reading.displayMode,
+                view: widget.slot.appearance.view,
+            });
             const noticeText = resolveBuiltInHelperInstallNoticeText({
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
                 helperStatus: options.helperStatus,
-                widgetData,
+                widgetData: renderHints.widgetData,
             });
 
             return {
                 ...baseOptions,
                 metricKey: GPU_VRAM_USED_METRIC_KEY,
-                widgetData,
+                widgetData: renderHints.widgetData,
                 ...(noticeText === undefined ? {} : { noticeText }),
                 ...buildMetricViewIcons({ hardware: "gpu", status: "memory" }),
+                footerIcon: renderHints.footerIcon,
             };
         }
         case "power": {

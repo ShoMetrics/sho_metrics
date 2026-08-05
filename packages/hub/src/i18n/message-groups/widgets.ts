@@ -101,11 +101,6 @@ export const diskMessages = {
         zh_CN: "磁盘指标",
         ja: "ディスクメトリクス",
     },
-    usageDisplayLabel: {
-        en: "Usage Display",
-        zh_CN: "使用率显示",
-        ja: "使用率表示",
-    },
     readMaxMibLabel: {
         en: "Read Max (MiB/s)",
         zh_CN: "读取最大值 (MiB/s)",

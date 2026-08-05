@@ -64,7 +64,7 @@ test("GPU action subscribes to the active GPU reading metrics", () => {
             metricKeys: [GPU_TEMP_METRIC_KEY],
         },
         {
-            reading: { kind: "vram" },
+            reading: { kind: "vram", displayMode: "usedPercentage" },
             metricKeys: [GPU_VRAM_USED_METRIC_KEY, GPU_VRAM_TOTAL_METRIC_KEY],
         },
         {
@@ -145,10 +145,44 @@ test("GPU VRAM widget data preserves helper-backed no-data copy", () => {
             unavailableDisplayValue: PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE,
         }),
         0,
+        {
+            displayMode: "usedPercentage",
+        },
     );
 
     assert.equal(widgetData.unavailableDisplayValue, PENDING_REFRESH_UNAVAILABLE_DISPLAY_VALUE);
     assert.equal(widgetData.sampleTimestampMilliseconds, sampleTimestampMilliseconds);
+});
+
+test("GPU adds the free-capacity marker only when the displayed VRAM value is free", () => {
+    const settings = resolveInitialActionSettings(undefined, "gpu").resolvedSettings;
+    const metrics = buildMetricReader({
+        [GPU_VRAM_USED_METRIC_KEY]: buildWidgetData({
+            current: 18 * 1024 ** 3,
+            sampleTimestampMilliseconds: Date.now(),
+        }),
+        [GPU_VRAM_TOTAL_METRIC_KEY]: buildWidgetData({
+            current: 32 * 1024 ** 3,
+            sampleTimestampMilliseconds: Date.now(),
+        }),
+    });
+
+    for (const displayMode of ["usedPercentage", "usedCapacity", "freeCapacity"] as const) {
+        const viewOptions = buildGpuViewOptions({
+            event: buildWillAppearEvent(),
+            settings,
+            target: buildGpuTarget({ kind: "vram", displayMode }),
+            metrics,
+            helperStatus: { state: "available" },
+        });
+
+        assert.equal(
+            viewOptions.widgetData.valueQualifierIconFragment !== undefined,
+            displayMode === "freeCapacity",
+            displayMode,
+        );
+        assert.equal(viewOptions.widgetData.secondaryDisplayValue, "18 / 32 GB");
+    }
 });
 
 test("GPU temperature keeps N/A path when fallback has no value", () => {

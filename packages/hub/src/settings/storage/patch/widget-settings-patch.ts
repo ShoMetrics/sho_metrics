@@ -24,6 +24,7 @@ import {
     applyCustomMetricPatch,
     applyDiskPatch,
     applyGpuPatch,
+    applyMemoryPatch,
     applyNetworkPatch,
     applySourcePatch,
 } from "./metric-target-settings-patch";
@@ -35,6 +36,7 @@ import {
     requireDenseMultiMetricWidget,
     requireDiskTarget,
     requireGpuTarget,
+    requireMemoryTarget,
     requireMetricSelection,
     requireNetworkTarget,
     requireSingleMetricSlot,
@@ -119,6 +121,10 @@ function applyPatch(
 
     if (patch.cpu) {
         applyCpuPatch(requireCpuTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.cpu);
+    }
+
+    if (patch.memory) {
+        applyMemoryPatch(requireMemoryTarget(requireMetricSelection(requireSingleMetricSlot(settings))), patch.memory);
     }
 
     if (patch.gpu) {

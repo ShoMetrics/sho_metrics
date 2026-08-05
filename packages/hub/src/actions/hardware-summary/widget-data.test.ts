@@ -27,7 +27,7 @@ const TEST_HELPER_SAMPLE_FRESHNESS_BUDGET_MILLISECONDS = 8000;
 test("primary VRAM progress uses used over total memory", () => {
     const bytesPerGibibyte = 1024 ** 3;
     const widget = buildHardwareSummaryWidget("gpu", [
-        { kind: "vram" },
+        { kind: "vram", displayMode: "usedPercentage" },
         { kind: "temperature", maximumCelsius: 100, unit: "celsius" },
         { kind: "usage" },
     ]);
