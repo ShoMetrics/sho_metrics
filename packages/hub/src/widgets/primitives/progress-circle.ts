@@ -71,7 +71,6 @@ export interface ProgressCircleConfig extends WidgetBaseConfig {
     themeEffects: RenderThemeEffectTokens;
     textOutline?: RenderOutlineTokens;
     shapeOutline?: RenderOutlineTokens;
-    innerTextScale: number;
     circleVariant: CircleVariant;
     gaugeRangeBlendProgress: number;
     centerIconFragment?: string;
@@ -96,7 +95,6 @@ export const DEFAULT_PROGRESS_CIRCLE_CONFIG: ProgressCircleConfig = {
     textOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.textOutline,
     shapeOutline: DEFAULT_RENDER_TRANSPARENT_SURFACE_TOKENS.shapeOutline,
     gradientHeadAdjustmentPercent: -42,
-    innerTextScale: 1,
     circleVariant: "full-ring",
     gaugeRangeBlendProgress: 0.16,
 };
@@ -207,12 +205,11 @@ export const progressCircle: Widget<ProgressCircleConfig> = {
                 strokeWidth: config.strokeWidth,
             });
 
-        const innerTextScale = config.innerTextScale;
-        const labelFontSize = ARC_LAYOUT.label.fontSize * innerTextScale;
+        const labelFontSize = ARC_LAYOUT.label.fontSize;
         const valueText = data.displayValue ?? `${data.current.toFixed(0)}`;
         const placeholderTextScale = valueText === "N/A" ? ARC_LAYOUT.placeholderValueScale : 1;
-        const valueFontSize = ARC_LAYOUT.value.fontSize * innerTextScale * placeholderTextScale;
-        const unitFontSize = ARC_LAYOUT.unit.fontSize * innerTextScale;
+        const valueFontSize = ARC_LAYOUT.value.fontSize * placeholderTextScale;
+        const unitFontSize = ARC_LAYOUT.unit.fontSize;
         const labelYCoordinate = centerYCoordinate + ARC_LAYOUT.label.yOffset;
         const valueCenterYCoordinate = centerYCoordinate + ARC_LAYOUT.value.yOffset;
         const unitText = data.unit;
@@ -697,9 +694,9 @@ function renderGaugeBottomLabel(options: {
     maxWidth: number;
     config: ProgressCircleConfig;
 }): string {
-    const labelTextStyle = options.config.textStyles.smallLabel;
+    const headingTextStyle = options.config.textStyles.heading;
     const baseFontSize = ARC_LAYOUT.gaugeBottomLabel.fontSize;
-    const resolvedFontSize = resolveRenderTextStyleFontSize(baseFontSize, labelTextStyle);
+    const resolvedFontSize = resolveRenderTextStyleFontSize(baseFontSize, headingTextStyle);
     const iconBaseSize = options.icon === undefined
         ? 0
         : options.icon.nominalSize * ARC_LAYOUT.gaugeBottomLabel.iconScale;
@@ -708,14 +705,14 @@ function renderGaugeBottomLabel(options: {
         runs: [{
             text: options.labelText,
             fontSize: resolvedFontSize,
-            fontWeight: labelTextStyle.fontWeight,
-            letterSpacing: resolvedFontSize * labelTextStyle.letterSpacingEm,
+            fontWeight: headingTextStyle.fontWeight,
+            letterSpacing: resolvedFontSize * headingTextStyle.letterSpacingEm,
         }],
         maxWidth: options.maxWidth,
         extraWidth: iconBaseSize + iconBaseGap,
         fitOptions: {
             minimumFontScale: 0.35,
-            widthScale: labelTextStyle.widthScale,
+            widthScale: headingTextStyle.widthScale,
         },
     });
     const contentScale = contentFit.fontScale;
@@ -727,14 +724,14 @@ function renderGaugeBottomLabel(options: {
     const estimatedLabelWidth = Math.min(labelMaxWidth, estimateSvgTextRunWidth({
         text: options.labelText,
         fontSize: labelFontSize,
-        fontWeight: labelTextStyle.fontWeight,
-        letterSpacing: labelFontSize * labelTextStyle.letterSpacingEm,
+        fontWeight: headingTextStyle.fontWeight,
+        letterSpacing: labelFontSize * headingTextStyle.letterSpacingEm,
     }));
     const labelXCoordinate = options.icon === undefined
         ? options.centerXCoordinate
         : options.centerXCoordinate - (iconSize + iconGap) / 2;
     const iconXCoordinate = labelXCoordinate + estimatedLabelWidth / 2 + iconGap + iconSize / 2;
-    const contentClipHeight = resolvedFontSize * labelTextStyle.clipHeightEm;
+    const contentClipHeight = resolvedFontSize * headingTextStyle.clipHeightEm;
     const contentClipXCoordinate = options.centerXCoordinate - options.maxWidth / 2;
     const contentClipYCoordinate = options.yCoordinate - contentClipHeight / 2;
 
@@ -755,11 +752,11 @@ function renderGaugeBottomLabel(options: {
                 yCoordinate: options.yCoordinate,
                 maxWidth: labelMaxWidth,
                 baseFontSize: baseFontSize * contentScale,
-                textStyle: labelTextStyle,
+                textStyle: headingTextStyle,
                 fill: options.config.labelTextColor,
                 textAnchor: "middle",
                 outline: options.config.textOutline,
-                extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+                extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
             })}
             ${renderInlineIcon({
                 iconFragment: options.icon?.fragment,
@@ -790,7 +787,7 @@ function renderCenterValue(options: {
     centerTextMaxWidth: number;
     config: ProgressCircleConfig;
 }): string {
-    const labelTextStyle = options.config.textStyles.label;
+    const headingTextStyle = options.config.textStyles.heading;
     const valueTextStyle = options.config.textStyles.value;
     const unitTextStyle = options.config.textStyles.unit;
 
@@ -802,11 +799,11 @@ function renderCenterValue(options: {
             yCoordinate: options.labelYCoordinate,
             maxWidth: options.labelMaxWidth,
             baseFontSize: options.labelFontSize,
-            textStyle: labelTextStyle,
+            textStyle: headingTextStyle,
             fill: options.config.labelTextColor,
             textAnchor: "middle",
             outline: options.config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
         ${renderMetricTextRow({
             id: "arc-value-unit",

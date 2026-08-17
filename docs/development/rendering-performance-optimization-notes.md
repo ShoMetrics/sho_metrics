@@ -199,7 +199,10 @@ loading extra large CJK font files on every title-card render.
 
 Files:
 
-- `packages/hub/assets/fonts/inter/InterVariable.ttf`
+- `packages/hub/assets/fonts/inter/Inter-Regular.ttf` (400)
+- `packages/hub/assets/fonts/inter/Inter-Medium.ttf` (500)
+- `packages/hub/assets/fonts/inter/Inter-SemiBold.ttf` (600)
+- `packages/hub/assets/fonts/inter/Inter-Bold.ttf` (700)
 - `packages/hub/assets/fonts/inter/LICENSE.txt`
 - `packages/hub/assets/fonts/inter/README.md`
 - `packages/hub/rollup.config.mjs`
@@ -218,6 +221,19 @@ packages/hub/com.ez.sho-metrics.sdPlugin/assets/fonts/inter/
 
 Bundle size was not treated as a blocking concern because the project is a Stream Deck
 plugin and users load the bundle at install/update time.
+
+Static faces are bundled instead of one variable font because resvg-js 2.6.2
+cannot select a variable font's `wght` axis. `InterVariable.ttf` was removed after
+a probe rendered identical text at weights 400 through 900 and produced
+byte-identical output every time. Weight is therefore a closed set
+(`RenderFontWeight`) whose members are the SVG numbers and map one-to-one onto
+bundled faces.
+
+Only four faces are kept. ExtraBold 800 and Black 900 were dropped because at
+Stream Deck key sizes neither adds stroke solidity over Bold while both close the
+counters further, so no view asked for them; each face costs about 410 KB. Every
+face is registered on every render, so `Resvg` construction cost and packed
+plugin size are the measurements to watch if faces are ever added back.
 
 ### Text fit guard
 

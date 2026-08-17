@@ -12,6 +12,15 @@ import {
 } from "../../view-rendering/rasterize/render-text-style";
 
 const QUALIFIER_TITLE_SKEW_DEGREES = -10;
+/**
+ * Clip headroom for the two title runs.
+ *
+ * Each run is positioned from its estimated advance, and renderStyledSvgText
+ * derives its clip box from the same number, so a small underestimate chops the
+ * last glyph (this clipped the "M" of "RAM" once weights started rendering).
+ * The runs keep their estimated positions; only the clip gets slack.
+ */
+const QUALIFIER_TITLE_CLIP_HEADROOM_RATIO = 1.08;
 
 export type SingleMetricLayoutMode = "wide" | "square";
 
@@ -43,7 +52,7 @@ export function resolveSingleMetricTitleFontSize(
 
 /**
  * Synthesizes a restrained italic treatment around the text's own anchor.
- * resvg-js 2.6.2 does not synthesize an italic face from bundled InterVariable.
+ * resvg-js 2.6.2 does not synthesize an italic face from the bundled Inter faces.
  */
 export function buildQualifierTextAttributes(
     xCoordinate: number,
@@ -104,6 +113,8 @@ export function renderTitleWithQualifier(options: QualifiedTitleOptions): string
     const labelXCoordinate = options.xCoordinate - combinedWidth / 2;
     const qualifierXCoordinate = labelXCoordinate + labelWidth + scaledGapWidth;
     const scaledBaseFontSize = options.baseFontSize * textFit.fontScale;
+    // Both runs already fit inside options.maxWidth, so the per-run fit only
+    // needs to render at the resolved size without re-shrinking.
     const exactFitOptions = {
         minimumFontScale: 1,
         widthGuardRatio: 1,
@@ -117,7 +128,7 @@ export function renderTitleWithQualifier(options: QualifiedTitleOptions): string
             text: options.labelText,
             xCoordinate: labelXCoordinate,
             yCoordinate: options.yCoordinate,
-            maxWidth: labelWidth,
+            maxWidth: labelWidth * QUALIFIER_TITLE_CLIP_HEADROOM_RATIO,
             baseFontSize: scaledBaseFontSize,
             textStyle: options.textStyle,
             fill: options.fill,
@@ -130,7 +141,7 @@ export function renderTitleWithQualifier(options: QualifiedTitleOptions): string
             text: options.qualifierText,
             xCoordinate: qualifierXCoordinate,
             yCoordinate: options.yCoordinate,
-            maxWidth: qualifierWidth,
+            maxWidth: qualifierWidth * QUALIFIER_TITLE_CLIP_HEADROOM_RATIO,
             baseFontSize: scaledBaseFontSize,
             textStyle: options.textStyle,
             fill: options.fill,

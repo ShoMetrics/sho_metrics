@@ -402,7 +402,7 @@ function renderTitle(options: {
     themeEffects: RenderThemeEffectTokens;
     textOutline: RenderOutlineTokens | undefined;
 }): string {
-    const titleTextStyle = options.textStyles.title;
+    const headingTextStyle = options.textStyles.heading;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
@@ -419,10 +419,10 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             baseFontSize: options.layout.fontSize,
-            textStyle: titleTextStyle,
+            textStyle: headingTextStyle,
             fill: options.textColor,
             outline: options.textOutline,
-            extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
     `;
 }
@@ -601,7 +601,7 @@ function renderVerticalGridLines(options: {
     themeEffects: RenderThemeEffectTokens;
     textOutline: RenderOutlineTokens | undefined;
 }): string {
-    const smallLabelTextStyle = options.textStyles.smallLabel;
+    const footnoteTextStyle = options.textStyles.footnote;
     const safeTickCount = Math.max(2, Math.round(options.timeGuideTickCount));
     const baselineYCoordinate = options.plotLayout.yCoordinate + options.plotLayout.height;
     const internalGuideList = Array.from({ length: Math.max(0, safeTickCount - 2) }, (ignoredValue, guideIndex) => {
@@ -625,11 +625,11 @@ function renderVerticalGridLines(options: {
                 yCoordinate: baselineYCoordinate + CHART_LABEL_BAND_HEIGHT - 2,
                 maxWidth: 24,
                 baseFontSize: 10,
-                textStyle: smallLabelTextStyle,
+                textStyle: footnoteTextStyle,
                 fill: options.paints.mutedText,
                 textAnchor: "middle",
                 outline: options.textOutline,
-                extraAttributes: buildSvgFilterAttributes(smallLabelTextStyle.filter),
+                extraAttributes: buildSvgFilterAttributes(footnoteTextStyle.filter),
             })}
         `;
     });

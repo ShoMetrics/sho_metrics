@@ -241,8 +241,8 @@ function buildMetricRenderAppearance(): MetricRenderAppearance {
                 ...DEFAULT_RENDER_TEXT_STYLES.label,
                 fontFamily: "Test Label Font",
             },
-            smallLabel: {
-                ...DEFAULT_RENDER_TEXT_STYLES.smallLabel,
+            footnote: {
+                ...DEFAULT_RENDER_TEXT_STYLES.footnote,
                 fontFamily: "Test Label Font",
             },
         },

@@ -500,7 +500,7 @@ function renderTitle(options: {
     themeEffects: RenderThemeEffectTokens;
     textOutline: RenderOutlineTokens | undefined;
 }): string {
-    const titleTextStyle = options.textStyles.title;
+    const headingTextStyle = options.textStyles.heading;
     const isInlineIcon = options.iconFragment !== undefined;
     const titleXCoordinate = isInlineIcon
         ? options.layout.xCoordinate + options.iconGap
@@ -522,11 +522,11 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             baseFontSize: options.layout.fontSize,
-            textStyle: titleTextStyle,
+            textStyle: headingTextStyle,
             fill: options.textColor,
             dominantBaseline: options.layout.dominantBaseline,
             outline: options.textOutline,
-            extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
     `;
 }
@@ -586,7 +586,7 @@ function renderSecondaryText(options: {
     if (!options.text) {
         return "";
     }
-    const textStyle = options.textStyles.smallLabel;
+    const textStyle = options.textStyles.footnote;
 
     return renderStyledSvgText({
         id: options.clipId,

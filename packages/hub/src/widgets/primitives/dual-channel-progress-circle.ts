@@ -619,7 +619,7 @@ function renderGaugeBottomLabel(options: {
     geometry: RingGeometry;
 }): string {
     const labelText = resolveGaugeBottomLabelText(options.config);
-    const labelTextStyle = options.config.textStyles.smallLabel;
+    const headingTextStyle = options.config.textStyles.heading;
 
     if (labelText.length === 0) {
         return "";
@@ -632,11 +632,11 @@ function renderGaugeBottomLabel(options: {
         yCoordinate: options.geometry.centerYCoordinate + ARC_LAYOUT.gaugeBottomLabelYOffset,
         maxWidth: Math.max(24, options.geometry.radius * ARC_LAYOUT.gaugeBottomLabelMaxWidthRatio),
         baseFontSize: ARC_LAYOUT.gaugeBottomLabelFontSize,
-        textStyle: labelTextStyle,
+        textStyle: headingTextStyle,
         fill: options.config.unitTextColor,
         textAnchor: "middle",
         outline: options.config.textOutline,
-        extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+        extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
     });
 }
 

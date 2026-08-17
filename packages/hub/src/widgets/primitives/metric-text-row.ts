@@ -47,6 +47,24 @@ interface MetricTextUnitSegment extends MetricTextSegment {
 const MINIMUM_ROW_WIDTH = 1;
 
 /**
+ * Per-side room between the fit width and the clip box.
+ *
+ * SVG `textLength` constrains the advance width, not the ink. Glyphs with an
+ * overhanging right edge, `%` most of all, paint past the advance once the row
+ * is compressed, and a clip box sized exactly to the fit width shaves that
+ * column off. Measured at 1 px of overhang for `100 %` in the full-ring centre
+ * row at 144 logical, with the default preset; 2 leaves margin.
+ *
+ * How far ink runs past the advance depends on the font and the rasterizer, so
+ * this is not a universal constant, only one wide enough for the bundled faces
+ * at the sizes in use. It is applied to every row rather than per style because
+ * the failure it prevents is not specific to one theme; the per-style bleed
+ * added on top covers faces that need more. Widening the box does relax the
+ * overflow guard by the same 2 px, which is the cost of not clipping ink.
+ */
+const ROW_INK_CLIP_HEADROOM_PIXELS = 2;
+
+/**
  * Renders a metric value and unit as one SVG text row inside a fixed box.
  * The row relies on resvg's own text layout for glyph placement, then clips the
  * final result to the caller-provided box. No per-frame text measurement or
@@ -101,7 +119,13 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
             unitFontSize * options.unit.textStyle.clipHeightEm,
         );
     const clipPathId = sanitizeSvgId(options.id, "metric-text-row");
-    const clipXCoordinate = resolveClipXCoordinate(options.layout.xCoordinate, width, textAnchor);
+    const clipHorizontalBleed = ROW_INK_CLIP_HEADROOM_PIXELS + Math.max(
+        options.value.textStyle.clipHorizontalBleedPixels,
+        options.unit.textStyle.clipHorizontalBleedPixels,
+    );
+    const clipWidth = width + clipHorizontalBleed * 2;
+    const clipXCoordinate = resolveClipXCoordinate(options.layout.xCoordinate, width, textAnchor)
+        - clipHorizontalBleed;
     const clipYCoordinate = yCoordinate - clipHeight / 2;
     const valueAttributes = options.value.extraAttributes?.length
         ? ` ${options.value.extraAttributes.join(" ")}`
@@ -114,7 +138,7 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const unitTspan = options.unit.text.length > 0
         ? `<tspan dx="${formatSvgNumber(unitGap)}" dy="${formatSvgNumber(unitBaselineOffset)}"
                 font-family="${escapeSvgText(options.unit.textStyle.fontFamily)}" font-size="${formatSvgNumber(unitFontSize)}"
-                font-weight="${escapeSvgText(String(options.unit.textStyle.fontWeight))}"
+                font-weight="${options.unit.textStyle.fontWeight}"
                 fill="${escapeSvgText(options.unit.fill)}"${unitLetterSpacingAttribute}${unitAttributes}>${escapeSvgText(options.unit.text)}</tspan>`
         : "";
     const textFitAttributes = formatSvgTextFitAttributes(textFit);
@@ -130,14 +154,14 @@ export function renderMetricTextRow(options: MetricTextRowOptions): string {
     const textElement = `<text x="${formatSvgNumber(options.layout.xCoordinate)}" y="${formatSvgNumber(yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="middle"${textFitAttributes}${outlineAttributes}><tspan
                     font-family="${escapeSvgText(options.value.textStyle.fontFamily)}" font-size="${formatSvgNumber(valueFontSize)}"
-                    font-weight="${escapeSvgText(String(options.value.textStyle.fontWeight))}"
+                    font-weight="${options.value.textStyle.fontWeight}"
                     fill="${escapeSvgText(options.value.fill)}"${valueLetterSpacingAttribute}${valueAttributes}>${escapeSvgText(options.value.text)}</tspan>${unitTspan}</text>`;
 
     return `
         <defs>
             <clipPath id="${clipPathId}">
                 <rect x="${formatSvgNumber(clipXCoordinate)}" y="${formatSvgNumber(clipYCoordinate)}"
-                    width="${formatSvgNumber(width)}" height="${formatSvgNumber(clipHeight)}" />
+                    width="${formatSvgNumber(clipWidth)}" height="${formatSvgNumber(clipHeight)}" />
             </clipPath>
         </defs>
         <g clip-path="url(#${clipPathId})">

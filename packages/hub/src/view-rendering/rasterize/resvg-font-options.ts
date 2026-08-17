@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { ResvgRenderOptions } from "@resvg/resvg-js";
+import { STATIC_INTER_FONT_FILE_NAMES } from "./render-font-weight";
 import { JAPANESE_SERIF_RENDER_FONT_FAMILY } from "./render-text-style";
 
 export type FontScript = "han" | "kana" | "hangul" | "symbol";
@@ -9,7 +10,11 @@ export type BundledFontFamily = "share-tech-mono" | "dotgothic16";
 export interface ResvgFontResolverEnvironment {
     platform: NodeJS.Platform;
     fileExists: (fontFile: string) => boolean;
-    bundledInterFontFile?: string;
+    /**
+     * Resolved paths to the bundled static Inter faces. resvg-js 2.6.2 cannot
+     * drive a variable font's weight axis, so every visible weight needs one.
+     */
+    bundledInterFontFiles?: readonly string[];
     bundledShareTechMonoFontFile?: string;
     bundledDotGothic16FontFile?: string;
     /**
@@ -28,10 +33,8 @@ export interface ResvgFontResolverEnvironment {
 const DEFAULT_FONT_RESOLVER_ENVIRONMENT: ResvgFontResolverEnvironment = {
     platform: process.platform,
     fileExists: existsSync,
-    // TODO: resvg-js 2.6.2 does not apply font-weight to InterVariable's
-    // weight axis. If visible weight matters, replace this with registered
-    // static Inter faces such as Regular and Bold.
-    bundledInterFontFile: resolveBundledFontFile("inter", "InterVariable.ttf"),
+    bundledInterFontFiles: STATIC_INTER_FONT_FILE_NAMES
+        .map(fontFileName => resolveBundledFontFile("inter", fontFileName)),
     bundledShareTechMonoFontFile: resolveBundledFontFile("share-tech-mono", "ShareTechMono-Regular.ttf"),
     bundledDotGothic16FontFile: resolveBundledFontFile("dotgothic16", "DotGothic16-Regular.ttf"),
     bundledJapaneseSerifFontFile: resolveBundledFontFile("biz-udpmincho", "BIZUDPMincho-Regular.ttf"),
@@ -77,7 +80,7 @@ export function resolveResvgFontOptions(
     const usesJapaneseSerifFontFamily = usesJapaneseSerifRenderFontFamily(svgString);
     const cacheKey = [
         environment.platform,
-        environment.bundledInterFontFile ?? "",
+        ...environment.bundledInterFontFiles ?? [],
         environment.bundledShareTechMonoFontFile ?? "",
         environment.bundledDotGothic16FontFile ?? "",
         environment.bundledJapaneseSerifFontFile ?? "",
@@ -172,7 +175,7 @@ function resolveFontFiles(
 ): readonly string[] {
     const cacheKey = [
         environment.platform,
-        environment.bundledInterFontFile ?? "",
+        ...environment.bundledInterFontFiles ?? [],
         environment.bundledShareTechMonoFontFile ?? "",
         environment.bundledDotGothic16FontFile ?? "",
         environment.bundledJapaneseSerifFontFile ?? "",
@@ -235,17 +238,16 @@ function resolvePrimaryFontFileCandidates(environment: ResvgFontResolverEnvironm
     switch (environment.platform) {
         case "win32":
             return [
-                environment.bundledInterFontFile,
+                ...environment.bundledInterFontFiles ?? [],
                 "C:\\Windows\\Fonts\\seguisym.ttf",
-            ].filter((fontFile): fontFile is string => Boolean(fontFile));
+            ];
         case "darwin":
             return [
                 "/System/Library/Fonts/HelveticaNeue.ttc",
-                environment.bundledInterFontFile,
-            ].filter((fontFile): fontFile is string => Boolean(fontFile));
+                ...environment.bundledInterFontFiles ?? [],
+            ];
         default:
-            return [environment.bundledInterFontFile]
-                .filter((fontFile): fontFile is string => Boolean(fontFile));
+            return [...environment.bundledInterFontFiles ?? []];
     }
 }
 

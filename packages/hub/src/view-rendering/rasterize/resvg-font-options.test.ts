@@ -9,9 +9,14 @@ import {
     usesJapaneseSerifRenderFontFamily,
     type ResvgFontResolverEnvironment,
 } from "./resvg-font-options";
+import { STATIC_INTER_FONT_FILE_NAMES } from "./render-font-weight";
 import { JAPANESE_SERIF_RENDER_FONT_FAMILY, PIXEL_RENDER_FONT_FAMILY } from "./render-text-style";
 
-const BUNDLED_INTER_FONT_FILE = "C:\\Plugin\\assets\\fonts\\inter\\InterVariable.ttf";
+// Synthetic install paths. The directory is invented so these stay hermetic;
+// the file names come from the shared source so a face added there has to be
+// accounted for here too instead of quietly going unresolved.
+const BUNDLED_INTER_FONT_FILES = STATIC_INTER_FONT_FILE_NAMES
+    .map(fontFileName => `C:\\Plugin\\assets\\fonts\\inter\\${fontFileName}`);
 const BUNDLED_SHARE_TECH_MONO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\share-tech-mono\\ShareTechMono-Regular.ttf";
 const BUNDLED_DOT_GOTHIC_16_FONT_FILE = "C:\\Plugin\\assets\\fonts\\dotgothic16\\DotGothic16-Regular.ttf";
 const BUNDLED_BIZ_UDP_MINCHO_FONT_FILE = "C:\\Plugin\\assets\\fonts\\biz-udpmincho\\BIZUDPMincho-Regular.ttf";
@@ -95,9 +100,9 @@ test("visible SVG text extraction handles tspan text and XML entities", () => {
 test("font options disable system fonts and load bundled Inter on Windows", () => {
     const fontOptions = resolveResvgFontOptions(buildTextSvg("CPU"), buildEnvironment({
         platform: "win32",
-        bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+        bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
         existingFontFiles: [
-            BUNDLED_INTER_FONT_FILE,
+            ...BUNDLED_INTER_FONT_FILES,
             "C:\\Windows\\Fonts\\seguisym.ttf",
         ],
     }));
@@ -105,7 +110,7 @@ test("font options disable system fonts and load bundled Inter on Windows", () =
     assert.equal(fontOptions.loadSystemFonts, false);
     assert.equal(fontOptions.defaultFontFamily, "Inter");
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
 });
@@ -115,10 +120,10 @@ test("font options load terminal bundled fonts before primary fonts when SVG ask
         buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             bundledShareTechMonoFontFile: BUNDLED_SHARE_TECH_MONO_FONT_FILE,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 BUNDLED_SHARE_TECH_MONO_FONT_FILE,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
             ],
@@ -127,7 +132,7 @@ test("font options load terminal bundled fonts before primary fonts when SVG ask
 
     assert.deepEqual(fontOptions.fontFiles, [
         BUNDLED_SHARE_TECH_MONO_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
 });
@@ -137,9 +142,9 @@ test("font options add only detected Windows CJK fallback font files", () => {
         buildTextSvg("&#28201;&#24230;&#12514;&#12491;&#12479;"),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
                 "C:\\Windows\\Fonts\\msyh.ttc",
                 "C:\\Windows\\Fonts\\meiryo.ttc",
@@ -149,7 +154,7 @@ test("font options add only detected Windows CJK fallback font files", () => {
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         "C:\\Windows\\Fonts\\msyh.ttc",
         "C:\\Windows\\Fonts\\meiryo.ttc",
@@ -161,9 +166,9 @@ test("font options load Japanese serif candidates only when requested", () => {
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
                 WINDOWS_YU_MINCHO_FONT_FILE,
                 "C:\\Windows\\Fonts\\msyh.ttc",
@@ -175,9 +180,9 @@ test("font options load Japanese serif candidates only when requested", () => {
         buildTextSvg("温度計"),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
                 WINDOWS_YU_MINCHO_FONT_FILE,
                 "C:\\Windows\\Fonts\\msyh.ttc",
@@ -186,12 +191,12 @@ test("font options load Japanese serif candidates only when requested", () => {
     );
 
     assert.deepEqual(titleCardFontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         WINDOWS_YU_MINCHO_FONT_FILE,
     ]);
     assert.deepEqual(plainCjkFontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         "C:\\Windows\\Fonts\\msyh.ttc",
     ]);
@@ -202,10 +207,10 @@ test("font options load DotGothic16 before primary fonts when SVG asks for it", 
         buildTextSvgWithFontFamily("999 MB/s", PIXEL_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             bundledDotGothic16FontFile: BUNDLED_DOT_GOTHIC_16_FONT_FILE,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 BUNDLED_DOT_GOTHIC_16_FONT_FILE,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
             ],
@@ -214,7 +219,7 @@ test("font options load DotGothic16 before primary fonts when SVG asks for it", 
 
     assert.deepEqual(fontOptions.fontFiles, [
         BUNDLED_DOT_GOTHIC_16_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
 });
@@ -224,10 +229,10 @@ test("font options load Japanese serif candidates on macOS", () => {
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "darwin",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
                 MACOS_HELVETICA_NEUE_FONT_FILE,
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 MACOS_HIRAGINO_MINCHO_FONT_FILE,
                 "/System/Library/Fonts/PingFang.ttc",
             ],
@@ -236,7 +241,7 @@ test("font options load Japanese serif candidates on macOS", () => {
 
     assert.deepEqual(fontOptions.fontFiles, [
         MACOS_HELVETICA_NEUE_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         MACOS_HIRAGINO_MINCHO_FONT_FILE,
     ]);
 });
@@ -246,9 +251,9 @@ test("font options use broad Japanese serif fallback when preferred fonts are mi
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
                 "C:\\Windows\\Fonts\\simsun.ttc",
             ],
@@ -256,7 +261,7 @@ test("font options use broad Japanese serif fallback when preferred fonts are mi
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         "C:\\Windows\\Fonts\\simsun.ttc",
     ]);
@@ -267,17 +272,17 @@ test("font options use bundled Japanese serif only after system candidates are m
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "linux",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             bundledJapaneseSerifFontFile: BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
             ],
         }),
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
     ]);
 });
@@ -287,11 +292,11 @@ test("font options prefer bundled Japanese serif for deterministic visual tests"
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             bundledJapaneseSerifFontFile: BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
             preferBundledJapaneseSerifFont: true,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
                 BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
                 WINDOWS_YU_MINCHO_FONT_FILE,
@@ -301,7 +306,7 @@ test("font options prefer bundled Japanese serif for deterministic visual tests"
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
         BUNDLED_BIZ_UDP_MINCHO_FONT_FILE,
     ]);
@@ -312,16 +317,16 @@ test("font options degrade safely when Windows CJK fallback font files are missi
         buildTextSvg("&#32593;&#32476;&#19979;&#36733;"),
         buildEnvironment({
             platform: "win32",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "C:\\Windows\\Fonts\\seguisym.ttf",
             ],
         }),
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "C:\\Windows\\Fonts\\seguisym.ttf",
     ]);
 });
@@ -331,16 +336,16 @@ test("font options load Linux CJK fallback fonts when visible text needs them", 
         buildTextSvg("温度計"),
         buildEnvironment({
             platform: "linux",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 LINUX_NOTO_SANS_CJK_FONT_FILE,
             ],
         }),
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         LINUX_NOTO_SANS_CJK_FONT_FILE,
     ]);
 });
@@ -350,9 +355,9 @@ test("font options load Linux Japanese serif before plain CJK fallback fonts", (
         buildTextSvgWithFontFamily("温度計", JAPANESE_SERIF_RENDER_FONT_FAMILY),
         buildEnvironment({
             platform: "linux",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 LINUX_NOTO_SERIF_CJK_FONT_FILE,
                 LINUX_NOTO_SANS_CJK_FONT_FILE,
             ],
@@ -360,7 +365,7 @@ test("font options load Linux Japanese serif before plain CJK fallback fonts", (
     );
 
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         LINUX_NOTO_SERIF_CJK_FONT_FILE,
     ]);
 });
@@ -368,7 +373,7 @@ test("font options load Linux Japanese serif before plain CJK fallback fonts", (
 test("font options degrade safely when bundled Inter is missing on Windows", () => {
     const fontOptions = resolveResvgFontOptions(buildTextSvg("CPU"), buildEnvironment({
         platform: "win32",
-        bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+        bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
         existingFontFiles: [
             "C:\\Windows\\Fonts\\seguisym.ttf",
         ],
@@ -383,15 +388,15 @@ test("font options degrade safely when bundled Inter is missing on Windows", () 
 test("font options use bundled Inter as the Linux primary font for visual tests", () => {
     const fontOptions = resolveResvgFontOptions(buildTextSvg("CPU"), buildEnvironment({
         platform: "linux",
-        bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+        bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
         existingFontFiles: [
-            BUNDLED_INTER_FONT_FILE,
+            ...BUNDLED_INTER_FONT_FILES,
         ],
     }));
 
     assert.equal(fontOptions.defaultFontFamily, "Inter");
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
     ]);
 });
 
@@ -400,10 +405,10 @@ test("font options add terminal fonts and bundled Inter on Linux", () => {
         buildTextSvgWithFontFamily("CPU", "'Share Tech Mono','Inter'"),
         buildEnvironment({
             platform: "linux",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             bundledShareTechMonoFontFile: BUNDLED_SHARE_TECH_MONO_FONT_FILE,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 BUNDLED_SHARE_TECH_MONO_FONT_FILE,
             ],
         }),
@@ -411,7 +416,7 @@ test("font options add terminal fonts and bundled Inter on Linux", () => {
 
     assert.deepEqual(fontOptions.fontFiles, [
         BUNDLED_SHARE_TECH_MONO_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
     ]);
 });
 
@@ -420,10 +425,10 @@ test("font options add only detected macOS Hangul fallback font files", () => {
         buildTextSvg("&#48176;&#53552;&#47532; &#49324;&#50857;"),
         buildEnvironment({
             platform: "darwin",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
                 MACOS_HELVETICA_NEUE_FONT_FILE,
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "/System/Library/Fonts/PingFang.ttc",
                 "/System/Library/Fonts/AppleSDGothicNeo.ttc",
             ],
@@ -434,7 +439,7 @@ test("font options add only detected macOS Hangul fallback font files", () => {
     assert.equal(fontOptions.defaultFontFamily, "SF Pro Display");
     assert.deepEqual(fontOptions.fontFiles, [
         MACOS_HELVETICA_NEUE_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "/System/Library/Fonts/AppleSDGothicNeo.ttc",
     ]);
 });
@@ -444,16 +449,16 @@ test("font options degrade safely to bundled Inter when macOS primary and CJK fa
         buildTextSvg("&#48176;&#53552;&#47532; &#49324;&#50857;"),
         buildEnvironment({
             platform: "darwin",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
             ],
         }),
     );
 
     assert.equal(fontOptions.defaultFontFamily, "SF Pro Display");
     assert.deepEqual(fontOptions.fontFiles, [
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
     ]);
 });
 
@@ -462,10 +467,10 @@ test("font options add macOS symbol fallback fonts only when visible text needs 
         buildTextSvg("&#8592; &#8594;"),
         buildEnvironment({
             platform: "darwin",
-            bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+            bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
             existingFontFiles: [
                 MACOS_HELVETICA_NEUE_FONT_FILE,
-                BUNDLED_INTER_FONT_FILE,
+                ...BUNDLED_INTER_FONT_FILES,
                 "/System/Library/Fonts/Apple Symbols.ttf",
             ],
         }),
@@ -473,7 +478,7 @@ test("font options add macOS symbol fallback fonts only when visible text needs 
 
     assert.deepEqual(fontOptions.fontFiles, [
         MACOS_HELVETICA_NEUE_FONT_FILE,
-        BUNDLED_INTER_FONT_FILE,
+        ...BUNDLED_INTER_FONT_FILES,
         "/System/Library/Fonts/Apple Symbols.ttf",
     ]);
 });
@@ -482,9 +487,9 @@ test("font option cache avoids repeated font existence checks for the same platf
     const checkedFontFiles: string[] = [];
     const environment = buildEnvironment({
         platform: "win32",
-        bundledInterFontFile: BUNDLED_INTER_FONT_FILE,
+        bundledInterFontFiles: BUNDLED_INTER_FONT_FILES,
         existingFontFiles: [
-            BUNDLED_INTER_FONT_FILE,
+            ...BUNDLED_INTER_FONT_FILES,
             "C:\\Windows\\Fonts\\seguisym.ttf",
             "C:\\Windows\\Fonts\\msyh.ttc",
         ],
@@ -518,7 +523,7 @@ function buildTextSvgWithFontFamily(text: string, fontFamily: string): string {
 function buildEnvironment(options: {
     platform: NodeJS.Platform;
     existingFontFiles: readonly string[];
-    bundledInterFontFile?: string;
+    bundledInterFontFiles?: readonly string[];
     bundledShareTechMonoFontFile?: string;
     bundledDotGothic16FontFile?: string;
     bundledJapaneseSerifFontFile?: string;
@@ -529,7 +534,7 @@ function buildEnvironment(options: {
 
     return {
         platform: options.platform,
-        bundledInterFontFile: options.bundledInterFontFile,
+        bundledInterFontFiles: options.bundledInterFontFiles,
         bundledShareTechMonoFontFile: options.bundledShareTechMonoFontFile,
         bundledDotGothic16FontFile: options.bundledDotGothic16FontFile,
         bundledJapaneseSerifFontFile: options.bundledJapaneseSerifFontFile,

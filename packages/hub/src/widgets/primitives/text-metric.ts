@@ -146,7 +146,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
     const textWidth = Math.max(24, keySize.width - SINGLE_TEXT_SQUARE_LAYOUT.horizontalPadding * 2);
     const valueText = data.displayValue ?? data.current.toFixed(0);
     const valueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
-    const labelTextStyle = config.textStyles.label;
+    const headingTextStyle = config.textStyles.heading;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
     const labelYCoordinate = keySize.height * SINGLE_TEXT_SQUARE_LAYOUT.labelYRatio;
@@ -158,7 +158,7 @@ function renderSquareCenteredTextMetric(data: WidgetData, config: TextMetricConf
             yCoordinate: labelYCoordinate,
             maxWidth: textWidth,
             baseFontSize: SINGLE_TEXT_SQUARE_LAYOUT.labelFontSize,
-            textStyle: labelTextStyle,
+            textStyle: headingTextStyle,
             fill: config.labelTextColor,
             outline: config.textOutline,
         })}
@@ -198,7 +198,7 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
     const contentWidth = keySize.width - SINGLE_TEXT_WIDE_LAYOUT.horizontalPadding * 2;
     const valueText = data.displayValue ?? data.current.toFixed(0);
     const valueTextColor = resolveThresholdColorForProgress(data.progress, config.colorConfig);
-    const labelTextStyle = config.textStyles.label;
+    const headingTextStyle = config.textStyles.heading;
     const valueTextStyle = config.textStyles.value;
     const unitTextStyle = config.textStyles.unit;
     const labelYCoordinate = keySize.height * SINGLE_TEXT_WIDE_LAYOUT.labelYRatio;
@@ -210,7 +210,7 @@ function renderWideCenteredTextMetric(data: WidgetData, config: TextMetricConfig
             yCoordinate: labelYCoordinate,
             maxWidth: contentWidth,
             baseFontSize: SINGLE_TEXT_WIDE_LAYOUT.labelFontSize,
-            textStyle: labelTextStyle,
+            textStyle: headingTextStyle,
             fill: config.labelTextColor,
             outline: config.textOutline,
         })}
@@ -251,7 +251,7 @@ function renderSquareCenteredDualTextMetric(
     keySize: KeySize,
     content: DualTextMetricContent,
 ): string {
-    const labelTextStyle = config.textStyles.label;
+    const headingTextStyle = config.textStyles.heading;
 
     return `
         ${renderStyledSvgText({
@@ -261,11 +261,11 @@ function renderSquareCenteredDualTextMetric(
             yCoordinate: keySize.height * DUAL_TEXT_SQUARE_LAYOUT.titleYRatio,
             maxWidth: keySize.width * 0.74,
             baseFontSize: DUAL_TEXT_SQUARE_LAYOUT.titleFontSize,
-            textStyle: labelTextStyle,
+            textStyle: headingTextStyle,
             fill: config.labelTextColor,
             textAnchor: "middle",
             outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
         ${renderDualTextRow({
             rowId: "text-metric-positive",
@@ -314,7 +314,7 @@ function renderWideCenteredDualTextMetric(
     keySize: KeySize,
     content: DualTextMetricContent,
 ): string {
-    const labelTextStyle = config.textStyles.label;
+    const headingTextStyle = config.textStyles.heading;
 
     return `
         ${renderStyledSvgText({
@@ -324,11 +324,11 @@ function renderWideCenteredDualTextMetric(
             yCoordinate: keySize.height * DUAL_TEXT_WIDE_LAYOUT.titleYRatio,
             maxWidth: DUAL_TEXT_WIDE_LAYOUT.titleWidth,
             baseFontSize: DUAL_TEXT_WIDE_LAYOUT.titleFontSize,
-            textStyle: labelTextStyle,
+            textStyle: headingTextStyle,
             fill: config.labelTextColor,
             textAnchor: "start",
             outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(labelTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
         ${renderDualTextRow({
             rowId: "text-metric-positive",

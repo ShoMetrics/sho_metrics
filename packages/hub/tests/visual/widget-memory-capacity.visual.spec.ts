@@ -123,7 +123,11 @@ const MEMORY_CAPACITY_VISUAL_TEST_CASES: readonly SingleMetricVisualTestCase[] =
                 circleVariant: "full-ring",
             }),
             data: FREE_CAPACITY_RENDER_DATA,
-            keySize: TOUCH_STRIP_LOGICAL_SIZE,
+            // Circle is the one view the strip does not hand the full body, so
+            // this case has to go through the frame to match production.
+            ...(selectedView === "circle"
+                ? { renderTarget: "touch-strip" as const }
+                : { keySize: TOUCH_STRIP_LOGICAL_SIZE }),
             centerIcon: "",
             topIcon: MEMORY_ICON_FRAGMENT,
         },

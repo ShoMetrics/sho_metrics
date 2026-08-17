@@ -71,6 +71,51 @@ PREFER `primitive` only inside renderer-owned code, such as
 
 DON'T rename `Resolved*` as part of metric view naming cleanup.
 
+## Renderer Text Roles
+
+`RenderTextStyles` has exactly five roles. A role carries font family, weight,
+filter, fit metrics, and a `fontSizeScale`. It does not own the base font size:
+each primitive owns that in its own layout constants, and the role's scale
+multiplies it. So a role does move the final size, but only by a factor the
+preset sets for the whole theme, never by deciding how big this one string is.
+
+| Role | Meaning |
+|---|---|
+| `value` | The reading itself. |
+| `unit` | The unit beside a value. |
+| `heading` | What the whole key is. Every `data.label` uses it; action-owned stand-in text may too. |
+| `label` | Which reading this is, when one key shows several. |
+| `footnote` | Supplementary text naming neither the key nor a reading. |
+
+DO select the role from where the text came from, not from where the view puts
+it or how large it is. Two invariants make that checkable:
+
+1. One semantic text source maps to exactly one role wherever it is rendered,
+   across every view, variant, and key size. Read "source" wider than
+   `WidgetData`: the dual views take their key name as a `titleText` prop and
+   their channel names as `labelText`, and those are sources too.
+2. `label` appears only when one key carries several readings at once. A
+   single-reading view names its reading with `heading` and never uses `label`.
+
+Invariant 1 runs one way only: every `data.label` is a `heading`, but not every
+`heading` is a `data.label`. Two places already use `heading` for text with no
+metric behind it. `renderMetricNoticeBody` does it deliberately, for
+action-owned copy such as `Install helper` that stands in for the key's
+identity. The title-card caption column does it too, for decorative chrome
+derived from the action and its content, which does not identify the key; that
+one is a known misfit, kept only to avoid unrelated visual churn during this
+migration. Treat it as legacy, not as precedent.
+
+DON'T select by position or size. Every misassignment found so far came from
+reading the rendered picture instead of the data: `data.label` was `heading` in
+the bar top row, `label` inside the circle ring, and `footnote` under the gauge
+ring, all for the same string.
+
+DON'T reintroduce a size adjective such as `smallLabel`. A size word in the
+vocabulary reads as permission to select by appearance, and it is the one name
+that made the picture look like the authority. The default theme gave the
+affected roles the same weight, so the mistakes stayed invisible for months.
+
 ## Boundary Vocabulary
 
 DO keep the same root word across product, settings, resolved settings,
@@ -196,3 +241,5 @@ Common historical mappings:
 | `metric-view-runner` | `view-updates` |
 | `rendering` renderer directory | `view-rendering` |
 | `MetricDisplay*` | `MetricView*` |
+| `title` text style role | `heading` |
+| `smallLabel` text style role | No single replacement. The key was renamed to `footnote`, but its call sites were split across `heading`, `label`, and `footnote` by where each string came from. Never map an old `smallLabel` site mechanically. |

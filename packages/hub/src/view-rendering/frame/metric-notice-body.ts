@@ -25,7 +25,7 @@ export function renderMetricNoticeBody(options: {
     readonly renderSize: KeySize;
 }): string {
     const lines = splitNoticeText(options.text);
-    const textStyle = options.visual.textStyles.title;
+    const textStyle = options.visual.textStyles.heading;
     const textWidth = Math.max(
         24,
         options.renderSize.width - NOTICE_BODY_LAYOUT.horizontalPadding * 2,

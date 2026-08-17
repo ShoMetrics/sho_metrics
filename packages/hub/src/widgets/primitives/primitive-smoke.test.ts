@@ -1,3 +1,4 @@
+import { RenderFontWeight } from "../../view-rendering/rasterize/render-font-weight";
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { ColorConfig } from "../../view-rendering/color/color-resolver";
@@ -244,7 +245,7 @@ test("title-card text metric renders supplied asymmetrical caption content", () 
             unit: {
                 ...DEFAULT_RENDER_TEXT_STYLES.unit,
                 fontFamily: "Title Unit Font",
-                fontWeight: 620,
+                fontWeight: RenderFontWeight.SemiBold,
             },
         },
     }, keySize, {
@@ -261,7 +262,7 @@ test("title-card text metric renders supplied asymmetrical caption content", () 
     assert.match(svgFragment, />率<\/text>/);
     assert.match(svgFragment, /id="title-card-value"[\s\S]*y="119\.92"[\s\S]*>23<\/text>/);
     assert.match(svgFragment, /id="title-card-unit"[\s\S]*y="124\.85"[\s\S]*font-family="Title Unit Font"/);
-    assert.match(svgFragment, /id="title-card-unit"[\s\S]*font-weight="620"[\s\S]*>%<\/text>/);
+    assert.match(svgFragment, /id="title-card-unit"[\s\S]*font-weight="600"[\s\S]*>%<\/text>/);
     assert.doesNotMatch(svgFragment, /title-card-secondary/);
     assert.doesNotMatch(svgFragment, /text-metric-label/);
 });
@@ -470,7 +471,10 @@ test.each([
         valueRowElement.indexOf(`>${value}</tspan>`) < valueRowElement.indexOf(`>${unit}</tspan>`),
     );
     assert.ok(readTspanFontSize(valueRowElement, "progress-circle-value") >= minimumValueFontSize);
-    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-circle-value-unit"), 89.25);
+    // The clip is the 89.25 fit width plus the row's ink headroom on each side.
+    // textLength bounds the advance, not the ink, so a glyph that overhangs it
+    // (`%` most of all) loses its last column without that margin.
+    assert.equal(readConstrainedTextClipWidth(svgFragment, "progress-circle-value-unit"), 89.25 + 2 * 2);
 });
 
 test("gauge circle variant uses semantic range bands for range colors", () => {
@@ -1022,8 +1026,9 @@ test("progress bar colors the value icon beside the value only when one is suppl
     assert.equal(valueIconMatches.length, 1);
     assert.match(iconBarFragment, /color="#f97316"/);
     // Value and unit now co-fit under one clip (square-style), so there is no
-    // separate unit clip; the value clip carries both.
-    assert.equal(readConstrainedTextClipWidth(iconBarFragment, "progress-bar-single-value"), 150);
+    // separate unit clip; the value clip carries both, plus the row's per-side
+    // ink headroom over the 150 fit width.
+    assert.equal(readConstrainedTextClipWidth(iconBarFragment, "progress-bar-single-value"), 150 + 2 * 2);
     assert.match(iconBarFragment, /KB\/s/);
 
     const plainBarFragment = progressBar.render({
@@ -1106,7 +1111,7 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
             textStyle: {
                 ...DEFAULT_RENDER_TEXT_STYLES.value,
                 fontFamily: `"Inter"`,
-                fontWeight: 900,
+                fontWeight: RenderFontWeight.Bold,
             },
             fill: `#fff"`,
         },
@@ -1116,14 +1121,16 @@ test("metric text row escapes values and clamps non-finite coordinates", () => {
             textStyle: {
                 ...DEFAULT_RENDER_TEXT_STYLES.unit,
                 fontFamily: `"Inter"`,
-                fontWeight: 700,
+                fontWeight: RenderFontWeight.Bold,
             },
             fill: "#aaa",
         },
     });
 
     assert.match(svgFragment, /clipPath id="metric-value"/);
-    assert.match(svgFragment, /width="1"/);
+    // Non-finite width clamps to the 1 px minimum, then gains the row's ink
+    // headroom on each side.
+    assert.match(svgFragment, /width="5"/);
     assert.match(svgFragment, /x="0" y="0"/);
     assert.match(svgFragment, /&lt;N\/A&gt;/);
     assert.match(svgFragment, /MB\/s &amp;/);
@@ -1171,7 +1178,7 @@ test("metric text row shrinks long values and units into the row width", () => {
             textStyle: {
                 ...DEFAULT_RENDER_TEXT_STYLES.value,
                 fontFamily: "Inter",
-                fontWeight: 900,
+                fontWeight: RenderFontWeight.Bold,
             },
             fill: "white",
         },
@@ -1181,7 +1188,7 @@ test("metric text row shrinks long values and units into the row width", () => {
             textStyle: {
                 ...DEFAULT_RENDER_TEXT_STYLES.unit,
                 fontFamily: "Inter",
-                fontWeight: 800,
+                fontWeight: RenderFontWeight.Bold,
             },
             fill: "#aaa",
         },

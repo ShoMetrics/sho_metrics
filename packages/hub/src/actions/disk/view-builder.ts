@@ -18,6 +18,7 @@ import { getDiskIcon, getDiskIconFragment, renderCenteredHardwareIconFragment } 
 import { renderDiskThroughputDirectionIconFragment } from "../../widgets/icons/catalog/disk";
 import { getMetricStatusIcon } from "../../widgets/icons/metric-status-icons";
 import type { ProgressCircleFooterIcon } from "../../widgets/primitives/progress-circle";
+import { RenderFontWeight } from "../../view-rendering/rasterize/render-font-weight";
 import { escapeSvgText } from "../../view-rendering/rasterize/svg-utils";
 import type { WidgetData } from "../../view-rendering/widget-data";
 import {
@@ -527,7 +528,7 @@ function buildDiskCenterIconFragment(volumeSelection: DiskVolumeSelection, label
         <text x="0" y="34" text-anchor="middle"
             dominant-baseline="middle"
             font-family="${escapeSvgText(labelFontFamily)}"
-            font-size="26" font-weight="850" fill="currentColor">${escapeSvgText(volumeLabel)}</text>
+            font-size="26" font-weight="${RenderFontWeight.Bold}" fill="currentColor">${escapeSvgText(volumeLabel)}</text>
     `;
 }
 

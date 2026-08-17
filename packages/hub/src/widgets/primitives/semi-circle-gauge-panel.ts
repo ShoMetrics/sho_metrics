@@ -487,11 +487,11 @@ function renderTitle(title: string, layout: TitleLayout, config: SemiCircleGauge
         yCoordinate: layout.yCoordinate,
         maxWidth: layout.textWidth,
         baseFontSize: layout.fontSize,
-        textStyle: config.textStyles.smallLabel,
+        textStyle: config.textStyles.heading,
         textAnchor: "start",
         fill: config.paints.primaryText,
         outline: config.textOutline,
-        extraAttributes: buildSvgFilterAttributes(config.textStyles.smallLabel.filter),
+        extraAttributes: buildSvgFilterAttributes(config.textStyles.heading.filter),
         fitOptions: { minimumFontScale: 0.58, widthGuardRatio: 1.05 },
     })}
     `;

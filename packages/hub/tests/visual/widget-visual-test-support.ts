@@ -5,11 +5,14 @@ import { renderDualMetricBodyView } from "../../src/view-rendering/views/dual-me
 import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
 import {
     composeMetricViewFrame,
+    resolveTouchStripMetricLayout,
+    type DualMetricRenderOptions,
     type MetricRenderTarget,
 } from "../../src/view-rendering/frame/metric-view-frame";
+import { STATIC_INTER_FONT_FILE_NAMES } from "../../src/view-rendering/rasterize/render-font-weight";
 import { resolveResvgFontOptions } from "../../src/view-rendering/rasterize/resvg-font-options";
 import { renderSingleMetricBodyView } from "../../src/view-rendering/views/single-metric-view";
-import type { TextMetricVariant } from "../../src/view-rendering/color/render-appearance";
+import type { MetricRenderAppearance, TextMetricVariant } from "../../src/view-rendering/color/render-appearance";
 import type { ColorConfig } from "../../src/view-rendering/color/color-resolver";
 import { resolveThresholdColorForProgress } from "../../src/view-rendering/color/color-resolver";
 import type {
@@ -17,7 +20,7 @@ import type {
     KeySize,
     WidgetData,
 } from "../../src/view-rendering/widget-data";
-import { WIDGET_LOGICAL_SIZE } from "../../src/view-rendering/widget-data";
+import { TOUCH_STRIP_LOGICAL_SIZE, WIDGET_LOGICAL_SIZE } from "../../src/view-rendering/widget-data";
 import type { ResolvedAppearanceSettingsOverride } from "../../src/settings/appearance-overrides";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
@@ -36,7 +39,9 @@ import type { DualChannelProgressCircleCenterContent } from "../../src/widgets/p
 import type { DualChannelSparklineMode } from "../../src/widgets/primitives/dual-channel-sparkline";
 import { getMetricStatusIcon } from "../../src/widgets/icons/metric-status-icons";
 
-const VISUAL_TEST_INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
+/** The same faces production registers, so a snapshot renders the same weights. */
+export const VISUAL_TEST_INTER_FONT_FILES: readonly string[] = STATIC_INTER_FONT_FILE_NAMES
+    .map(fontFileName => path.resolve(process.cwd(), "assets", "fonts", "inter", fontFileName));
 const VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE = path.resolve(
     process.cwd(),
     "assets",
@@ -329,6 +334,12 @@ export function renderSingleMetricWidgetPngBuffer(testCase: SingleMetricVisualTe
 
     const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
+
+    assertReachableBodyRenderSize({
+        snapshotName: testCase.snapshotName,
+        keySize,
+        renderPrimitive: visualSettings.renderPrimitive,
+    });
     const body = renderSingleMetricBodyView({
         data: testCase.data,
         visual: visualSettings,
@@ -361,6 +372,14 @@ export function renderDualMetricWidgetPngBuffer(testCase: DualMetricVisualTestCa
 
     const keySize = testCase.keySize ?? WIDGET_LOGICAL_SIZE;
     const visualSettings = buildMetricRenderAppearance(buildDefaultAppearanceSettings(testCase.appearance));
+
+    assertReachableBodyRenderSize({
+        snapshotName: testCase.snapshotName,
+        keySize,
+        renderPrimitive: visualSettings.renderPrimitive,
+        dualRenderPrimitive: toDualRenderPrimitive(testCase.selectedView),
+    });
+
     const positiveColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkUpload);
     const negativeColorConfig = buildSolidColorConfig(VISUAL_TEST_COLORS.networkDownload);
     const body = renderDualMetricBodyView({
@@ -466,7 +485,7 @@ export function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
         font: resolveResvgFontOptions(svg, {
             platform: process.platform,
             fileExists: existsSync,
-            bundledInterFontFile: VISUAL_TEST_INTER_FONT_FILE,
+            bundledInterFontFiles: VISUAL_TEST_INTER_FONT_FILES,
             bundledShareTechMonoFontFile: VISUAL_TEST_SHARE_TECH_MONO_FONT_FILE,
             bundledDotGothic16FontFile: VISUAL_TEST_DOT_GOTHIC_16_FONT_FILE,
             bundledJapaneseSerifFontFile: VISUAL_TEST_BIZ_UDP_MINCHO_FONT_FILE,
@@ -551,6 +570,48 @@ function buildSolidColorConfig(color: string): ColorConfig {
         thresholds: [],
         isGradientEnabled: true,
     };
+}
+
+/**
+ * Rejects a body-path case whose key size production would never hand that
+ * primitive.
+ *
+ * The body path passes `keySize` straight to the body renderer, which is only
+ * faithful when production gives the body the whole strip. That is the "wide"
+ * layout. Circles route to a square body inside the wide frame instead, so a
+ * table that pairs every view with every size produces a picture that cannot
+ * occur: a circle stretched across the full 200x100. Asking the production
+ * resolver keeps this honest without restating its routing rules here.
+ */
+function assertReachableBodyRenderSize(options: {
+    readonly snapshotName: string;
+    readonly keySize: KeySize;
+    readonly renderPrimitive: MetricRenderAppearance["renderPrimitive"];
+    readonly dualRenderPrimitive?: DualMetricRenderOptions["dualRenderPrimitive"];
+}): void {
+    const isTouchStripSize = options.keySize.width === TOUCH_STRIP_LOGICAL_SIZE.width
+        && options.keySize.height === TOUCH_STRIP_LOGICAL_SIZE.height;
+
+    if (!isTouchStripSize) {
+        return;
+    }
+
+    const { kind } = resolveTouchStripMetricLayout({
+        metricRenderKind: options.dualRenderPrimitive === undefined ? "singleMetric" : "dualMetric",
+        renderPrimitive: options.renderPrimitive,
+        dualRenderPrimitive: options.dualRenderPrimitive,
+    });
+
+    if (kind === "wide") {
+        return;
+    }
+
+    throw new Error(
+        `Visual case "${options.snapshotName}" renders ${options.renderPrimitive} into the whole`
+        + ` ${options.keySize.width}x${options.keySize.height} touch strip, but production gives it the`
+        + ` "${kind}" layout, whose body is smaller than the strip. Set renderTarget: "touch-strip" so`
+        + " the case goes through the frame path, or drop it.",
+    );
 }
 
 function toDualRenderPrimitive(selectedView: DualVisualMetricView) {

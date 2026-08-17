@@ -1,3 +1,4 @@
+import { RenderFontWeight } from "./render-font-weight";
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
@@ -45,7 +46,7 @@ test("constrained SVG text sanitizes ids, escapes text attributes, and preserves
         fontSize: 18,
         fill: `#fff" onclick="bad`,
         fontFamily: `"Inter" & Test`,
-        fontWeight: "bold",
+        fontWeight: RenderFontWeight.Bold,
         textAnchor: "middle",
         extraAttributes: ["font-variant-numeric=\"tabular-nums\""],
     });
@@ -69,10 +70,15 @@ test("constrained SVG text shrinks near-boundary labels instead of clipping them
         fontSize: 18,
         fill: "#fff",
         fontFamily: "Inter",
-        fontWeight: 850,
+        fontWeight: RenderFontWeight.Bold,
     });
 
-    assert.match(svgFragment, /font-size="17\.[0-9]+"/);
+    // The exact shrunk size follows the weight-aware width estimate; assert the
+    // contract (it shrank and was bound to the box) instead of a tuned decimal.
+    const renderedFontSize = Number(/font-size="([0-9.]+)"/.exec(svgFragment)?.[1]);
+
+    assert.ok(renderedFontSize < 18, `expected shrink below 18, got ${renderedFontSize}`);
+    assert.ok(renderedFontSize > 14, `expected a readable size, got ${renderedFontSize}`);
     assert.match(svgFragment, /textLength="87" lengthAdjust="spacingAndGlyphs"/);
 });
 
@@ -86,7 +92,7 @@ test("constrained SVG text leaves clearly short labels at their original size", 
         fontSize: 18,
         fill: "#fff",
         fontFamily: "Inter",
-        fontWeight: 850,
+        fontWeight: RenderFontWeight.Bold,
     });
 
     assert.match(svgFragment, /font-size="18"/);
@@ -276,7 +282,7 @@ test("constrained SVG text emits shared outline attributes when enabled", () => 
         fontSize: 20,
         fill: "#fff",
         fontFamily: "Inter",
-        fontWeight: 850,
+        fontWeight: RenderFontWeight.Bold,
         outline: { color: "#000000", strength: 0.5 },
     });
 
@@ -317,12 +323,12 @@ test("SVG shape outline attribute helper emits stroke backing attributes", () =>
 
 test("SVG text fitting applies width scale before the guard ratio", () => {
     const roomyFit = resolveSvgTextFit({
-        runs: [{ text: "Net Speed", fontSize: 18, fontWeight: 850 }],
+        runs: [{ text: "Net Speed", fontSize: 18, fontWeight: RenderFontWeight.Bold }],
         maxWidth: 87,
         fitOptions: { widthScale: 0.5 },
     });
     const strictFit = resolveSvgTextFit({
-        runs: [{ text: "Net Speed", fontSize: 18, fontWeight: 850 }],
+        runs: [{ text: "Net Speed", fontSize: 18, fontWeight: RenderFontWeight.Bold }],
         maxWidth: 87,
         fitOptions: { widthScale: 2 },
     });
@@ -334,12 +340,12 @@ test("SVG text fitting applies width scale before the guard ratio", () => {
 
 test("SVG text fitting includes letter spacing in estimated width", () => {
     const normalFit = resolveSvgTextFit({
-        runs: [{ text: "NET", fontSize: 18, fontWeight: 850 }],
+        runs: [{ text: "NET", fontSize: 18, fontWeight: RenderFontWeight.Bold }],
         maxWidth: 38,
         fitOptions: { widthGuardRatio: 1 },
     });
     const spacedFit = resolveSvgTextFit({
-        runs: [{ text: "NET", fontSize: 18, fontWeight: 850, letterSpacing: 2 }],
+        runs: [{ text: "NET", fontSize: 18, fontWeight: RenderFontWeight.Bold, letterSpacing: 2 }],
         maxWidth: 38,
         fitOptions: { widthGuardRatio: 1 },
     });
@@ -351,12 +357,12 @@ test("SVG text fitting includes letter spacing in estimated width", () => {
 
 test("SVG text fitting clamps minimum font scale to safe bounds", () => {
     const belowRangeFit = resolveSvgTextFit({
-        runs: [{ text: "VeryLongTelemetryLabel", fontSize: 20, fontWeight: 900 }],
+        runs: [{ text: "VeryLongTelemetryLabel", fontSize: 20, fontWeight: RenderFontWeight.Bold }],
         maxWidth: 1,
         fitOptions: { minimumFontScale: -1 },
     });
     const aboveRangeFit = resolveSvgTextFit({
-        runs: [{ text: "VeryLongTelemetryLabel", fontSize: 20, fontWeight: 900 }],
+        runs: [{ text: "VeryLongTelemetryLabel", fontSize: 20, fontWeight: RenderFontWeight.Bold }],
         maxWidth: 1,
         fitOptions: { minimumFontScale: 2 },
     });

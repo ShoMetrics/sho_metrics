@@ -3,9 +3,23 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 import { Resvg } from "@resvg/resvg-js";
+// Node strips the types on import, so the benchmark measures the same faces and
+// the same weights production can actually express.
+import {
+    RenderFontWeight,
+    STATIC_INTER_FONT_FILE_NAMES,
+} from "../../src/view-rendering/rasterize/render-font-weight.ts";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const hubDirectory = resolve(scriptDirectory, "../..");
+
+/**
+ * What TITLE_CARD_RENDER_TEXT_STYLES asks for, so the benchmark loads the face a
+ * user's machine loads. This was 900, which is not the weight that rendered: Yu
+ * Mincho has no 900 and resolved it to its 600 Demibold, and 900 is now outside
+ * RenderFontWeight entirely.
+ */
+const TITLE_CARD_BENCHMARK_FONT_WEIGHT = RenderFontWeight.SemiBold;
 const iterationCount = resolveIterationCount(process.argv[2]);
 
 const japaneseSerifFontFamily = [
@@ -232,17 +246,17 @@ function resolvePrimaryFontFileCandidates() {
     switch (process.platform) {
         case "win32":
             return [
-                join(hubDirectory, "assets", "fonts", "inter", "InterVariable.ttf"),
+                ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(hubDirectory, "assets", "fonts", "inter", fontFileName)),
                 "C:\\Windows\\Fonts\\seguisym.ttf",
             ];
         case "darwin":
             return [
                 "/System/Library/Fonts/HelveticaNeue.ttc",
-                join(hubDirectory, "assets", "fonts", "inter", "InterVariable.ttf"),
+                ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(hubDirectory, "assets", "fonts", "inter", fontFileName)),
             ];
         default:
             return [
-                join(hubDirectory, "assets", "fonts", "inter", "InterVariable.ttf"),
+                ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(hubDirectory, "assets", "fonts", "inter", fontFileName)),
             ];
     }
 }
@@ -477,7 +491,7 @@ function buildTextElement(options) {
 
     return [
         `<text id="${options.id}" x="${options.x}" y="${options.y}" text-anchor="${anchor}" `,
-        `font-family="${japaneseSerifFontFamily}" font-size="${options.fontSize}" font-weight="900" `,
+        `font-family="${japaneseSerifFontFamily}" font-size="${options.fontSize}" font-weight="${TITLE_CARD_BENCHMARK_FONT_WEIGHT}" `,
         'font-variant-numeric="tabular-nums" fill="#f8f8f8">',
         options.text,
         "</text>",
@@ -489,7 +503,7 @@ function buildScaledTextElement(options) {
 
     return [
         `<text id="${options.id}" x="${options.x}" y="${options.y}" text-anchor="start" `,
-        `font-family="${japaneseSerifFontFamily}" font-size="${options.fontSize}" font-weight="900" `,
+        `font-family="${japaneseSerifFontFamily}" font-size="${options.fontSize}" font-weight="${TITLE_CARD_BENCHMARK_FONT_WEIGHT}" `,
         `transform="translate(${origin}) scale(${options.xScale} ${options.yScale}) translate(${-options.x} ${-options.y})" `,
         'stroke="#f8f8f8" stroke-width="0.6" paint-order="stroke fill" fill="#f8f8f8">',
         options.text,

@@ -1,3 +1,4 @@
+import { RenderFontWeight } from "../rasterize/render-font-weight";
 import { Monitor } from "lucide";
 import {
     COLOR_COMPENSATION_SAMPLE_SWATCHES,
@@ -47,7 +48,7 @@ function renderPreflightPattern(): string {
         ${renderLongMatchArrowSvg()}
         <text x="72" y="122" fill="#e8e8e8" opacity="0.85"
             font-family="Inter, Segoe UI, Arial, sans-serif"
-            font-size="20" font-weight="700" letter-spacing="3"
+            font-size="20" font-weight="${RenderFontWeight.Bold}" letter-spacing="3"
             text-anchor="middle">MATCH</text>
     `;
 }
@@ -159,6 +160,6 @@ function renderLabelText(text: string, x: number, y: number, fontSize: number, o
         opacity="${opacity}"
         font-family="Inter, Segoe UI, Arial, sans-serif"
         font-size="${fontSize}"
-        font-weight="800"
+        font-weight="${RenderFontWeight.Bold}"
         text-anchor="middle">${text}</text>`;
 }

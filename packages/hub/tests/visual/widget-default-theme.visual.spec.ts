@@ -1,4 +1,3 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
 import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
@@ -15,8 +14,8 @@ import { buildDefaultAppearanceSettings } from "../../src/settings/default-appea
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
 import { getHardwareIconFragment } from "../../src/widgets/icons/hardware-icons";
 import { renderNetworkDirectionIconFragment, renderNetworkInterfaceIconFragment } from "../../src/widgets/icons/catalog/network";
+import { VISUAL_TEST_INTER_FONT_FILES } from "./widget-visual-test-support";
 
-const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
 const CPU_ICON_FRAGMENT = getHardwareIconFragment("cpu");
 const BATTERY_ICON_FRAGMENT = getHardwareIconFragment("battery-medium");
 const NETWORK_UPLOAD_ICON_FRAGMENT = renderNetworkDirectionIconFragment({
@@ -242,7 +241,7 @@ function renderSvgToPngBuffer(svg: string, keySize: KeySize): Buffer {
         },
         font: {
             loadSystemFonts: false,
-            fontFiles: [INTER_FONT_FILE],
+            fontFiles: [...VISUAL_TEST_INTER_FONT_FILES],
             defaultFontFamily: "Inter",
             sansSerifFamily: "Inter",
         },

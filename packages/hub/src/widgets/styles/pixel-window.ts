@@ -1,3 +1,4 @@
+import { RenderFontWeight } from "../../view-rendering/rasterize/render-font-weight";
 import { PIXEL_RENDER_FONT_FAMILY } from "../../view-rendering/rasterize/render-text-style";
 import { clamp, escapeSvgText } from "../../view-rendering/rasterize/svg-utils";
 import { DEFAULT_PIXEL_WINDOW_PALETTE } from "../../view-rendering/color/pixel-window-theme-tokens";
@@ -132,7 +133,7 @@ function renderTitleBarText(geometry: PixelWindowGeometry): string {
     // Frame chrome text is renderer-local and intentionally bypasses metric text layout.
     return `<text x="${xCoordinate}" y="${yCoordinate}" fill="${DEFAULT_PIXEL_WINDOW_PALETTE.titleText}"
             font-family="${escapeSvgText(PIXEL_RENDER_FONT_FAMILY)}" font-size="${fontSize}"
-            font-weight="400" dominant-baseline="middle">${escapeSvgText(PIXEL_WINDOW_TITLE_TEXT)}</text>`;
+            font-weight="${RenderFontWeight.Regular}" dominant-baseline="middle">${escapeSvgText(PIXEL_WINDOW_TITLE_TEXT)}</text>`;
 }
 
 function renderWindowControl(geometry: PixelWindowGeometry): string {

@@ -506,7 +506,7 @@ function renderTitle(options: {
     themeEffects: RenderThemeEffectTokens;
     textOutline: RenderOutlineTokens | undefined;
 }): string {
-    const titleTextStyle = options.textStyles.title;
+    const headingTextStyle = options.textStyles.heading;
     const titleXCoordinate = options.iconFragment
         ? options.layout.xCoordinate + options.iconGap
         : options.layout.xCoordinate;
@@ -524,10 +524,10 @@ function renderTitle(options: {
             yCoordinate: options.layout.yCoordinate,
             maxWidth: titleMaxWidth,
             baseFontSize: options.layout.fontSize,
-            textStyle: titleTextStyle,
+            textStyle: headingTextStyle,
             fill: options.textColor,
             outline: options.textOutline,
-            extraAttributes: buildSvgFilterAttributes(titleTextStyle.filter),
+            extraAttributes: buildSvgFilterAttributes(headingTextStyle.filter),
         })}
     `;
 }

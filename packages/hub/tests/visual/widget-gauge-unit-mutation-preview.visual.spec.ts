@@ -1,4 +1,3 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { Resvg } from "@resvg/resvg-js";
 import { renderMetricFrame } from "../../src/view-rendering/frame/metric-frame";
@@ -9,8 +8,7 @@ import {
 } from "../../src/view-rendering/widget-data";
 import { buildDefaultAppearanceSettings } from "../../src/settings/default-appearance-settings";
 import { buildMetricRenderAppearance } from "../../src/settings/render-appearance-builder";
-
-const INTER_FONT_FILE = path.resolve(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf");
+import { VISUAL_TEST_INTER_FONT_FILES } from "./widget-visual-test-support";
 
 const UNIT_CASES: readonly {
     readonly snapshotSegment: string;
@@ -63,7 +61,7 @@ function renderSingleGaugeWidgetPng(svg: string): Buffer {
         },
         font: {
             loadSystemFonts: false,
-            fontFiles: [INTER_FONT_FILE],
+            fontFiles: [...VISUAL_TEST_INTER_FONT_FILES],
             defaultFontFamily: "Inter",
             sansSerifFamily: "Inter",
         },

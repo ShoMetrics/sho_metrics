@@ -1,4 +1,5 @@
 import type { DualChannelWidgetData, KeySize, WidgetData } from "../../view-rendering/widget-data";
+import type { RenderFontWeight } from "../../view-rendering/rasterize/render-font-weight";
 import { resolveThresholdColorForProgress } from "../../view-rendering/color/color-resolver";
 import { buildSvgFilterAttributes } from "../../view-rendering/rasterize/render-svg-effects";
 import type { RenderTextStyle } from "../../view-rendering/rasterize/render-text-style";
@@ -225,9 +226,9 @@ function renderSquareTitleCardTextMetric(
             xCoordinate: layout.codeX,
             yCoordinate: layout.codeY,
             maxWidth: layout.codeWidth,
-            fontSize: layout.codeFontSize * config.textStyles.title.fontSizeScale,
-            fontFamily: config.textStyles.title.fontFamily,
-            fontWeight: config.textStyles.title.fontWeight,
+            fontSize: layout.codeFontSize * config.textStyles.heading.fontSizeScale,
+            fontFamily: config.textStyles.heading.fontFamily,
+            fontWeight: config.textStyles.heading.fontWeight,
             fill: staticTextColor,
             textAnchor: "start",
             outline: config.textOutline,
@@ -239,7 +240,7 @@ function renderSquareTitleCardTextMetric(
                     0.84,
                 ),
                 ...buildTitleCardStrokeAttributes(staticTextColor, 0.35, config.textOutline),
-                ...buildSvgFilterAttributes(config.textStyles.title.filter),
+                ...buildSvgFilterAttributes(config.textStyles.heading.filter),
             ],
         })}
         ${renderTitleCardCaptionColumn({
@@ -247,7 +248,7 @@ function renderSquareTitleCardTextMetric(
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: layout.caption,
             fill: staticTextColor,
-            textStyle: config.textStyles.title,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
@@ -318,7 +319,7 @@ function renderWideTitleCardTextMetric(
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
             fill: staticTextColor,
-            textStyle: config.textStyles.title,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
@@ -329,7 +330,7 @@ function renderWideTitleCardTextMetric(
             letterGap: TITLE_CARD_WIDE_LAYOUT.codeLetterGap,
             fontSizes: TITLE_CARD_WIDE_LAYOUT.codeFontSizes,
             fill: staticTextColor,
-            textStyle: config.textStyles.smallLabel,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderConstrainedSvgText({
@@ -396,20 +397,20 @@ function renderSquareTitleCardDualTextMetric(
             xCoordinate: layout.dualCodeX,
             yCoordinate: layout.dualCodeY,
             maxWidth: layout.dualCodeWidth,
-            fontSize: layout.dualCodeFontSize * config.textStyles.title.fontSizeScale,
-            fontFamily: config.textStyles.title.fontFamily,
-            fontWeight: config.textStyles.title.fontWeight,
+            fontSize: layout.dualCodeFontSize * config.textStyles.heading.fontSizeScale,
+            fontFamily: config.textStyles.heading.fontFamily,
+            fontWeight: config.textStyles.heading.fontWeight,
             fill: staticTextColor,
             textAnchor: "start",
             outline: config.textOutline,
-            extraAttributes: buildSvgFilterAttributes(config.textStyles.title.filter),
+            extraAttributes: buildSvgFilterAttributes(config.textStyles.heading.filter),
         })}
         ${renderTitleCardCaptionColumn({
             idPrefix: "title-card-dual-caption",
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: layout.caption,
             fill: staticTextColor,
-            textStyle: config.textStyles.title,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
@@ -467,7 +468,7 @@ function renderWideTitleCardDualTextMetric(
             characters: titleCardCaptionCharacters(content.threeCharacterCaptionText),
             layout: TITLE_CARD_WIDE_CAPTION_COLUMN_LAYOUT,
             fill: staticTextColor,
-            textStyle: config.textStyles.title,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderTitleCardCodeLetters({
@@ -478,7 +479,7 @@ function renderWideTitleCardDualTextMetric(
             letterGap: TITLE_CARD_DUAL_WIDE_LAYOUT.codeLetterGap,
             fontSizes: TITLE_CARD_DUAL_WIDE_LAYOUT.codeFontSizes,
             fill: staticTextColor,
-            textStyle: config.textStyles.smallLabel,
+            textStyle: config.textStyles.heading,
             outline: config.textOutline,
         })}
         ${renderTitleCardDualRow({
@@ -702,7 +703,7 @@ function resolveSquareTitleCardUnitYCoordinate(
 function resolveBottomBiasedTextYCoordinate(options: {
     readonly text: string;
     readonly fontSize: number;
-    readonly fontWeight: number | string;
+    readonly fontWeight: RenderFontWeight;
     readonly maxWidth: number;
     readonly bottomYCoordinate: number;
     readonly bottomGuard: number;
@@ -840,7 +841,7 @@ function renderTitleCardDualRow(options: {
             maxWidth: 24,
             fontSize: 13,
             fill: options.config.labelTextColor,
-            textStyle: options.config.textStyles.smallLabel,
+            textStyle: options.config.textStyles.label,
             outline: options.config.textOutline,
         })}
         ${renderConstrainedSvgText({

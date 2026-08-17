@@ -1,4 +1,5 @@
 import { adjustHexColorBrightness } from "../../shared/color-utils";
+import { RenderFontWeight } from "./render-font-weight";
 import {
     DEFAULT_RENDER_TEXT_CLIP_HEIGHT_EM,
     DEFAULT_RENDER_TEXT_LETTER_SPACING_EM,
@@ -35,7 +36,7 @@ export interface ConstrainedSvgTextOptions {
     fontSize: number;
     fill: string;
     fontFamily: string;
-    fontWeight: number | string;
+    fontWeight: RenderFontWeight;
     textAnchor?: SvgTextAnchor;
     dominantBaseline?: "middle" | "auto";
     /** Legacy title-card escape hatch. New callers should prefer clipHeightEm. */
@@ -78,7 +79,7 @@ export interface SvgTextFitOptions {
 export interface SvgTextFitRun {
     text: string;
     fontSize: number;
-    fontWeight?: number | string;
+    fontWeight?: RenderFontWeight;
     letterSpacing?: number;
 }
 
@@ -181,7 +182,7 @@ export function renderConstrainedSvgText(options: ConstrainedSvgTextOptions): st
             <text x="${formatSvgNumber(options.xCoordinate)}" y="${formatSvgNumber(options.yCoordinate)}"
                 text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
                 font-family="${escapeSvgText(options.fontFamily)}"
-                font-size="${formatSvgNumber(fontSize)}" font-weight="${escapeSvgText(String(options.fontWeight))}"
+                font-size="${formatSvgNumber(fontSize)}" font-weight="${options.fontWeight}"
                 fill="${escapeSvgText(options.fill)}"${letterSpacingAttribute}${textFitAttributes}${outlineAttributes}${extraAttributes}>${escapeSvgText(options.text)}</text>
         </g>
     `;
@@ -380,14 +381,36 @@ function resolveTextClipXCoordinate(xCoordinate: number, maxWidth: number, textA
 
 /** Estimates one SVG text run using the same model as resolveSvgTextFit. */
 export function estimateSvgTextRunWidth(textRun: SvgTextFitRun): number {
-    const fontWeight = typeof textRun.fontWeight === "number" ? textRun.fontWeight : 400;
-    const weightRatio = fontWeight >= 850 ? 1.03 : fontWeight >= 700 ? 1.015 : 1;
+    const weightRatio = resolveTextRunWeightRatio(textRun.fontWeight ?? RenderFontWeight.Regular);
     const characterCount = Array.from(textRun.text).length;
     const letterSpacingWidth = Math.max(0, characterCount - 1) * (textRun.letterSpacing ?? 0);
 
     return Array.from(textRun.text).reduce((widthTotal, character) => {
         return widthTotal + estimateSvgCharacterWidthRatio(character) * textRun.fontSize * weightRatio;
     }, letterSpacingWidth);
+}
+
+/**
+ * Widens the width estimate for the heavier static Inter faces.
+ *
+ * Measured against Inter 4.1 by rendering representative key strings at 160 px
+ * and comparing ink extents with Regular. Growth depends on the string (short
+ * all-caps such as "RAM" grows most, mixed-case such as "CPU Load" least), so
+ * these are the measured means; per-run overshoot is absorbed by the width
+ * guard. Do not lower them without re-measuring: an underestimate clips glyphs
+ * because the clip box is sized from this estimate.
+ */
+function resolveTextRunWeightRatio(fontWeight: RenderFontWeight): number {
+    switch (fontWeight) {
+        case RenderFontWeight.Regular:
+            return 1;
+        case RenderFontWeight.Medium:
+            return 1.015;
+        case RenderFontWeight.SemiBold:
+            return 1.03;
+        case RenderFontWeight.Bold:
+            return 1.045;
+    }
 }
 
 function estimateSvgCharacterWidthRatio(character: string): number {

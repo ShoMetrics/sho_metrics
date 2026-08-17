@@ -3,6 +3,12 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 import { Resvg } from "@resvg/resvg-js";
+// Node strips the types on import, so the benchmark measures the same faces and
+// the same weights production can actually express.
+import {
+    RenderFontWeight,
+    STATIC_INTER_FONT_FILE_NAMES,
+} from "../../src/view-rendering/rasterize/render-font-weight.ts";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const hubDirectory = resolve(scriptDirectory, "../..");
@@ -177,12 +183,17 @@ function buildTinyRectSvg() {
     ].join("");
 }
 
+// Weights below follow DEFAULT_RENDER_TEXT_STYLES so a benchmark sample stays a
+// configuration production can produce: the reading itself is `value` (Medium),
+// the name of the thing is `heading` (SemiBold), and a small secondary line is
+// `footnote` (Bold). The heavier-small-text inversion that produces is real, not
+// a mistake here. These used to be 750-900, which no bundled face can express.
 function buildTextSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 67, fontSize: 31, fontWeight: 850, fill: "#f9fafb", text: "42%" }),
-        buildTextElement({ x: 72, y: 92, fontSize: 13, fontWeight: 750, fill: "#9ca3af", text: "CPU" }),
+        buildTextElement({ x: 72, y: 67, fontSize: 31, fontWeight: RenderFontWeight.Medium, fill: "#f9fafb", text: "42%" }),
+        buildTextElement({ x: 72, y: 92, fontSize: 13, fontWeight: RenderFontWeight.SemiBold, fill: "#9ca3af", text: "CPU" }),
         "</svg>",
     ].join("");
 }
@@ -191,10 +202,10 @@ function buildSmallScreenMixedSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 34, fontSize: 14, fontWeight: 800, fill: "#d1d5db", text: "CPU &#28201;&#24230;" }),
-        buildTextElement({ x: 72, y: 73, fontSize: 34, fontWeight: 850, fill: "#38bdf8", text: "42&#176;C" }),
-        buildTextElement({ x: 72, y: 101, fontSize: 15, fontWeight: 800, fill: "#f9fafb", text: "1.25 MB/s" }),
-        buildTextElement({ x: 72, y: 123, fontSize: 12, fontWeight: 750, fill: "#9ca3af", text: "&#8593; 8.4 MB/s  &#956;  &#937;" }),
+        buildTextElement({ x: 72, y: 34, fontSize: 14, fontWeight: RenderFontWeight.SemiBold, fill: "#d1d5db", text: "CPU &#28201;&#24230;" }),
+        buildTextElement({ x: 72, y: 73, fontSize: 34, fontWeight: RenderFontWeight.Medium, fill: "#38bdf8", text: "42&#176;C" }),
+        buildTextElement({ x: 72, y: 101, fontSize: 15, fontWeight: RenderFontWeight.Medium, fill: "#f9fafb", text: "1.25 MB/s" }),
+        buildTextElement({ x: 72, y: 123, fontSize: 12, fontWeight: RenderFontWeight.Bold, fill: "#9ca3af", text: "&#8593; 8.4 MB/s  &#956;  &#937;" }),
         "</svg>",
     ].join("");
 }
@@ -225,7 +236,7 @@ function buildSparklineLikeSvg() {
         'stroke-linecap="round" stroke-linejoin="round" filter="url(#line-glow)" opacity="0.55"/>',
         `<polyline points="${points}" fill="none" stroke="url(#line-gradient)" stroke-width="2.5" `,
         'stroke-linecap="round" stroke-linejoin="round"/>',
-        buildTextElement({ x: 72, y: 126, fontSize: 17, fontWeight: 850, fill: "#f9fafb", text: "42.0 MB/s" }),
+        buildTextElement({ x: 72, y: 126, fontSize: 17, fontWeight: RenderFontWeight.Medium, fill: "#f9fafb", text: "42.0 MB/s" }),
         "</svg>",
     ].join("");
 }
@@ -234,9 +245,9 @@ function buildI18nMixedSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 49, fontSize: 16, fontWeight: 850, fill: "#f9fafb", text: "CPU &#28201;&#24230;" }),
-        buildTextElement({ x: 72, y: 81, fontSize: 30, fontWeight: 850, fill: "#38bdf8", text: "42&#176;C" }),
-        buildTextElement({ x: 72, y: 106, fontSize: 13, fontWeight: 750, fill: "#9ca3af", text: "&#8595; 1.2 MB/s  &#8593; 8.4 MB/s" }),
+        buildTextElement({ x: 72, y: 49, fontSize: 16, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "CPU &#28201;&#24230;" }),
+        buildTextElement({ x: 72, y: 81, fontSize: 30, fontWeight: RenderFontWeight.Medium, fill: "#38bdf8", text: "42&#176;C" }),
+        buildTextElement({ x: 72, y: 106, fontSize: 13, fontWeight: RenderFontWeight.Bold, fill: "#9ca3af", text: "&#8595; 1.2 MB/s  &#8593; 8.4 MB/s" }),
         "</svg>",
     ].join("");
 }
@@ -245,8 +256,8 @@ function buildI18nZhSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: 850, fill: "#f9fafb", text: "&#32593;&#32476;&#19979;&#36733;" }),
-        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: 850, fill: "#38bdf8", text: "42%" }),
+        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#32593;&#32476;&#19979;&#36733;" }),
+        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: RenderFontWeight.Medium, fill: "#38bdf8", text: "42%" }),
         "</svg>",
     ].join("");
 }
@@ -255,8 +266,8 @@ function buildI18nJaSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: 850, fill: "#f9fafb", text: "&#28201;&#24230;&#12514;&#12491;&#12479;" }),
-        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: 850, fill: "#38bdf8", text: "42&#176;C" }),
+        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#28201;&#24230;&#12514;&#12491;&#12479;" }),
+        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: RenderFontWeight.Medium, fill: "#38bdf8", text: "42&#176;C" }),
         "</svg>",
     ].join("");
 }
@@ -265,8 +276,8 @@ function buildI18nKoSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: 850, fill: "#f9fafb", text: "&#48176;&#53552;&#47532; &#49324;&#50857;" }),
-        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: 850, fill: "#38bdf8", text: "42%" }),
+        buildTextElement({ x: 72, y: 58, fontSize: 18, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#48176;&#53552;&#47532; &#49324;&#50857;" }),
+        buildTextElement({ x: 72, y: 92, fontSize: 26, fontWeight: RenderFontWeight.Medium, fill: "#38bdf8", text: "42%" }),
         "</svg>",
     ].join("");
 }
@@ -275,10 +286,10 @@ function buildI18nCjkSvg() {
     return [
         '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">',
         '<rect width="144" height="144" rx="12" fill="#111827"/>',
-        buildTextElement({ x: 72, y: 42, fontSize: 15, fontWeight: 850, fill: "#f9fafb", text: "&#20013;&#25991;" }),
-        buildTextElement({ x: 72, y: 68, fontSize: 15, fontWeight: 850, fill: "#f9fafb", text: "&#26085;&#26412;&#35486;&#12514;&#12491;&#12479;" }),
-        buildTextElement({ x: 72, y: 94, fontSize: 15, fontWeight: 850, fill: "#f9fafb", text: "&#54620;&#44397;&#50612;" }),
-        buildTextElement({ x: 72, y: 120, fontSize: 13, fontWeight: 750, fill: "#9ca3af", text: "&#176;C &#956; &#937; &#8592; &#8594;" }),
+        buildTextElement({ x: 72, y: 42, fontSize: 15, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#20013;&#25991;" }),
+        buildTextElement({ x: 72, y: 68, fontSize: 15, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#26085;&#26412;&#35486;&#12514;&#12491;&#12479;" }),
+        buildTextElement({ x: 72, y: 94, fontSize: 15, fontWeight: RenderFontWeight.SemiBold, fill: "#f9fafb", text: "&#54620;&#44397;&#50612;" }),
+        buildTextElement({ x: 72, y: 120, fontSize: 13, fontWeight: RenderFontWeight.Bold, fill: "#9ca3af", text: "&#176;C &#956; &#937; &#8592; &#8594;" }),
         "</svg>",
     ].join("");
 }
@@ -387,9 +398,9 @@ function resolveSystemPrimaryFontFileCandidates() {
 
 function resolveBundledPrimaryFontFileCandidates() {
     return [
-        join(hubDirectory, "assets", "fonts", "inter", "InterVariable.ttf"),
-        join(process.cwd(), "assets", "fonts", "inter", "InterVariable.ttf"),
-        join(process.cwd(), "packages", "hub", "assets", "fonts", "inter", "InterVariable.ttf"),
+        ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(hubDirectory, "assets", "fonts", "inter", fontFileName)),
+        ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(process.cwd(), "assets", "fonts", "inter", fontFileName)),
+        ...STATIC_INTER_FONT_FILE_NAMES.map(fontFileName => join(process.cwd(), "packages", "hub", "assets", "fonts", "inter", fontFileName)),
         ...resolvePlatformSymbolFontFileCandidates(),
     ];
 }
