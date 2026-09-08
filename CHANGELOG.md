@@ -4,6 +4,17 @@ All notable changes to ShoMetrics will be documented in this file.
 
 ## Unreleased
 
+## v0.3.0
+
+### Stream Deck plugin
+
+- Added used and free capacity display modes for RAM, VRAM, and disk usage widgets.
+- Improved text rendering with bundled static Inter font weights.
+
+### Windows Helper
+
+- Windows Helper remains at v0.2.0. The attached installers are the original v0.2.0 files, unchanged and not rebuilt. Existing v0.2.0 installations do not need an update.
+
 ## v0.2.0
 
 ### Stream Deck plugin
