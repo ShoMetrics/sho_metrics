@@ -4,6 +4,17 @@ All notable changes to ShoMetrics will be documented in this file.
 
 ## Unreleased
 
+## v0.4.0
+
+### Stream Deck plugin
+
+- Fixed incorrect unit selection in Bit/s mode that caused network speeds to display as `999 Kb/s` or `999 Mb/s` ([#7](https://github.com/ShoMetrics/sho_metrics/issues/7)).
+- Fixed low network traffic in Bit/s mode incorrectly displaying zero below 8 Kbps.
+
+### Windows Helper
+
+- Windows Helper remains at v0.2.0 with no changes. Existing v0.2.0 installations do not need an update.
+
 ## v0.3.0
 
 ### Stream Deck plugin

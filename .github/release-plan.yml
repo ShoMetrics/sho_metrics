@@ -33,3 +33,6 @@ releases:
   - tag: v0.3.0
     streamdeckPluginVersion: 0.3.0.0
     windowsVersion: 0.2.0
+  - tag: v0.4.0
+    streamdeckPluginVersion: 0.4.0.0
+    windowsVersion: 0.2.0
