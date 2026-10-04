@@ -19,22 +19,23 @@ export function formatBytesPerSecond(options: {
     const safeBytesPerSecond = Math.max(0, options.bytesPerSecond);
     const unitCharacter = options.unitBase === "byte" ? "B" : "b";
     const unitMultiplier = options.unitBase === "byte" ? 1 : BITS_PER_BYTE;
+    const displayUnitsPerSecond = safeBytesPerSecond * unitMultiplier;
 
-    if (safeBytesPerSecond < options.base) {
+    if (displayUnitsPerSecond < options.base) {
         return { value: "0", unit: `K${unitCharacter}/s` };
     }
 
-    if (safeBytesPerSecond < options.base ** 2) {
+    if (displayUnitsPerSecond < options.base ** 2) {
         return {
-            value: formatCompactNumber((safeBytesPerSecond * unitMultiplier) / options.base, 0, options.maximumDisplayDigits),
+            value: formatCompactNumber(displayUnitsPerSecond / options.base, 0, options.maximumDisplayDigits),
             unit: `K${unitCharacter}/s`,
         };
     }
 
-    if (safeBytesPerSecond < 100 * options.base ** 2) {
+    if (displayUnitsPerSecond < 100 * options.base ** 2) {
         return {
             value: formatCompactNumber(
-                (safeBytesPerSecond * unitMultiplier) / (options.base ** 2),
+                displayUnitsPerSecond / (options.base ** 2),
                 1,
                 options.maximumDisplayDigits,
             ),
@@ -42,10 +43,10 @@ export function formatBytesPerSecond(options: {
         };
     }
 
-    if (safeBytesPerSecond < options.base ** 3) {
+    if (displayUnitsPerSecond < options.base ** 3) {
         return {
             value: formatCompactNumber(
-                (safeBytesPerSecond * unitMultiplier) / (options.base ** 2),
+                displayUnitsPerSecond / (options.base ** 2),
                 0,
                 options.maximumDisplayDigits,
             ),
@@ -55,7 +56,7 @@ export function formatBytesPerSecond(options: {
 
     return {
         value: formatCompactNumber(
-            (safeBytesPerSecond * unitMultiplier) / (options.base ** 3),
+            displayUnitsPerSecond / (options.base ** 3),
             1,
             options.maximumDisplayDigits,
         ),
